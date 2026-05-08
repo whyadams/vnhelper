@@ -1,15 +1,38 @@
-import { useState } from "react";
-import { useKanban } from "../../state/kanbanStore";
+import { useRef, useState } from "react";
+import {
+  useKanban,
+  type WorkspaceListItem,
+} from "../../state/kanbanStore";
 import { PlusIcon } from "./Icon";
 import { SettingsFilledIcon } from "./SidebarIcons";
 import { useDialog } from "../ui/Dialog";
 import { SettingsModal } from "../settings/SettingsModal";
+import { EditWorkspaceModal } from "../workspace/EditWorkspaceModal";
+import {
+  MMenu,
+  MMenuItem,
+  MMenuPage,
+  MMenuSeparator,
+} from "../ui/MMenu";
 
 export function Rail() {
-  const { state, dispatch, createWorkspace } = useKanban();
+  const {
+    state,
+    dispatch,
+    createWorkspace,
+    updateWorkspace,
+    uploadWorkspaceAvatar,
+    removeWorkspaceAvatar,
+    deleteWorkspace,
+  } = useKanban();
   const dialog = useDialog();
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editWorkspace, setEditWorkspace] = useState<WorkspaceListItem | null>(
+    null,
+  );
+  const [menuFor, setMenuFor] = useState<WorkspaceListItem | null>(null);
+  const menuAnchorRef = useRef<HTMLElement | null>(null);
 
   const onCreate = async () => {
     if (busy) return;
@@ -26,6 +49,14 @@ export function Rail() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const openMenuFor = (
+    ws: WorkspaceListItem,
+    el: HTMLElement,
+  ) => {
+    menuAnchorRef.current = el;
+    setMenuFor(ws);
   };
 
   return (
@@ -46,17 +77,32 @@ export function Rail() {
             <button
               key={ws.id}
               className={
-                "rail-app" + (state.workspaceId === ws.id ? " is-active" : "")
+                "rail-app" +
+                (state.workspaceId === ws.id ? " is-active" : "") +
+                (ws.avatar_url ? " has-avatar" : "")
               }
-              title={`${ws.name} · ${ws.role}`}
+              title={`${ws.name} · ${ws.role} · right-click for settings`}
               type="button"
               onClick={() =>
                 dispatch({ type: "SET_ACTIVE_WORKSPACE", id: ws.id })
               }
+              onContextMenu={(e) => {
+                e.preventDefault();
+                openMenuFor(ws, e.currentTarget);
+              }}
             >
-              <span className="rail-glyph">
-                {ws.name.trim().charAt(0).toUpperCase() || "W"}
-              </span>
+              {ws.avatar_url ? (
+                <img
+                  src={ws.avatar_url}
+                  alt=""
+                  className="rail-app-img"
+                  draggable={false}
+                />
+              ) : (
+                <span className="rail-glyph">
+                  {ws.name.trim().charAt(0).toUpperCase() || "W"}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -73,6 +119,68 @@ export function Rail() {
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+      />
+      <MMenu
+        open={menuFor !== null}
+        onClose={() => setMenuFor(null)}
+        anchorRef={menuAnchorRef as React.RefObject<HTMLElement>}
+        align="left"
+        minWidth={200}
+      >
+        <MMenuPage id="main">
+          <MMenuItem
+            onClick={() => {
+              if (menuFor) {
+                setEditWorkspace(menuFor);
+              }
+              setMenuFor(null);
+            }}
+          >
+            <span>Workspace settings…</span>
+          </MMenuItem>
+          {menuFor?.role === "owner" && (
+            <>
+              <MMenuSeparator />
+              <MMenuItem
+                variant="danger"
+                onClick={() => {
+                  const ws = menuFor;
+                  setMenuFor(null);
+                  if (!ws) return;
+                  void (async () => {
+                    const ok = await dialog.confirm({
+                      title: "Delete workspace",
+                      message: `Delete "${ws.name}" and everything inside it? This cannot be undone.`,
+                      variant: "danger",
+                      confirmLabel: "Delete forever",
+                    });
+                    if (ok) await deleteWorkspace(ws.id);
+                  })();
+                }}
+              >
+                Delete workspace…
+              </MMenuItem>
+            </>
+          )}
+        </MMenuPage>
+      </MMenu>
+      <EditWorkspaceModal
+        open={editWorkspace !== null}
+        workspace={editWorkspace}
+        onClose={() => setEditWorkspace(null)}
+        onSave={async ({ name }) => {
+          if (editWorkspace) await updateWorkspace(editWorkspace.id, { name });
+        }}
+        onUploadAvatar={async (file) => {
+          if (!editWorkspace) return null;
+          return uploadWorkspaceAvatar(editWorkspace.id, file);
+        }}
+        onRemoveAvatar={async () => {
+          if (editWorkspace) await removeWorkspaceAvatar(editWorkspace.id);
+        }}
+        onDelete={async () => {
+          if (editWorkspace) await deleteWorkspace(editWorkspace.id);
+        }}
       />
     </aside>
   );

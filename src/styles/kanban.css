@@ -190,6 +190,17 @@ html, body, #root {
 }
 .rail-app.is-active .rail-glyph { color: var(--text-1); }
 .rail-app.bg-add:disabled { opacity: 0.4; cursor: default; }
+.rail-app.has-avatar {
+  padding: 0;
+  overflow: hidden;
+}
+.rail-app-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+}
 .rail-settings {
   width: 44px;
   height: 44px;

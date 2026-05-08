@@ -33,6 +33,7 @@ export interface WorkspaceListItem {
   id: string;
   name: string;
   role: WorkspaceRole;
+  avatar_url: string | null;
 }
 
 export interface IncomingInvitation {
@@ -449,6 +450,16 @@ const KanbanCtx = createContext<{
   refreshWorkspaces: () => Promise<void>;
   refreshInvitations: () => Promise<void>;
   createWorkspace: (name: string) => Promise<string | null>;
+  updateWorkspace: (
+    id: string,
+    patch: { name?: string; avatar_url?: string | null },
+  ) => Promise<void>;
+  uploadWorkspaceAvatar: (
+    workspaceId: string,
+    file: File,
+  ) => Promise<string | null>;
+  removeWorkspaceAvatar: (workspaceId: string) => Promise<void>;
+  deleteWorkspace: (id: string) => Promise<void>;
   renameBoard: (name: string) => Promise<void>;
   addColumn: (title: string) => Promise<void>;
   renameColumn: (columnId: string, title: string) => Promise<void>;
@@ -476,7 +487,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         await Promise.all([
           supabase
             .from("workspaces")
-            .select("id, name")
+            .select("id, name, avatar_url")
             .order("created_at", { ascending: true }),
           supabase
             .from("workspace_members")
@@ -494,6 +505,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         id: w.id,
         name: w.name,
         role: roleByWs.get(w.id) ?? "viewer",
+        avatar_url: w.avatar_url ?? null,
       }));
 
       if (list.length === 0) {
@@ -518,7 +530,12 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         }
         const created = await creatingRef.current;
         if (created) {
-          list.push({ id: created.id, name: created.name, role: "owner" });
+          list.push({
+            id: created.id,
+            name: created.name,
+            role: "owner",
+            avatar_url: null,
+          });
         }
       }
 
@@ -1002,6 +1019,66 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
     [refreshWorkspaces],
   );
 
+  const updateWorkspace = useCallback(
+    async (id: string, patch: { name?: string; avatar_url?: string | null }) => {
+      const { error } = await supabase
+        .from("workspaces")
+        .update(patch)
+        .eq("id", id);
+      if (error) {
+        console.error("updateWorkspace failed", error);
+        return;
+      }
+      await refreshWorkspaces();
+    },
+    [refreshWorkspaces],
+  );
+
+  const uploadWorkspaceAvatar = useCallback(
+    async (workspaceId: string, file: File): Promise<string | null> => {
+      if (!user) return null;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${workspaceId}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("workspace-avatars")
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || "image/png",
+        });
+      if (upErr) {
+        console.error("uploadWorkspaceAvatar upload", upErr);
+        return null;
+      }
+      const { data } = supabase.storage
+        .from("workspace-avatars")
+        .getPublicUrl(path);
+      const url = data.publicUrl;
+      await updateWorkspace(workspaceId, { avatar_url: url });
+      return url;
+    },
+    [user, updateWorkspace],
+  );
+
+  const removeWorkspaceAvatar = useCallback(
+    async (workspaceId: string) => {
+      await updateWorkspace(workspaceId, { avatar_url: null });
+    },
+    [updateWorkspace],
+  );
+
+  const deleteWorkspace = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from("workspaces").delete().eq("id", id);
+      if (error) {
+        console.error("deleteWorkspace failed", error);
+        return;
+      }
+      await refreshWorkspaces();
+    },
+    [refreshWorkspaces],
+  );
+
   const value = useMemo(
     () => ({
       state,
@@ -1009,6 +1086,10 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
       refreshWorkspaces,
       refreshInvitations,
       createWorkspace,
+      updateWorkspace,
+      uploadWorkspaceAvatar,
+      removeWorkspaceAvatar,
+      deleteWorkspace,
       renameBoard,
       addColumn,
       renameColumn,
@@ -1020,6 +1101,10 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
       refreshWorkspaces,
       refreshInvitations,
       createWorkspace,
+      updateWorkspace,
+      uploadWorkspaceAvatar,
+      removeWorkspaceAvatar,
+      deleteWorkspace,
       renameBoard,
       addColumn,
       renameColumn,

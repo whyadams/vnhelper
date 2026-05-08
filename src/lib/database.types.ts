@@ -833,18 +833,21 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          avatar_url: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
           owner_id: string
+          avatar_url?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           owner_id?: string
+          avatar_url?: string | null
         }
         Relationships: [
           {
