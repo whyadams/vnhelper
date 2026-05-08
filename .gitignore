@@ -23,6 +23,12 @@ dist-ssr
 # Rust build output
 src-tauri/target/
 
+# Local Claude Code agent caches
+.agents/
+.claude/
+skills-lock.json
+memory/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
