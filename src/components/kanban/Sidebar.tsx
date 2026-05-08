@@ -68,6 +68,9 @@ export function Sidebar() {
 
   const wsName = state.workspaceName || "Workspace";
   const wsInitials = wsName.trim().charAt(0).toUpperCase() || "W";
+  const wsAvatar =
+    state.workspaces.find((w) => w.id === state.workspaceId)?.avatar_url ??
+    null;
 
   const isActive = (key: string) => state.activeNav === key;
 
@@ -79,7 +82,17 @@ export function Sidebar() {
     <aside className="sidebar">
       {/* Workspace card */}
       <div className="ws-card">
-        <div className="ws-card-avatar">{wsInitials}</div>
+        <div
+          className={
+            "ws-card-avatar" + (wsAvatar ? " ws-card-avatar-img" : "")
+          }
+        >
+          {wsAvatar ? (
+            <img src={wsAvatar} alt="" draggable={false} />
+          ) : (
+            wsInitials
+          )}
+        </div>
         <div className="ws-card-info">
           <div className="ws-card-name" title={wsName}>
             {wsName}
