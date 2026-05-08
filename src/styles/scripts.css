@@ -94,6 +94,56 @@
   transition: background 0.12s;
 }
 .vn-project-switch:hover { background: rgba(200, 199, 202, 0.08); }
+.vn-project-av-img {
+  background: transparent !important;
+  overflow: hidden;
+  padding: 0;
+}
+.vn-project-av-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vn-project-cover-thumb {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(200, 199, 202, 0.05);
+}
+.vn-project-cover-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vn-project-edit-btn {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: rgba(200, 199, 202, 0.4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.vn-project-edit-btn:hover {
+  background: rgba(200, 199, 202, 0.1);
+  color: var(--text-1);
+}
+.menu-item:hover .vn-project-edit-btn,
+.menu-item.is-active .vn-project-edit-btn {
+  opacity: 1;
+}
 .vn-project-av {
   display: grid;
   place-items: center;
@@ -1418,6 +1468,65 @@
   padding: 12px 18px 16px;
   border-top: 1px solid var(--border);
 }
+.vn-cover-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 4px;
+}
+.vn-cover-preview {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  background: var(--bg-canvas);
+  border: 1px solid rgba(200, 199, 202, 0.08);
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: border-color 0.12s;
+}
+.vn-cover-preview:hover {
+  border-color: rgba(200, 199, 202, 0.2);
+}
+.vn-cover-preview:disabled { cursor: progress; }
+.vn-cover-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vn-cover-emoji-fallback {
+  font-size: 32px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.vn-cover-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--text-1);
+  font-size: 18px;
+  font-weight: 600;
+}
+.vn-cover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.vn-cover-actions .hbtn { height: 28px; padding: 0 12px; font-size: 12px; }
+.vn-cover-hint {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  color: rgba(200, 199, 202, 0.4);
+}
+
 .vn-emoji-row {
   display: flex;
   flex-wrap: wrap;

@@ -12,6 +12,7 @@ export interface ScriptProject {
   title: string;
   synopsis: string;
   cover_emoji: string | null;
+  cover_image_url: string | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -141,7 +142,7 @@ export function useScripts(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("script_projects")
       .select(
-        "id, workspace_id, title, synopsis, cover_emoji, position, created_at, updated_at",
+        "id, workspace_id, title, synopsis, cover_emoji, cover_image_url, position, created_at, updated_at",
       )
       .eq("workspace_id", workspaceId)
       .order("position", { ascending: true });
@@ -391,7 +392,14 @@ export function useScripts(workspaceId: string | null) {
     async (
       id: string,
       patch: Partial<
-        Pick<ScriptProject, "title" | "synopsis" | "cover_emoji" | "position">
+        Pick<
+          ScriptProject,
+          | "title"
+          | "synopsis"
+          | "cover_emoji"
+          | "cover_image_url"
+          | "position"
+        >
       >,
     ) => {
       if (!user) return;
@@ -405,6 +413,39 @@ export function useScripts(workspaceId: string | null) {
       if (error) console.error("updateProject", error);
     },
     [user],
+  );
+
+  const uploadProjectCover = useCallback(
+    async (projectId: string, file: File): Promise<string | null> => {
+      if (!user || !workspaceId) return null;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${workspaceId}/${projectId}/cover-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("script-covers")
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || "image/png",
+        });
+      if (upErr) {
+        console.error("uploadProjectCover upload", upErr);
+        return null;
+      }
+      const { data } = supabase.storage
+        .from("script-covers")
+        .getPublicUrl(path);
+      const url = data.publicUrl;
+      await updateProject(projectId, { cover_image_url: url });
+      return url;
+    },
+    [user, workspaceId, updateProject],
+  );
+
+  const removeProjectCover = useCallback(
+    async (projectId: string) => {
+      await updateProject(projectId, { cover_image_url: null });
+    },
+    [updateProject],
   );
 
   const deleteProject = useCallback(
@@ -725,6 +766,8 @@ export function useScripts(workspaceId: string | null) {
     createProject,
     updateProject,
     deleteProject,
+    uploadProjectCover,
+    removeProjectCover,
 
     // nodes
     nodes,

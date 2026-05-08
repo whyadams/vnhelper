@@ -373,6 +373,7 @@ export type Database = {
           title: string
           synopsis: string
           cover_emoji: string | null
+          cover_image_url: string | null
           position: number
           created_by: string | null
           updated_by: string | null
@@ -385,6 +386,7 @@ export type Database = {
           title?: string
           synopsis?: string
           cover_emoji?: string | null
+          cover_image_url?: string | null
           position?: number
           created_by?: string | null
           updated_by?: string | null
@@ -397,6 +399,7 @@ export type Database = {
           title?: string
           synopsis?: string
           cover_emoji?: string | null
+          cover_image_url?: string | null
           position?: number
           created_by?: string | null
           updated_by?: string | null

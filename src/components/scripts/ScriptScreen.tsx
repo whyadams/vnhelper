@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useKanban } from "../../state/kanbanStore";
+import type { ScriptProject } from "../../state/scripts";
 import { useScripts } from "../../state/scripts";
 import { CreateProjectModal } from "./CreateProjectModal";
+import { EditProjectModal } from "./EditProjectModal";
 import { QuickAddCharacterModal } from "./QuickAddCharacterModal";
 import { ScriptCharactersPage } from "./ScriptCharactersPage";
 import { ScriptDoc } from "./ScriptDoc";
@@ -14,6 +16,7 @@ export function ScriptScreen() {
   const scripts = useScripts(state.workspaceId);
   const [createOpen, setCreateOpen] = useState(false);
   const [quickCharOpen, setQuickCharOpen] = useState(false);
+  const [editProject, setEditProject] = useState<ScriptProject | null>(null);
   const [view, setView] = useState<View>("scene");
 
   return (
@@ -21,6 +24,7 @@ export function ScriptScreen() {
       <ScriptPane
         scripts={scripts}
         onCreateProject={() => setCreateOpen(true)}
+        onEditProject={(p) => setEditProject(p)}
         onShowCharacters={() => setView("characters")}
         charactersActive={view === "characters"}
       />
@@ -41,6 +45,24 @@ export function ScriptScreen() {
         onClose={() => setCreateOpen(false)}
         onCreate={(title, emoji) => {
           void scripts.createProject(title, emoji);
+        }}
+      />
+      <EditProjectModal
+        open={editProject !== null}
+        project={editProject}
+        onClose={() => setEditProject(null)}
+        onSave={(patch) => {
+          if (editProject) void scripts.updateProject(editProject.id, patch);
+        }}
+        onUploadCover={async (file) => {
+          if (!editProject) return null;
+          return scripts.uploadProjectCover(editProject.id, file);
+        }}
+        onRemoveCover={async () => {
+          if (editProject) await scripts.removeProjectCover(editProject.id);
+        }}
+        onDelete={async () => {
+          if (editProject) await scripts.deleteProject(editProject.id);
         }}
       />
       <QuickAddCharacterModal
