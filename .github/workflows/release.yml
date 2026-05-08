@@ -8,16 +8,9 @@ on:
 
 jobs:
   build:
+    runs-on: windows-latest
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: windows-latest
-            args: ""
-
-    runs-on: ${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
@@ -35,11 +28,9 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Cache cargo
-        uses: swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
 
@@ -58,4 +49,3 @@ jobs:
           releaseBody: "See the assets to download and install this version. The app updates automatically."
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
