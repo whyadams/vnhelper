@@ -1,0 +1,280 @@
+.members-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 90;
+}
+
+.members-panel {
+  width: min(460px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.members-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.members-close {
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.members-close:hover { color: var(--text-1); }
+
+.members-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.member-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-1);
+  font-size: 11px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+}
+.member-info { display: flex; flex-direction: column; min-width: 0; }
+.member-name { font-size: 13px; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-email { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-role,
+.member-role-badge {
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.member-role { font-family: inherit; cursor: pointer; }
+.member-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.member-remove:hover { color: #f08a8a; }
+
+.invite-accept {
+  background: rgba(138, 214, 163, 0.12);
+  border: 1px solid rgba(138, 214, 163, 0.3);
+  color: #8ad6a3;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.invite-accept:hover { background: rgba(138, 214, 163, 0.2); }
+
+.member-row.pending { opacity: 0.85; }
+.members-subhead {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-top: 6px;
+}
+.invites-empty {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 12px 4px;
+  text-align: center;
+}
+
+/* Sidebar invitations trigger with badge */
+.invitations-trigger {
+  margin: 4px 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  width: calc(100% - 24px);
+}
+.invitations-trigger:hover {
+  background: var(--bg-card);
+  color: var(--text-1);
+}
+.invitations-trigger.has-pending {
+  border-color: rgba(138, 214, 163, 0.5);
+  color: var(--text-1);
+}
+.invitations-trigger .badge {
+  background: rgba(138, 214, 163, 0.18);
+  color: #8ad6a3;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.invite-form {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  margin-top: 6px;
+}
+.invite-form input,
+.invite-form select {
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  color: var(--text-1);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+.invite-form button {
+  background: var(--text-1);
+  color: #0d0e11;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+}
+.invite-form button:disabled { opacity: 0.5; cursor: default; }
+
+/* User chip in sidebar */
+.user-chip {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.user-chip .avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-1);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.user-chip .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-chip button {
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+}
+.user-chip button:hover { color: var(--text-1); }
+
+.members-trigger {
+  margin: 4px 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  width: calc(100% - 24px);
+}
+.members-trigger:hover {
+  background: var(--bg-card);
+  color: var(--text-1);
+}
+
+/* Notifications list */
+.notifications-list { gap: 4px; }
+.notif-row {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.notif-row:hover { background: var(--bg-elevated); }
+.notif-row.is-unread {
+  border-color: rgba(106, 163, 255, 0.3);
+}
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+  margin-top: 5px;
+}
+.notif-row.is-unread .notif-dot { background: #6aa3ff; }
+.notif-body { min-width: 0; }
+.notif-text {
+  font-size: 12.5px;
+  color: var(--text-1);
+  line-height: 1.4;
+}
+.notif-meta {
+  font-size: 10.5px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
