@@ -708,6 +708,12 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
           columnIdByKey[col.key as ColumnKey] = col.id;
         }
 
+        // If the user has already switched to another workspace while this
+        // request was in flight, drop the stale result — otherwise the late
+        // SET_BOARD overwrites workspaceId back to the previous selection
+        // and looks like the rail "auto-switches" by itself.
+        if (stateRef.current.workspaceId !== workspaceId) return;
+
         baseDispatch({
           type: "SET_BOARD",
           workspaceId,
