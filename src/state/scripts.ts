@@ -514,6 +514,31 @@ export function useScripts(workspaceId: string | null) {
 
   const deleteNode = useCallback(
     async (id: string) => {
+      // Optimistic local removal: walk local tree to collect the node + every
+      // descendant, then drop them all in one setNodes pass. The DB cascade
+      // removes the same set server-side; the realtime DELETE events arrive
+      // moments later but the UI is already correct.
+      setNodes((list) => {
+        const childrenByParent = new Map<string, string[]>();
+        for (const n of list) {
+          if (n.parent_id) {
+            const arr = childrenByParent.get(n.parent_id) ?? [];
+            arr.push(n.id);
+            childrenByParent.set(n.parent_id, arr);
+          }
+        }
+        const toRemove = new Set<string>();
+        const stack = [id];
+        while (stack.length) {
+          const cur = stack.pop()!;
+          if (toRemove.has(cur)) continue;
+          toRemove.add(cur);
+          for (const child of childrenByParent.get(cur) ?? []) {
+            stack.push(child);
+          }
+        }
+        return list.filter((n) => !toRemove.has(n.id));
+      });
       if (activeNodeIdRef.current === id) {
         setActiveNodeId(null);
         setActiveNode(null);
