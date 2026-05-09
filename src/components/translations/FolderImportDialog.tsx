@@ -3,6 +3,7 @@ import {
   detectRenpyLanguage,
   parseRenpyTranslations,
 } from "../../lib/renpy";
+import type { ParseWarning } from "../../lib/renpy";
 import type { FolderImportItem } from "./TranslationsSidebar";
 
 interface PreviewItem {
@@ -10,7 +11,7 @@ interface PreviewItem {
   folderPath: string;
   content: string;
   count: number;
-  warnings: number;
+  warnings: ParseWarning[];
   detectedLang: string;
   selected: boolean;
   status: "pending" | "importing" | "done" | "error";
@@ -43,6 +44,11 @@ export function FolderImportDialog({
   const [busy, setBusy] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Index of the item whose warnings panel is currently expanded (single
+  // panel at a time keeps the dialog scannable).
+  const [expandedWarnings, setExpandedWarnings] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +56,7 @@ export function FolderImportDialog({
     setErr(null);
     setOverrideLang("");
     setItems([]);
+    setExpandedWarnings(null);
     if (!incoming || incoming.length === 0) return;
 
     let cancelled = false;
@@ -66,7 +73,7 @@ export function FolderImportDialog({
             folderPath: it.folderPath,
             content,
             count: parsed.strings.length,
-            warnings: parsed.warnings.length,
+            warnings: parsed.warnings,
             detectedLang: lang,
             selected: parsed.strings.length > 0,
             status: "pending",
@@ -77,7 +84,7 @@ export function FolderImportDialog({
             folderPath: it.folderPath,
             content: "",
             count: 0,
-            warnings: 0,
+            warnings: [],
             detectedLang: "russian",
             selected: false,
             status: "error",
@@ -99,6 +106,10 @@ export function FolderImportDialog({
   const stats = useMemo(() => {
     const selected = items.filter((it) => it.selected);
     const totalStrings = selected.reduce((sum, it) => sum + it.count, 0);
+    const totalWarnings = selected.reduce(
+      (sum, it) => sum + it.warnings.length,
+      0,
+    );
     const langs = Array.from(
       new Set(selected.map((it) => it.detectedLang)),
     ).sort();
@@ -106,6 +117,7 @@ export function FolderImportDialog({
       filesSel: selected.length,
       totalFiles: items.length,
       totalStrings,
+      totalWarnings,
       langs,
     };
   }, [items]);
@@ -208,6 +220,14 @@ export function FolderImportDialog({
                   <strong>{stats.filesSel}</strong> of {stats.totalFiles} files
                   ·{" "}
                   <strong>{stats.totalStrings.toLocaleString()}</strong> strings
+                  {stats.totalWarnings > 0 && (
+                    <>
+                      {" · "}
+                      <span className="tr-folder-warn">
+                        {stats.totalWarnings} warnings
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="tr-folder-langs">
                   <span className="tr-folder-summary-into">into</span>
@@ -243,74 +263,126 @@ export function FolderImportDialog({
 
               <div className="tr-folder-list">
                 {items.map((it, i) => (
-                  <label
-                    key={i}
-                    className={
-                      "tr-folder-item is-" +
-                      it.status +
-                      (it.count === 0 ? " is-disabled" : "")
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      checked={it.selected}
-                      onChange={() => toggle(i)}
-                      disabled={busy || it.count === 0}
-                    />
-                    <div className="tr-folder-item-text">
-                      <div
-                        className="tr-folder-item-name"
-                        title={
-                          it.folderPath
-                            ? `${it.folderPath}/${it.filename}`
-                            : it.filename
-                        }
-                      >
-                        {it.folderPath && (
-                          <span className="tr-folder-item-path">
-                            {it.folderPath}/
-                          </span>
-                        )}
-                        {it.filename}
-                      </div>
-                      <div className="tr-folder-item-meta">
-                        {it.count === 0 ? (
-                          <span className="tr-folder-warn">no strings</span>
-                        ) : (
-                          <>
-                            <span>
-                              {it.count.toLocaleString()}{" "}
-                              {it.count === 1 ? "string" : "strings"}
+                  <div key={i} className="tr-folder-item-wrap">
+                    <label
+                      className={
+                        "tr-folder-item is-" +
+                        it.status +
+                        (it.count === 0 ? " is-disabled" : "")
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={it.selected}
+                        onChange={() => toggle(i)}
+                        disabled={busy || it.count === 0}
+                      />
+                      <div className="tr-folder-item-text">
+                        <div
+                          className="tr-folder-item-name"
+                          title={
+                            it.folderPath
+                              ? `${it.folderPath}/${it.filename}`
+                              : it.filename
+                          }
+                        >
+                          {it.folderPath && (
+                            <span className="tr-folder-item-path">
+                              {it.folderPath}/
                             </span>
-                            <span className="tr-dot" />
-                            <span className="tr-file-tag">
-                              {it.detectedLang}
-                            </span>
-                            {it.warnings > 0 && (
-                              <>
-                                <span className="tr-dot" />
-                                <span className="tr-folder-warn">
-                                  {it.warnings} warnings
-                                </span>
-                              </>
-                            )}
-                          </>
+                          )}
+                          {it.filename}
+                        </div>
+                        <div className="tr-folder-item-meta">
+                          {it.count === 0 ? (
+                            <span className="tr-folder-warn">no strings</span>
+                          ) : (
+                            <>
+                              <span>
+                                {it.count.toLocaleString()}{" "}
+                                {it.count === 1 ? "string" : "strings"}
+                              </span>
+                              <span className="tr-dot" />
+                              <span className="tr-file-tag">
+                                {it.detectedLang}
+                              </span>
+                              {it.warnings.length > 0 && (
+                                <>
+                                  <span className="tr-dot" />
+                                  <button
+                                    type="button"
+                                    className={
+                                      "tr-folder-warn-btn" +
+                                      (expandedWarnings === i
+                                        ? " is-expanded"
+                                        : "")
+                                    }
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setExpandedWarnings((cur) =>
+                                        cur === i ? null : i,
+                                      );
+                                    }}
+                                    title="Click to inspect skipped lines"
+                                  >
+                                    {it.warnings.length} warnings
+                                    <span className="tr-folder-warn-chev">
+                                      {expandedWarnings === i ? "▾" : "▸"}
+                                    </span>
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        {it.error && (
+                          <div className="tr-folder-item-error">{it.error}</div>
                         )}
                       </div>
-                      {it.error && (
-                        <div className="tr-folder-item-error">{it.error}</div>
-                      )}
-                    </div>
-                    <div className="tr-folder-item-status">
-                      {it.status === "importing" && <span>importing…</span>}
-                      {it.status === "done" && (
-                        <span className="tr-folder-ok">✓</span>
-                      )}
-                      {it.status === "error" && (
-                        <span className="tr-folder-err">!</span>
-                      )}
-                    </div>
-                  </label>
+                      <div className="tr-folder-item-status">
+                        {it.status === "importing" && <span>importing…</span>}
+                        {it.status === "done" && (
+                          <span className="tr-folder-ok">✓</span>
+                        )}
+                        {it.status === "error" && (
+                          <span className="tr-folder-err">!</span>
+                        )}
+                      </div>
+                    </label>
+
+                    {expandedWarnings === i && it.warnings.length > 0 && (
+                      <div className="tr-folder-warn-panel">
+                        <div className="tr-folder-warn-help">
+                          The parser skipped these lines (they don't match
+                          standard Ren'Py translate syntax). Strings outside
+                          these lines were imported normally.
+                        </div>
+                        <div className="tr-folder-warn-list">
+                          {it.warnings.slice(0, 50).map((w, wi) => (
+                            <div key={wi} className="tr-folder-warn-row">
+                              <span className="tr-folder-warn-line">
+                                L{w.line}
+                              </span>
+                              <span className="tr-folder-warn-msg">
+                                {w.message}
+                              </span>
+                              {w.raw && (
+                                <code className="tr-folder-warn-raw">
+                                  {w.raw}
+                                </code>
+                              )}
+                            </div>
+                          ))}
+                          {it.warnings.length > 50 && (
+                            <div className="tr-folder-warn-row tr-folder-warn-truncated">
+                              … and {it.warnings.length - 50} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </>

@@ -1582,6 +1582,101 @@
   color: var(--status-danger);
 }
 .tr-folder-warn { color: var(--status-warn); }
+
+/* Wrapper that holds the item + (optional) expanded warnings panel below it */
+.tr-folder-item-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Inline button that toggles the warnings panel */
+.tr-folder-warn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--status-warn);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(168, 152, 130, 0.4);
+  text-underline-offset: 2px;
+}
+.tr-folder-warn-btn:hover {
+  text-decoration-color: var(--status-warn);
+}
+.tr-folder-warn-chev {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+/* Expanded panel — sits below the item, full width within the list border */
+.tr-folder-warn-panel {
+  margin: 2px 6px 6px 30px;
+  padding: 10px 12px;
+  background: rgba(168, 152, 130, 0.06);
+  border-left: 2px solid rgba(168, 152, 130, 0.4);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tr-folder-warn-help {
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.tr-folder-warn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 199, 202, 0.12) transparent;
+}
+.tr-folder-warn-row {
+  display: grid;
+  grid-template-columns: 42px minmax(120px, 220px) 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11.5px;
+  color: var(--text-3);
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(200, 199, 202, 0.04);
+}
+.tr-folder-warn-row:last-child { border-bottom: 0; }
+.tr-folder-warn-line {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+.tr-folder-warn-msg {
+  color: var(--status-warn);
+}
+.tr-folder-warn-raw {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-2);
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: pre;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.tr-folder-warn-truncated {
+  grid-template-columns: 1fr;
+  color: var(--text-4);
+  font-style: italic;
+  text-align: center;
+  padding-top: 6px;
+}
 .tr-folder-item-status {
   font-size: 11px;
   color: var(--text-3);
