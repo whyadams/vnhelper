@@ -112,6 +112,7 @@ type RemoteAction =
     }
   | { type: "REMOTE_UPSERT_CARD"; card: CardData }
   | { type: "REMOTE_DELETE_CARD"; id: string }
+  | { type: "REMOVE_COLUMN"; id: string }
   | { type: "LOCAL_PATCH_CARD"; id: string; patch: Partial<CardData> }
   | { type: "SET_INVITATIONS"; list: IncomingInvitation[] };
 
@@ -355,6 +356,26 @@ function reducer(state: KanbanState, action: Action): KanbanState {
           cards: col.cards.filter((c) => c.id !== action.id),
         })),
       };
+
+    case "REMOVE_COLUMN": {
+      // Optimistic local removal of a column. Rebuilds columnIdByKey so
+      // ADD_CARD / MOVE_CARD don't reference the dropped column.
+      const removed = state.columns.find((c) => c.id === action.id);
+      if (!removed) return state;
+      const focused = removed.cards.some((c) => c.id === state.focusedId)
+        ? null
+        : state.focusedId;
+      const nextIdByKey = { ...state.columnIdByKey };
+      for (const k of Object.keys(nextIdByKey) as ColumnKey[]) {
+        if (nextIdByKey[k] === action.id) delete nextIdByKey[k];
+      }
+      return {
+        ...state,
+        focusedId: focused,
+        columns: state.columns.filter((c) => c.id !== action.id),
+        columnIdByKey: nextIdByKey,
+      };
+    }
 
     case "LOCAL_PATCH_CARD":
       return {
@@ -1011,12 +1032,20 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteColumn = useCallback(async (columnId: string) => {
+    // Optimistic: drop the column locally first so the UI feels instant.
+    // The realtime echo will re-confirm via loadBoard a moment later.
+    baseDispatch({ type: "REMOVE_COLUMN", id: columnId });
     const { error } = await supabase
       .from("columns")
       .delete()
       .eq("id", columnId);
-    if (error) console.error("deleteColumn", error);
-  }, []);
+    if (error) {
+      console.error("deleteColumn", error);
+      // Rollback by re-fetching the board so the dropped column reappears.
+      const wsId = stateRef.current.workspaceId;
+      if (wsId) void loadBoard(wsId);
+    }
+  }, [loadBoard]);
 
   const createWorkspace = useCallback(
     async (name: string): Promise<string | null> => {

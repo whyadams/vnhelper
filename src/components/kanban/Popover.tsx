@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export function Popover({
   open,
@@ -44,9 +45,15 @@ export function Popover({
     zIndex: 100,
   };
 
-  return (
+  // Render via a portal so the popover lives at document.body, escaping any
+  // ancestor that creates a containing block for fixed positioning (e.g. a
+  // .card with `transform: translateY(-1px)` on hover, which previously
+  // anchored fixed popovers to the card instead of the viewport — making
+  // the menu pop up offscreen until the user moved the mouse off the card).
+  return createPortal(
     <div ref={popRef} className="popover" style={style}>
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
