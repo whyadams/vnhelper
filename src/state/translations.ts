@@ -40,6 +40,8 @@ export interface TranslationString {
   translateId: string | null;
   /** Speaker prefix (`dg`, `dm`, …); null for narrator / strings: rows. */
   speaker: string | null;
+  /** Trailing modifier (`with dissolve`, `pause 0.5`, …); null when none. */
+  trailing: string | null;
 }
 
 interface DbStringRow {
@@ -54,6 +56,7 @@ interface DbStringRow {
   updated_at: string;
   translate_id: string | null;
   speaker: string | null;
+  trailing: string | null;
 }
 
 function rowToString(r: DbStringRow): TranslationString {
@@ -69,6 +72,7 @@ function rowToString(r: DbStringRow): TranslationString {
     updatedAt: r.updated_at,
     translateId: r.translate_id ?? null,
     speaker: r.speaker ?? null,
+    trailing: r.trailing ?? null,
   };
 }
 
@@ -259,7 +263,7 @@ export function useTranslations(workspaceId: string | null) {
       const { data: page, error: pageErr } = await supabase
         .from("translation_strings")
         .select(
-          "id, file_id, group_label, source_path, source_line, source_text, translated_text, status, updated_at, translate_id, speaker",
+          "id, file_id, group_label, source_path, source_line, source_text, translated_text, status, updated_at, translate_id, speaker, trailing",
         )
         .eq("file_id", myFile)
         .order("source_path", { ascending: true })
@@ -555,6 +559,7 @@ export function useTranslations(workspaceId: string | null) {
         status: s.translatedText === "" ? "empty" : "done",
         translate_id: s.translateId,
         speaker: s.speaker,
+        trailing: s.trailing,
       }));
 
       let inserted = 0;

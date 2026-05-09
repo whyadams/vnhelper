@@ -46,3 +46,15 @@ translate russian detective_b95048ed:
 
     # dm "Now do you understand the seriousness of what we are dealing with?"
     dm "Теперь ты понимаешь серьёзность того, с чем мы имеем дело?"
+
+# game/chapters/ch1/ch1.rpy:751
+translate russian outside_university_e1d4cb22:
+
+    # mr "Phew, finally — my whole back is numb!" with dissolve
+    mr "Уф, наконец-то, у меня вся спина затекла!" with dissolve
+
+# game/chapters/ch1/ch1.rpy:2559
+translate russian clothing_kira_b62224f9:
+
+    # "" with dissolve
+    "" with dissolve

@@ -9,15 +9,20 @@ const TRANSLATE_STRINGS_HEADER_RE = /^translate\s+(\S+)\s+strings:\s*$/;
 const TRANSLATE_DIALOG_HEADER_RE = /^translate\s+(\S+)\s+(\S+):\s*$/;
 const PATH_COMMENT_RE = /^\s*#\s*(\S+):(\d+)\s*$/;
 const OLD_NEW_RE = /^\s*(old|new)\s+"((?:\\.|[^"\\])*)"\s*$/;
-// Optional speaker token, then a quoted string. Matches both:
-//   dg "Hmm..."          (speaker = "dg")
-//   "Just a thought"     (speaker = null, narrator)
-//   "Bella" "Hi"         (speaker = '"Bella"')  ← rare, captured verbatim
+// Optional speaker token, then a quoted string, then an optional trailing
+// modifier (`with dissolve`, `pause 0.5`, `id "label"`, etc.) that Ren'Py
+// allows after the dialogue text. Trailing is captured so we can round-trip
+// it on export. Examples:
+//   dg "Hmm..."                              (speaker = "dg")
+//   "Just a thought"                         (speaker = null, narrator)
+//   "Bella" "Hi"                             (speaker = '"Bella"', rare)
+//   mr "Phew." with dissolve                 (trailing = "with dissolve")
+//   ol "Hi" with dissolve id "ol_001"        (trailing = "with dissolve id \"ol_001\"")
 const DIALOG_LINE_RE =
-  /^\s*(?:((?:"(?:\\.|[^"\\])*"|\S+))\s+)?"((?:\\.|[^"\\])*)"\s*$/;
+  /^\s*(?:((?:"(?:\\.|[^"\\])*"|\S+))\s+)?"((?:\\.|[^"\\])*)"(?:\s+(\S.*?))?\s*$/;
 // Same shape but commented out — that's the source line in a dialog block.
 const DIALOG_COMMENT_RE =
-  /^\s*#\s*(?:((?:"(?:\\.|[^"\\])*"|\S+))\s+)?"((?:\\.|[^"\\])*)"\s*$/;
+  /^\s*#\s*(?:((?:"(?:\\.|[^"\\])*"|\S+))\s+)?"((?:\\.|[^"\\])*)"(?:\s+(\S.*?))?\s*$/;
 const COMMENT_RE = /^\s*#/;
 const BLANK_RE = /^\s*$/;
 
@@ -56,6 +61,7 @@ export function parseRenpyTranslations(content: string): ParseResult {
   let dialogId: string | null = null;
   let dialogSpeaker: string | null = null;
   let dialogSource: string | null = null;
+  let dialogTrailing: string | null = null;
   let dialogPath: string | null = null;
   let dialogLine: number | null = null;
   let dialogSawSource = false;
@@ -71,6 +77,7 @@ export function parseRenpyTranslations(content: string): ParseResult {
     dialogId = null;
     dialogSpeaker = null;
     dialogSource = null;
+    dialogTrailing = null;
     dialogPath = null;
     dialogLine = null;
     dialogSawSource = false;
@@ -192,6 +199,7 @@ export function parseRenpyTranslations(content: string): ParseResult {
             translatedText: value,
             translateId: null,
             speaker: null,
+            trailing: null,
           });
           resetStrings();
         }
@@ -209,6 +217,7 @@ export function parseRenpyTranslations(content: string): ParseResult {
       if (cm) {
         dialogSpeaker = cm[1] ?? null;
         dialogSource = unescapeRenpyString(cm[2]);
+        dialogTrailing = cm[3] ?? null;
         dialogSawSource = true;
         continue;
       }
@@ -224,6 +233,7 @@ export function parseRenpyTranslations(content: string): ParseResult {
     if (tm) {
       const trSpeaker = tm[1] ?? null;
       const trText = unescapeRenpyString(tm[2]);
+      const trTrailing = tm[3] ?? null;
       if (
         dialogSpeaker !== null &&
         trSpeaker !== null &&
@@ -249,6 +259,9 @@ export function parseRenpyTranslations(content: string): ParseResult {
         translatedText: trText,
         translateId: dialogId,
         speaker: trSpeaker ?? dialogSpeaker,
+        // Prefer the translation's trailing modifier; fall back to source
+        // (translators usually copy it verbatim, occasionally drop it).
+        trailing: trTrailing ?? dialogTrailing,
       });
       resetDialog();
       // After one dialog entry the block is over until the next header.

@@ -41,6 +41,7 @@ function stringsToParsed(
     translatedText: s.translatedText,
     translateId: s.translateId,
     speaker: s.speaker,
+    trailing: s.trailing,
   }));
 }
 

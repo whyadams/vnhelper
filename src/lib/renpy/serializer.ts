@@ -64,8 +64,13 @@ export function serializeRenpyTranslations(
       out.push(`translate ${s.targetLanguage} ${s.translateId}:`);
       out.push("");
       const sp = s.speaker ? `${s.speaker} ` : "";
-      out.push(`${INDENT}# ${sp}"${escapeRenpyString(s.sourceText)}"`);
-      out.push(`${INDENT}${sp}"${escapeRenpyString(s.translatedText)}"`);
+      const tail = s.trailing ? ` ${s.trailing}` : "";
+      out.push(
+        `${INDENT}# ${sp}"${escapeRenpyString(s.sourceText)}"${tail}`,
+      );
+      out.push(
+        `${INDENT}${sp}"${escapeRenpyString(s.translatedText)}"${tail}`,
+      );
       out.push("");
       prevLang = s.targetLanguage;
       prevKind = "dialog";

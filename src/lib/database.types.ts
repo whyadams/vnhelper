@@ -851,6 +851,7 @@ export type Database = {
           updated_by: string | null
           translate_id: string | null
           speaker: string | null
+          trailing: string | null
         }
         Insert: {
           id?: string
@@ -865,6 +866,7 @@ export type Database = {
           updated_by?: string | null
           translate_id?: string | null
           speaker?: string | null
+          trailing?: string | null
         }
         Update: {
           id?: string
@@ -879,6 +881,7 @@ export type Database = {
           updated_by?: string | null
           translate_id?: string | null
           speaker?: string | null
+          trailing?: string | null
         }
         Relationships: [
           {

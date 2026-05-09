@@ -16,6 +16,12 @@ export interface ParsedString {
    * comment and the translated line.
    */
   speaker: string | null;
+  /**
+   * Trailing Ren'Py modifier after the closing quote, e.g. "with dissolve",
+   * "pause 0.5", `id "abc"`. `null` when none. Emitted on both source comment
+   * and translated line on serialise. Strings: rows always have null.
+   */
+  trailing: string | null;
 }
 
 export interface ParseWarning {
