@@ -51,9 +51,7 @@ interface PaneProps {
   onCreateProject: () => void;
   onEditProject: (project: ScriptsApi["activeProject"]) => void;
   onShowCharacters: () => void;
-  onShowTranslations: () => void;
   charactersActive?: boolean;
-  translationsActive?: boolean;
 }
 
 export function ScriptPane({
@@ -61,9 +59,7 @@ export function ScriptPane({
   onCreateProject,
   onEditProject,
   onShowCharacters,
-  onShowTranslations,
   charactersActive,
-  translationsActive,
 }: PaneProps) {
   const dialog = useDialog();
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
@@ -442,28 +438,16 @@ export function ScriptPane({
       </div>
 
       {scripts.activeProjectId && (
-        <div className="vn-pane-foot">
-          <button
-            type="button"
-            className={
-              "vn-pane-cast-btn" + (charactersActive ? " is-active" : "")
-            }
-            onClick={onShowCharacters}
-            title="Manage characters & locations"
-          >
-            Cast
-          </button>
-          <button
-            type="button"
-            className={
-              "vn-pane-cast-btn" + (translationsActive ? " is-active" : "")
-            }
-            onClick={onShowTranslations}
-            title="Manage translations"
-          >
-            Translations
-          </button>
-        </div>
+        <button
+          type="button"
+          className={
+            "vn-pane-cast-btn" + (charactersActive ? " is-active" : "")
+          }
+          onClick={onShowCharacters}
+          title="Manage characters & locations"
+        >
+          Cast
+        </button>
       )}
     </aside>
   );
