@@ -1062,6 +1062,25 @@
   gap: 8px;
 }
 
+/* Progressive-rendering "load more" footer. Doubles as a sentinel for the
+   IntersectionObserver that auto-extends the window. */
+.tr-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 24px;
+}
+.tr-load-more .tr-cta {
+  flex: 0 0 auto;
+  min-width: 220px;
+  padding: 0 18px;
+}
+.tr-load-more-meta {
+  margin-left: 8px;
+  color: rgba(200, 199, 202, 0.5);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Group divider — Telegram-style centered label with hairlines on either
    side. Not sticky, scrolls with content. Sits above its group's rows. */
 .tr-group-divider {

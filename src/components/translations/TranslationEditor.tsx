@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import type { Role } from "../../lib/roles";
 import type {
   StringStatus,
@@ -32,6 +39,41 @@ export function TranslationEditor({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const rowsRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // Progressive rendering. Big translation files (10k+ lines) used to freeze
+  // the app: each StringRow mounts a textarea + a useLayoutEffect that forces
+  // a layout reflow. Render only PAGE_SIZE rows at first, then extend on
+  // user demand or when the bottom sentinel scrolls into view. Prevents the
+  // 30-second main-thread freeze observed on big imports.
+  const PAGE_SIZE = 200;
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset window when the file changes — otherwise we'd carry over a stale
+  // visibleCount from the previous file.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [file.id]);
+
+  // Auto-extend the window when the sentinel scrolls into view. Cheaper than
+  // listening to scroll events and avoids tearing on fast scrolls.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setVisibleCount((c) => c + PAGE_SIZE);
+            break;
+          }
+        }
+      },
+      { root: rowsRef.current, rootMargin: "400px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visibleCount, file.id]);
 
   const counts = useMemo(() => {
     let empty = 0,
@@ -239,33 +281,68 @@ export function TranslationEditor({
             <p>No strings match the current filter.</p>
           </div>
         ) : (
-          groups.map((g, i) => (
-            <div key={`g-${i}-${g.label ?? ""}`} className="tr-group">
-              {g.label && (
+          (() => {
+            // Slice the flat row sequence to visibleCount, then re-group.
+            const out: ReactElement[] = [];
+            let rowsLeft = visibleCount;
+            for (let gi = 0; gi < groups.length && rowsLeft > 0; gi++) {
+              const g = groups[gi];
+              const take = Math.min(rowsLeft, g.rows.length);
+              const rowsSlice = g.rows.slice(0, take);
+              out.push(
                 <div
-                  className="tr-group-divider"
-                  role="separator"
-                  aria-label={g.label}
+                  key={`g-${gi}-${g.label ?? ""}`}
+                  className="tr-group"
                 >
-                  <span className="tr-group-divider-line" aria-hidden />
-                  <span className="tr-group-divider-label">{g.label}</span>
-                  <span className="tr-group-divider-line" aria-hidden />
-                </div>
-              )}
-              {g.rows.map((row) => (
-                <StringRow
-                  key={row.id}
-                  row={row}
-                  fileTargetLang={file.target_language}
-                  role={role}
-                  isFocused={focusedId === row.id}
-                  onFocus={() => setFocusedId(row.id)}
-                  onAdvance={() => advanceFromRow(row.id)}
-                  onUpdate={(patch) => api.updateString(row.id, patch)}
-                />
-              ))}
-            </div>
-          ))
+                  {g.label && (
+                    <div
+                      className="tr-group-divider"
+                      role="separator"
+                      aria-label={g.label}
+                    >
+                      <span className="tr-group-divider-line" aria-hidden />
+                      <span className="tr-group-divider-label">
+                        {g.label}
+                      </span>
+                      <span className="tr-group-divider-line" aria-hidden />
+                    </div>
+                  )}
+                  {rowsSlice.map((row) => (
+                    <StringRow
+                      key={row.id}
+                      row={row}
+                      fileTargetLang={file.target_language}
+                      role={role}
+                      isFocused={focusedId === row.id}
+                      onFocus={() => setFocusedId(row.id)}
+                      onAdvance={() => advanceFromRow(row.id)}
+                      onUpdate={(patch) => api.updateString(row.id, patch)}
+                    />
+                  ))}
+                </div>,
+              );
+              rowsLeft -= take;
+            }
+            return out;
+          })()
+        )}
+        {visible.length > visibleCount && (
+          <div className="tr-load-more" ref={sentinelRef}>
+            <button
+              type="button"
+              className="tr-cta"
+              onClick={() =>
+                setVisibleCount((c) =>
+                  Math.min(c + PAGE_SIZE, visible.length),
+                )
+              }
+            >
+              Load {Math.min(PAGE_SIZE, visible.length - visibleCount)} more
+              <span className="tr-load-more-meta">
+                · {visibleCount} of {visible.length}
+              </span>
+            </button>
+          </div>
         )}
       </div>
     </div>
