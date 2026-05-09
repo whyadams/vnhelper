@@ -208,28 +208,34 @@ export function useTranslations(workspaceId: string | null) {
   }, [activeProjectId]);
 
   // ---------- Per-file stats (total/done) ----------
+  // One RPC round-trip aggregates every file's stats. The previous
+  // implementation issued 2*N parallel head-count queries which slowed
+  // big projects to 10–15 seconds when many files were involved.
   const fetchFileStats = useCallback(async (fileIds: string[]) => {
     if (fileIds.length === 0) {
       setFileStats({});
       return;
     }
-    const entries = await Promise.all(
-      fileIds.map(async (id) => {
-        const [{ count: total }, { count: done }] = await Promise.all([
-          supabase
-            .from("translation_strings")
-            .select("id", { count: "exact", head: true })
-            .eq("file_id", id),
-          supabase
-            .from("translation_strings")
-            .select("id", { count: "exact", head: true })
-            .eq("file_id", id)
-            .eq("status", "done"),
-        ]);
-        return [id, { total: total ?? 0, done: done ?? 0 }] as const;
-      }),
-    );
-    setFileStats(Object.fromEntries(entries));
+    const { data, error } = await supabase.rpc("translation_file_stats", {
+      _file_ids: fileIds,
+    });
+    if (error) {
+      console.error("translation_file_stats", error);
+      return;
+    }
+    type Row = { file_id: string; total: number | null; done: number | null };
+    const rows = (data ?? []) as unknown as Row[];
+    const next: Record<string, { total: number; done: number }> = {};
+    // Files with zero strings won't appear in GROUP BY output — seed all
+    // requested IDs with zeros so the UI shows "0/0" rather than skeleton.
+    for (const id of fileIds) next[id] = { total: 0, done: 0 };
+    for (const r of rows) {
+      next[r.file_id] = {
+        total: Number(r.total ?? 0),
+        done: Number(r.done ?? 0),
+      };
+    }
+    setFileStats(next);
   }, []);
 
   // ---------- Strings for active file ----------
@@ -239,14 +245,41 @@ export function useTranslations(workspaceId: string | null) {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("translation_strings")
-      .select(
-        "id, file_id, group_label, source_path, source_line, source_text, translated_text, status, updated_at, translate_id, speaker",
-      )
-      .eq("file_id", activeFileId)
-      .order("source_path", { ascending: true })
-      .order("source_line", { ascending: true });
+    // Supabase enforces a default 1000-row limit when no .range / .limit
+    // is set. Big translation files (5k–20k rows) silently get truncated
+    // without it. Page through the table in 1000-row windows until exhausted.
+    const PAGE = 1000;
+    const collected: DbStringRow[] = [];
+    let from = 0;
+    let error: unknown = null;
+    // Capture the file id at start so paging can short-circuit if the user
+    // switches files mid-fetch.
+    const myFile = activeFileId;
+    while (true) {
+      const { data: page, error: pageErr } = await supabase
+        .from("translation_strings")
+        .select(
+          "id, file_id, group_label, source_path, source_line, source_text, translated_text, status, updated_at, translate_id, speaker",
+        )
+        .eq("file_id", myFile)
+        .order("source_path", { ascending: true })
+        .order("source_line", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (pageErr) {
+        error = pageErr;
+        break;
+      }
+      if (activeFileIdRef.current !== myFile) {
+        // The user moved on; drop the in-flight result.
+        setLoading(false);
+        return;
+      }
+      const rows = (page ?? []) as DbStringRow[];
+      collected.push(...rows);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+    const data = collected;
     setLoading(false);
     if (error) {
       console.error("translation strings list", error);

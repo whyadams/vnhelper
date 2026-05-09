@@ -997,6 +997,14 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      translation_file_stats: {
+        Args: { _file_ids: string[] }
+        Returns: {
+          file_id: string
+          total: number
+          done: number
+        }[]
+      }
       create_workspace: {
         Args: { _name: string }
         Returns: {
