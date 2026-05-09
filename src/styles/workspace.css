@@ -278,9 +278,17 @@
 .ws-role-owner .ws-role-dot { background: var(--role-owner); }
 .ws-role-editor .ws-role-dot { background: var(--role-editor); }
 .ws-role-viewer .ws-role-dot { background: var(--role-viewer); }
+.ws-role-translator .ws-role-dot { background: var(--status-info); }
 .ws-role-owner,
 .ws-role-editor,
-.ws-role-viewer { color: var(--text-1); }
+.ws-role-viewer,
+.ws-role-translator { color: var(--text-1); }
+.ws-role-lang {
+  margin-left: 2px;
+  color: var(--text-3);
+  font-weight: 400;
+  text-transform: lowercase;
+}
 
 .ws-role-edit {
   margin-left: 6px;

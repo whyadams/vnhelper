@@ -1,7 +1,9 @@
 import { type ComponentType, type SVGProps } from "react";
+import { Languages as LucideLanguages } from "lucide-react";
 import { useAuth } from "../../state/AuthProvider";
 import { useKanban } from "../../state/kanbanStore";
 import { useNotifications } from "../../state/notifications";
+import { canSeeNav, type Role } from "../../lib/roles";
 import {
   BellFilledIcon,
   CalendarFilledIcon,
@@ -12,6 +14,11 @@ import {
   ShareFilledIcon,
   UsersFilledIcon,
 } from "./SidebarIcons";
+
+function LanguagesIcon(p: SVGProps<SVGSVGElement> & { size?: number }) {
+  const { size = 16, ...rest } = p;
+  return <LucideLanguages width={size} height={size} {...rest} />;
+}
 
 type IconCmp = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 
@@ -26,6 +33,7 @@ const essentialItems: NavItem[] = [
   { key: "calendar", label: "Calendar", Icon: CalendarFilledIcon },
   { key: "graph", label: "Graph", Icon: ShareFilledIcon },
   { key: "script", label: "Script", Icon: DocumentFilledIcon },
+  { key: "translations", label: "Translations", Icon: LanguagesIcon },
   { key: "photos", label: "Photos", Icon: ImageFilledIcon },
 ];
 
@@ -74,9 +82,17 @@ export function Sidebar() {
 
   const isActive = (key: string) => state.activeNav === key;
 
-  const wsRoleLabel = state.myRole
+  const role = (state.myRole ?? null) as Role | null;
+  const baseRoleLabel = state.myRole
     ? `${state.myRole.charAt(0).toUpperCase()}${state.myRole.slice(1)}`
     : "Member";
+  const wsRoleLabel =
+    role === "translator" && state.myTargetLanguage
+      ? `${baseRoleLabel} · ${state.myTargetLanguage}`
+      : baseRoleLabel;
+
+  const visibleNav = essentialItems.filter((it) => canSeeNav(role, it.key));
+  const showWorkspaceSection = role !== "translator";
 
   return (
     <aside className="sidebar">
@@ -120,7 +136,7 @@ export function Sidebar() {
       {/* Essentials */}
       <div className="nav-section">
         <div className="nav-section-label">ESSENTIALS</div>
-        {essentialItems.map(({ key, label, Icon }) => (
+        {visibleNav.map(({ key, label, Icon }) => (
           <button
             key={key}
             className={"nav-item" + (isActive(key) ? " is-active" : "")}
@@ -133,48 +149,52 @@ export function Sidebar() {
         ))}
       </div>
 
-      <div className="sidebar-spacer-18" />
-
-      {/* Workspace */}
-      <div className="nav-section">
-        <div className="nav-section-label">WORKSPACE</div>
-        <button
-          className={"nav-item" + (isActive("members") ? " is-active" : "")}
-          type="button"
-          onClick={() => dispatch({ type: "SET_ACTIVE_NAV", key: "members" })}
-        >
-          <MembersGlyph className="ico" />
-          <span className="nav-item-label">Members</span>
-        </button>
-        <button
-          className={
-            "nav-item" + (isActive("invitations") ? " is-active" : "")
-          }
-          type="button"
-          onClick={() =>
-            dispatch({ type: "SET_ACTIVE_NAV", key: "invitations" })
-          }
-        >
-          <InvitesGlyph className="ico" />
-          <span className="nav-item-label">Invitations</span>
-          {pendingInvites > 0 && (
-            <span className="nav-badge">{pendingInvites}</span>
-          )}
-        </button>
-        <button
-          className={
-            "nav-item" + (isActive("notifications") ? " is-active" : "")
-          }
-          type="button"
-          onClick={() =>
-            dispatch({ type: "SET_ACTIVE_NAV", key: "notifications" })
-          }
-        >
-          <BellGlyph className="ico" />
-          <span className="nav-item-label">Notifications</span>
-          {unreadNotifs > 0 && <span className="nav-dot" />}
-        </button>
-      </div>
+      {showWorkspaceSection && (
+        <>
+          <div className="sidebar-spacer-18" />
+          <div className="nav-section">
+            <div className="nav-section-label">WORKSPACE</div>
+            <button
+              className={"nav-item" + (isActive("members") ? " is-active" : "")}
+              type="button"
+              onClick={() =>
+                dispatch({ type: "SET_ACTIVE_NAV", key: "members" })
+              }
+            >
+              <MembersGlyph className="ico" />
+              <span className="nav-item-label">Members</span>
+            </button>
+            <button
+              className={
+                "nav-item" + (isActive("invitations") ? " is-active" : "")
+              }
+              type="button"
+              onClick={() =>
+                dispatch({ type: "SET_ACTIVE_NAV", key: "invitations" })
+              }
+            >
+              <InvitesGlyph className="ico" />
+              <span className="nav-item-label">Invitations</span>
+              {pendingInvites > 0 && (
+                <span className="nav-badge">{pendingInvites}</span>
+              )}
+            </button>
+            <button
+              className={
+                "nav-item" + (isActive("notifications") ? " is-active" : "")
+              }
+              type="button"
+              onClick={() =>
+                dispatch({ type: "SET_ACTIVE_NAV", key: "notifications" })
+              }
+            >
+              <BellGlyph className="ico" />
+              <span className="nav-item-label">Notifications</span>
+              {unreadNotifs > 0 && <span className="nav-dot" />}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Stretch filler */}
       <div className="sidebar-flex" />

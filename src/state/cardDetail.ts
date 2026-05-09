@@ -173,23 +173,25 @@ export function useCardDetail(cardId: string | null, boardId: string | null) {
   }, [state.workspaceId]);
 
   // ---------- initial load on cardId change ----------
+  // Synchronously wipe per-card state on every cardId change so the previous
+  // card's subtasks/comments/tags don't flash while the new fetch lands.
   useEffect(() => {
-    if (!cardId) {
-      setSubtasks([]);
-      setComments([]);
-      setCardTags([]);
-      return;
-    }
+    setSubtasks([]);
+    setComments([]);
+    setCardTags([]);
+    if (!cardId) return;
     void fetchSubtasks();
     void fetchComments();
     void fetchCardTags();
   }, [cardId, fetchSubtasks, fetchComments, fetchCardTags]);
 
   useEffect(() => {
+    setBoardTags([]);
     if (boardId) void fetchBoardTags();
   }, [boardId, fetchBoardTags]);
 
   useEffect(() => {
+    setWorkspaceMembers([]);
     if (cardId) void fetchWorkspaceMembers();
   }, [cardId, fetchWorkspaceMembers]);
 

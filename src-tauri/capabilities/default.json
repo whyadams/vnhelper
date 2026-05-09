@@ -19,6 +19,21 @@
     "updater:default",
     "process:default",
     "process:allow-restart",
+    "dialog:default",
+    "dialog:allow-open",
+    "fs:default",
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-stat",
+      "allow": [{ "path": "**" }]
+    },
     {
       "identifier": "http:default",
       "allow": [

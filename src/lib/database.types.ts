@@ -761,6 +761,129 @@ export type Database = {
           },
         ]
       }
+      translation_projects: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          source_lang: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          source_lang?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          name?: string
+          source_lang?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "translation_projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      translation_files: {
+        Row: {
+          id: string
+          project_id: string
+          filename: string
+          raw_content: string
+          target_language: string
+          uploaded_at: string
+          uploaded_by: string | null
+          folder_path: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          filename: string
+          raw_content: string
+          target_language: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+          folder_path?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          filename?: string
+          raw_content?: string
+          target_language?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+          folder_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "translation_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "translation_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      translation_strings: {
+        Row: {
+          id: string
+          file_id: string
+          group_label: string | null
+          source_path: string
+          source_line: number
+          source_text: string
+          translated_text: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          file_id: string
+          group_label?: string | null
+          source_path: string
+          source_line: number
+          source_text: string
+          translated_text?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          file_id?: string
+          group_label?: string | null
+          source_path?: string
+          source_line?: number
+          source_text?: string
+          translated_text?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "translation_strings_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "translation_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_invitations: {
         Row: {
           created_at: string
@@ -769,6 +892,7 @@ export type Database = {
           invited_by: string | null
           invited_user_id: string | null
           role: Database["public"]["Enums"]["workspace_role"]
+          target_language: string | null
           workspace_id: string
         }
         Insert: {
@@ -778,6 +902,7 @@ export type Database = {
           invited_by?: string | null
           invited_user_id?: string | null
           role?: Database["public"]["Enums"]["workspace_role"]
+          target_language?: string | null
           workspace_id: string
         }
         Update: {
@@ -787,6 +912,7 @@ export type Database = {
           invited_by?: string | null
           invited_user_id?: string | null
           role?: Database["public"]["Enums"]["workspace_role"]
+          target_language?: string | null
           workspace_id?: string
         }
         Relationships: []
@@ -795,18 +921,21 @@ export type Database = {
         Row: {
           created_at: string
           role: Database["public"]["Enums"]["workspace_role"]
+          target_language: string | null
           user_id: string
           workspace_id: string
         }
         Insert: {
           created_at?: string
           role?: Database["public"]["Enums"]["workspace_role"]
+          target_language?: string | null
           user_id: string
           workspace_id: string
         }
         Update: {
           created_at?: string
           role?: Database["public"]["Enums"]["workspace_role"]
+          target_language?: string | null
           user_id?: string
           workspace_id?: string
         }
@@ -906,7 +1035,7 @@ export type Database = {
       }
     }
     Enums: {
-      workspace_role: "owner" | "editor" | "viewer"
+      workspace_role: "owner" | "editor" | "viewer" | "translator"
       card_priority: "low" | "medium" | "high" | "urgent"
     }
     CompositeTypes: { [_ in never]: never }

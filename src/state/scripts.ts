@@ -112,10 +112,47 @@ export function useScripts(workspaceId: string | null) {
   const [activeNode, setActiveNode] = useState<ScriptNodeFull | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // "Ready" flags so consumers can show a skeleton while data is in flight
+  // and avoid flashing empty-state screens for the brief async window.
+  // - projectsReady: first fetchProjects() for current workspaceId settled
+  // - contentReady: first fetch of nodes / characters / locations for current
+  //                 activeProjectId settled (all three).
+  const [projectsReady, setProjectsReady] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
+
   const activeProjectIdRef = useRef<string | null>(null);
   const activeNodeIdRef = useRef<string | null>(null);
+  const workspaceIdRef = useRef<string | null>(workspaceId);
   activeProjectIdRef.current = activeProjectId;
   activeNodeIdRef.current = activeNodeId;
+  workspaceIdRef.current = workspaceId;
+
+  // Synchronously clear ALL scoped state the moment the workspace flips.
+  // Without this, the previous workspace's projects / nodes / characters /
+  // locations linger on screen until the async refetch lands. This is the
+  // root cause of the "Script shows old workspace's data" bug.
+  useEffect(() => {
+    setProjects([]);
+    setNodes([]);
+    setCharacters([]);
+    setLocations([]);
+    setActiveNode(null);
+    // Reset readiness so consumers display skeletons until data arrives.
+    setProjectsReady(false);
+    setContentReady(false);
+    // We don't touch activeProjectId here — fetchProjects() validates it
+    // against the new workspace's project list and overrides if needed.
+  }, [workspaceId]);
+
+  // Same idea, but for project switches inside a workspace: clear nodes /
+  // characters / locations and the open node before the async fetch arrives.
+  useEffect(() => {
+    setNodes([]);
+    setCharacters([]);
+    setLocations([]);
+    setActiveNode(null);
+    setContentReady(false);
+  }, [activeProjectId]);
 
   const setActiveProjectId = useCallback((id: string | null) => {
     setActiveProjectIdState(id);
@@ -137,17 +174,22 @@ export function useScripts(workspaceId: string | null) {
   const fetchProjects = useCallback(async () => {
     if (!workspaceId) {
       setProjects([]);
+      setProjectsReady(true);
       return;
     }
+    const myWs = workspaceId;
     const { data, error } = await supabase
       .from("script_projects")
       .select(
         "id, workspace_id, title, synopsis, cover_emoji, cover_image_url, position, created_at, updated_at",
       )
-      .eq("workspace_id", workspaceId)
+      .eq("workspace_id", myWs)
       .order("position", { ascending: true });
+    // Drop the response if the workspace flipped while we were fetching.
+    if (workspaceIdRef.current !== myWs) return;
     if (error) {
       console.error("script projects list", error);
+      setProjectsReady(true);
       return;
     }
     const list = (data ?? []) as ScriptProject[];
@@ -161,6 +203,7 @@ export function useScripts(workspaceId: string | null) {
     } else if (!activeProjectIdRef.current && list.length > 0) {
       setActiveProjectId(list[0].id);
     }
+    setProjectsReady(true);
   }, [workspaceId, setActiveProjectId]);
 
   // ---------- Nodes / characters / locations for active project ----------
@@ -169,14 +212,16 @@ export function useScripts(workspaceId: string | null) {
       setNodes([]);
       return;
     }
+    const myProject = activeProjectId;
     const { data, error } = await supabase
       .from("script_nodes")
       .select(
         "id, project_id, parent_id, kind, title, emoji, pinned, position, status, pov, location_id, tags, updated_at",
       )
-      .eq("project_id", activeProjectId)
+      .eq("project_id", myProject)
       .order("pinned", { ascending: false })
       .order("position", { ascending: true });
+    if (activeProjectIdRef.current !== myProject) return;
     if (error) {
       console.error("script nodes list", error);
       return;
@@ -189,13 +234,15 @@ export function useScripts(workspaceId: string | null) {
       setCharacters([]);
       return;
     }
+    const myProject = activeProjectId;
     const { data, error } = await supabase
       .from("script_characters")
       .select(
         "id, project_id, workspace_id, name, short_name, color, emoji, pronouns, age, role, voice_notes, traits, aliases, avatar_url, position",
       )
-      .eq("project_id", activeProjectId)
+      .eq("project_id", myProject)
       .order("position", { ascending: true });
+    if (activeProjectIdRef.current !== myProject) return;
     if (error) {
       console.error("script characters list", error);
       return;
@@ -208,13 +255,15 @@ export function useScripts(workspaceId: string | null) {
       setLocations([]);
       return;
     }
+    const myProject = activeProjectId;
     const { data, error } = await supabase
       .from("script_locations")
       .select(
         "id, project_id, name, description, mood, image_url, position",
       )
-      .eq("project_id", activeProjectId)
+      .eq("project_id", myProject)
       .order("position", { ascending: true });
+    if (activeProjectIdRef.current !== myProject) return;
     if (error) {
       console.error("script locations list", error);
       return;
@@ -248,10 +297,19 @@ export function useScripts(workspaceId: string | null) {
   }, [fetchProjects]);
 
   useEffect(() => {
-    void fetchNodes();
-    void fetchCharacters();
-    void fetchLocations();
-  }, [fetchNodes, fetchCharacters, fetchLocations]);
+    if (!activeProjectId) {
+      // No project selected → nothing to load; consumers can render their
+      // empty state immediately rather than skeleton.
+      setContentReady(true);
+      return;
+    }
+    const myProject = activeProjectId;
+    void Promise.all([fetchNodes(), fetchCharacters(), fetchLocations()])
+      .catch((e) => console.error("script content fetch failed", e))
+      .finally(() => {
+        if (activeProjectIdRef.current === myProject) setContentReady(true);
+      });
+  }, [activeProjectId, fetchNodes, fetchCharacters, fetchLocations]);
 
   useEffect(() => {
     if (!activeNodeId) {
@@ -275,58 +333,93 @@ export function useScripts(workspaceId: string | null) {
   }, [nodes, activeNodeId, setActiveNodeId]);
 
   // ---------- Realtime ----------
+  // Workspace-scoped: project list updates. Inline INSERT/UPDATE/DELETE on
+  // `projects` so we don't refetch the entire list on every echo.
   useEffect(() => {
     if (!workspaceId) return;
+    const myWs = workspaceId;
     const ch = supabase
-      .channel(`scripts:${workspaceId}`)
+      .channel(`scripts:${myWs}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "script_projects",
-          filter: `workspace_id=eq.${workspaceId}`,
+          filter: `workspace_id=eq.${myWs}`,
         },
-        () => void fetchProjects(),
+        (payload) => {
+          if (workspaceIdRef.current !== myWs) return;
+          if (payload.eventType === "DELETE") {
+            const id = (payload.old as { id?: string } | null)?.id;
+            if (!id) return;
+            setProjects((cur) => cur.filter((p) => p.id !== id));
+            return;
+          }
+          const row = payload.new as ScriptProject | null;
+          if (!row) return;
+          setProjects((cur) => {
+            const idx = cur.findIndex((p) => p.id === row.id);
+            if (idx === -1) {
+              return [...cur, row].sort((a, b) => a.position - b.position);
+            }
+            const copy = cur.slice();
+            copy[idx] = { ...copy[idx], ...row };
+            return copy;
+          });
+        },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [workspaceId, fetchProjects]);
+  }, [workspaceId]);
 
+  // Project-scoped: nodes / characters / locations. Each handler patches its
+  // local list inline instead of re-fetching everything.
   useEffect(() => {
     if (!activeProjectId) return;
+    const myProject = activeProjectId;
     const ch = supabase
-      .channel(`script_project:${activeProjectId}`)
+      .channel(`script_project:${myProject}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "script_nodes",
-          filter: `project_id=eq.${activeProjectId}`,
+          filter: `project_id=eq.${myProject}`,
         },
         (payload) => {
-          void fetchNodes();
-          const id =
-            (payload.new as { id?: string } | null)?.id ??
-            (payload.old as { id?: string } | null)?.id;
-          if (
-            payload.eventType === "DELETE" &&
-            id &&
-            activeNodeIdRef.current === id
-          ) {
-            setActiveNode(null);
-            setActiveNodeId(null);
+          if (activeProjectIdRef.current !== myProject) return;
+          if (payload.eventType === "DELETE") {
+            const id = (payload.old as { id?: string } | null)?.id;
+            if (!id) return;
+            setNodes((cur) => cur.filter((n) => n.id !== id));
+            if (activeNodeIdRef.current === id) {
+              setActiveNode(null);
+              setActiveNodeId(null);
+            }
             return;
           }
+          const row = payload.new as ScriptNodeSummary | null;
+          if (!row) return;
+          setNodes((cur) => {
+            const idx = cur.findIndex((n) => n.id === row.id);
+            if (idx === -1) {
+              // Skip duplicates: optimistic insert may have added it already.
+              return [...cur, row];
+            }
+            const copy = cur.slice();
+            copy[idx] = { ...copy[idx], ...row };
+            return copy;
+          });
+          // If the open node was edited elsewhere, refresh its full body.
           if (
             payload.eventType === "UPDATE" &&
-            id &&
-            activeNodeIdRef.current === id
+            activeNodeIdRef.current === row.id
           ) {
-            void fetchActiveNode(id);
+            void fetchActiveNode(row.id);
           }
         },
       )
@@ -336,9 +429,26 @@ export function useScripts(workspaceId: string | null) {
           event: "*",
           schema: "public",
           table: "script_characters",
-          filter: `project_id=eq.${activeProjectId}`,
+          filter: `project_id=eq.${myProject}`,
         },
-        () => void fetchCharacters(),
+        (payload) => {
+          if (activeProjectIdRef.current !== myProject) return;
+          if (payload.eventType === "DELETE") {
+            const id = (payload.old as { id?: string } | null)?.id;
+            if (!id) return;
+            setCharacters((cur) => cur.filter((c) => c.id !== id));
+            return;
+          }
+          const row = payload.new as ScriptCharacter | null;
+          if (!row) return;
+          setCharacters((cur) => {
+            const idx = cur.findIndex((c) => c.id === row.id);
+            if (idx === -1) return [...cur, row];
+            const copy = cur.slice();
+            copy[idx] = { ...copy[idx], ...row };
+            return copy;
+          });
+        },
       )
       .on(
         "postgres_changes",
@@ -346,43 +456,70 @@ export function useScripts(workspaceId: string | null) {
           event: "*",
           schema: "public",
           table: "script_locations",
-          filter: `project_id=eq.${activeProjectId}`,
+          filter: `project_id=eq.${myProject}`,
         },
-        () => void fetchLocations(),
+        (payload) => {
+          if (activeProjectIdRef.current !== myProject) return;
+          if (payload.eventType === "DELETE") {
+            const id = (payload.old as { id?: string } | null)?.id;
+            if (!id) return;
+            setLocations((cur) => cur.filter((l) => l.id !== id));
+            return;
+          }
+          const row = payload.new as ScriptLocation | null;
+          if (!row) return;
+          setLocations((cur) => {
+            const idx = cur.findIndex((l) => l.id === row.id);
+            if (idx === -1) return [...cur, row];
+            const copy = cur.slice();
+            copy[idx] = { ...copy[idx], ...row };
+            return copy;
+          });
+        },
       )
       .subscribe();
     return () => {
       void supabase.removeChannel(ch);
     };
-  }, [
-    activeProjectId,
-    fetchNodes,
-    fetchCharacters,
-    fetchLocations,
-    fetchActiveNode,
-    setActiveNodeId,
-  ]);
+  }, [activeProjectId, fetchActiveNode, setActiveNodeId]);
 
   // ---------- Project mutations ----------
   const createProject = useCallback(
     async (title: string, coverEmoji?: string): Promise<string | null> => {
       if (!workspaceId || !user) return null;
       const id = newUuid();
-      const { error } = await supabase.from("script_projects").insert({
+      const now = new Date().toISOString();
+      const optimistic: ScriptProject = {
         id,
         workspace_id: workspaceId,
         title: title.trim() || "Untitled Script",
+        synopsis: "",
+        cover_emoji: coverEmoji ?? null,
+        cover_image_url: null,
+        position: Date.now(),
+        created_at: now,
+        updated_at: now,
+      };
+      // Optimistic: show in list immediately and switch to it.
+      setProjects((cur) => [...cur, optimistic]);
+      setActiveProjectId(id);
+      setActiveNodeId(null);
+
+      const { error } = await supabase.from("script_projects").insert({
+        id,
+        workspace_id: workspaceId,
+        title: optimistic.title,
         cover_emoji: coverEmoji ?? null,
         created_by: user.id,
         updated_by: user.id,
-        position: Date.now(),
+        position: optimistic.position,
       });
       if (error) {
         console.error("createProject", error);
+        // Rollback: drop the optimistic row.
+        setProjects((cur) => cur.filter((p) => p.id !== id));
         return null;
       }
-      setActiveProjectId(id);
-      setActiveNodeId(null);
       return id;
     },
     [workspaceId, user, setActiveProjectId, setActiveNodeId],
@@ -450,6 +587,11 @@ export function useScripts(workspaceId: string | null) {
 
   const deleteProject = useCallback(
     async (id: string) => {
+      let snapshot: ScriptProject | undefined;
+      setProjects((cur) => {
+        snapshot = cur.find((p) => p.id === id);
+        return cur.filter((p) => p.id !== id);
+      });
       if (activeProjectIdRef.current === id) {
         setActiveProjectId(null);
         setActiveNodeId(null);
@@ -458,7 +600,10 @@ export function useScripts(workspaceId: string | null) {
         .from("script_projects")
         .delete()
         .eq("id", id);
-      if (error) console.error("deleteProject", error);
+      if (error) {
+        console.error("deleteProject", error);
+        if (snapshot) setProjects((cur) => [...cur, snapshot!]);
+      }
     },
     [setActiveProjectId, setActiveNodeId],
   );
@@ -472,23 +617,46 @@ export function useScripts(workspaceId: string | null) {
     } = {}): Promise<string | null> => {
       if (!workspaceId || !user || !activeProjectId) return null;
       const id = newUuid();
+      const now = new Date().toISOString();
+      const kind = opts.kind ?? "scene";
+      const optimistic: ScriptNodeSummary = {
+        id,
+        project_id: activeProjectId,
+        parent_id: opts.parentId ?? null,
+        kind,
+        title: opts.title ?? "Untitled",
+        emoji: null,
+        pinned: false,
+        position: Date.now(),
+        status: "draft",
+        pov: null,
+        location_id: null,
+        tags: [],
+        updated_at: now,
+      };
+      // Optimistic: insert into the local tree before the round-trip.
+      setNodes((cur) => [...cur, optimistic]);
+      setActiveNodeId(id);
+
       const { error } = await supabase.from("script_nodes").insert({
         id,
         project_id: activeProjectId,
         workspace_id: workspaceId,
-        parent_id: opts.parentId ?? null,
-        kind: opts.kind ?? "scene",
-        title: opts.title ?? "Untitled",
+        parent_id: optimistic.parent_id,
+        kind,
+        title: optimistic.title,
         body: "",
         created_by: user.id,
         updated_by: user.id,
-        position: Date.now(),
+        position: optimistic.position,
       });
       if (error) {
         console.error("createNode", error);
+        // Rollback optimistic insert.
+        setNodes((cur) => cur.filter((n) => n.id !== id));
+        if (activeNodeIdRef.current === id) setActiveNodeId(null);
         return null;
       }
-      setActiveNodeId(id);
       return id;
     },
     [workspaceId, user, activeProjectId, setActiveNodeId],
@@ -610,19 +778,39 @@ export function useScripts(workspaceId: string | null) {
     ): Promise<string | null> => {
       if (!workspaceId || !user || !activeProjectId) return null;
       const id = newUuid();
-      const { error } = await supabase.from("script_characters").insert({
+      const optimistic: ScriptCharacter = {
         id,
         project_id: activeProjectId,
         workspace_id: workspaceId,
         name: name.trim() || "Unnamed",
+        short_name: null,
         color: opts.color ?? "#6aa6ff",
         emoji: opts.emoji ?? null,
+        pronouns: null,
+        age: null,
+        role: null,
+        voice_notes: "",
+        traits: null,
         aliases: opts.aliases ?? [],
-        created_by: user.id,
+        avatar_url: null,
         position: Date.now(),
+      };
+      setCharacters((cur) => [...cur, optimistic]);
+
+      const { error } = await supabase.from("script_characters").insert({
+        id,
+        project_id: activeProjectId,
+        workspace_id: workspaceId,
+        name: optimistic.name,
+        color: optimistic.color,
+        emoji: optimistic.emoji,
+        aliases: optimistic.aliases,
+        created_by: user.id,
+        position: optimistic.position,
       });
       if (error) {
         console.error("createCharacter", error);
+        setCharacters((cur) => cur.filter((c) => c.id !== id));
         return null;
       }
       return id;
@@ -664,11 +852,21 @@ export function useScripts(workspaceId: string | null) {
   );
 
   const deleteCharacter = useCallback(async (id: string) => {
+    // Optimistic removal so the row disappears before the server round-trip.
+    let snapshot: ScriptCharacter | undefined;
+    setCharacters((cur) => {
+      snapshot = cur.find((c) => c.id === id);
+      return cur.filter((c) => c.id !== id);
+    });
     const { error } = await supabase
       .from("script_characters")
       .delete()
       .eq("id", id);
-    if (error) console.error("deleteCharacter", error);
+    if (error) {
+      console.error("deleteCharacter", error);
+      // Rollback if the server rejected the delete.
+      if (snapshot) setCharacters((cur) => [...cur, snapshot!]);
+    }
   }, []);
 
   // ---------- Location mutations ----------
@@ -676,16 +874,28 @@ export function useScripts(workspaceId: string | null) {
     async (name: string): Promise<string | null> => {
       if (!workspaceId || !user || !activeProjectId) return null;
       const id = newUuid();
+      const optimistic: ScriptLocation = {
+        id,
+        project_id: activeProjectId,
+        name: name.trim() || "Unnamed",
+        description: "",
+        mood: null,
+        image_url: null,
+        position: Date.now(),
+      };
+      setLocations((cur) => [...cur, optimistic]);
+
       const { error } = await supabase.from("script_locations").insert({
         id,
         project_id: activeProjectId,
         workspace_id: workspaceId,
-        name: name.trim() || "Unnamed",
+        name: optimistic.name,
         created_by: user.id,
-        position: Date.now(),
+        position: optimistic.position,
       });
       if (error) {
         console.error("createLocation", error);
+        setLocations((cur) => cur.filter((l) => l.id !== id));
         return null;
       }
       return id;
@@ -716,11 +926,19 @@ export function useScripts(workspaceId: string | null) {
   );
 
   const deleteLocation = useCallback(async (id: string) => {
+    let snapshot: ScriptLocation | undefined;
+    setLocations((cur) => {
+      snapshot = cur.find((l) => l.id === id);
+      return cur.filter((l) => l.id !== id);
+    });
     const { error } = await supabase
       .from("script_locations")
       .delete()
       .eq("id", id);
-    if (error) console.error("deleteLocation", error);
+    if (error) {
+      console.error("deleteLocation", error);
+      if (snapshot) setLocations((cur) => [...cur, snapshot!]);
+    }
   }, []);
 
   // ---------- Derived ----------
@@ -796,5 +1014,7 @@ export function useScripts(workspaceId: string | null) {
 
     // misc
     stats,
+    projectsReady,
+    contentReady,
   };
 }

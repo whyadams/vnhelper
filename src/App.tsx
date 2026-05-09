@@ -9,6 +9,8 @@ import "./styles/auth.css";
 import "./styles/mmenu.css";
 import "./styles/members.css";
 import "./styles/workspace.css";
+import "./styles/translations.css";
+import "./styles/skeleton.css";
 import { AutoUpdater } from "./components/AutoUpdater";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { CalendarScreen } from "./components/calendar/CalendarScreen";
@@ -22,11 +24,13 @@ import { InvitationsScreen } from "./components/members/InvitationsScreen";
 import { MembersScreen } from "./components/members/MembersScreen";
 import { NotificationsScreen } from "./components/notifications/NotificationsScreen";
 import { ScriptScreen } from "./components/scripts/ScriptScreen";
+import { TranslationsScreen } from "./components/translations/TranslationsScreen";
 import { ComingSoonScreen } from "./components/ui/ComingSoonScreen";
 import { DialogProvider } from "./components/ui/Dialog";
 import { AuthProvider, useAuth } from "./state/AuthProvider";
 import { KanbanProvider, useKanban } from "./state/kanbanStore";
 import { useTrayTasks } from "./state/useTrayTasks";
+import { canSeeNav, type Role } from "./lib/roles";
 
 function GlobalShortcuts() {
   useEffect(() => {
@@ -59,8 +63,18 @@ function KanbanScreen() {
 }
 
 function ActiveScreen() {
-  const { state } = useKanban();
+  const { state, dispatch } = useKanban();
   useTrayTasks();
+  const role = (state.myRole ?? null) as Role | null;
+  const navAllowed = canSeeNav(role, state.activeNav);
+  useEffect(() => {
+    if (role === "translator" && !navAllowed) {
+      dispatch({ type: "SET_ACTIVE_NAV", key: "task" });
+    }
+  }, [role, navAllowed, dispatch]);
+  if (role === "translator" && !navAllowed) {
+    return null;
+  }
   if (!state.ready) {
     return <div className="app-splash">Loading workspace…</div>;
   }
@@ -72,6 +86,7 @@ function ActiveScreen() {
       />
     );
   if (state.activeNav === "script") return <ScriptScreen />;
+  if (state.activeNav === "translations") return <TranslationsScreen />;
   if (state.activeNav === "calendar") return <CalendarScreen />;
   if (state.activeNav === "photos")
     return (

@@ -1,0 +1,77 @@
+/* ============================================================
+   Skeleton placeholders + content fade-in.
+
+   Behaviour:
+   - Skeleton primitives (.sk-block, .sk-stack, .sk-box) are invisible
+     for the first 100ms of their lifetime (animation-delay + backwards
+     fill mode). If data arrives before that they unmount silently and
+     no visual artefact is produced.
+   - After 100ms they fade in over 150ms with a subtle pulse so the
+     surface reads as "loading", not "empty".
+   - When real content mounts after a load, .fade-in animates it in
+     with opacity + slight translate for a calm reveal.
+   ============================================================ */
+
+@keyframes sk-appear {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes sk-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.85; }
+}
+
+.sk-block {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    rgba(200, 199, 202, 0.05) 0%,
+    rgba(200, 199, 202, 0.09) 50%,
+    rgba(200, 199, 202, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation:
+    sk-appear 0.18s ease backwards,
+    sk-pulse 1.4s ease-in-out 0.18s infinite;
+  animation-delay: 100ms, 100ms;
+}
+
+.sk-stack {
+  animation: sk-appear 0.18s ease backwards;
+  animation-delay: 100ms;
+}
+
+.sk-box {
+  animation: sk-appear 0.18s ease backwards;
+  animation-delay: 100ms;
+}
+
+/* Avoid double-fade for primitives nested in a delayed sk-box */
+.sk-box .sk-block {
+  animation:
+    sk-pulse 1.4s ease-in-out infinite;
+  animation-delay: 0ms;
+  opacity: 0.7;
+}
+
+/* ============================================================
+   Content fade-in: when real content mounts after a load, soften
+   the appearance with opacity + tiny translate. Add the .fade-in
+   class to the root of the content block.
+   ============================================================ */
+
+@keyframes content-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: content-fade-in 0.18s ease-out;
+}

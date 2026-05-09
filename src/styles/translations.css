@@ -1,0 +1,1561 @@
+/* Translations feature — strict Figma spec (1:1)
+   Sidebar 253px wide, dark canvas, padding 24/25 throughout.
+*/
+
+.main.translations {
+  display: grid;
+  grid-template-columns: 253px 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Sidebar shell ---------- */
+
+.tr-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-canvas);
+  border-right: 1px solid rgba(200, 199, 202, 0.05);
+  position: relative;
+}
+
+/* ---------- Pane header (col3Head) ----------
+   Figma: px-25 py-24, gap-14, border-bottom 1px rgba(200,199,202,0.05)
+*/
+.tr-pane-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 25px;
+  border-bottom: 1px solid rgba(200, 199, 202, 0.05);
+}
+
+.tr-head-row {
+  display: flex;
+  align-items: center;
+}
+.tr-head-title-row {
+  gap: 10px;
+}
+.tr-head-detail-row {
+  justify-content: space-between;
+  white-space: nowrap;
+}
+.tr-head-spacer { flex: 1 0 0; min-width: 0; }
+
+/* "Translations" — Montserrat Bold 16px, tracking -0.01 */
+.tr-pane-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01px;
+  color: var(--text-1);
+  line-height: normal;
+  white-space: nowrap;
+}
+/* Detail title "English" — SemiBold 14px */
+.tr-pane-title-detail {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* Count "2" — Medium 11px, opacity 0.5 */
+.tr-pane-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-1);
+  opacity: 0.5;
+  line-height: normal;
+}
+/* "33%" — Medium 12px, color #a87080 (--status-danger) */
+.tr-pane-pct {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--status-danger);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  line-height: normal;
+}
+.tr-pane-pct.is-progress { color: var(--status-danger); }
+.tr-pane-pct.is-complete { color: var(--status-ok); }
+
+/* ---------- Pane body (flexFill) ----------
+   Figma list view: gap-10 between rows
+   Figma detail view: gap-25 between sections
+*/
+.tr-pane-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px 25px;
+  display: flex;
+  flex-direction: column;
+  /* Custom scrollbar — thin, gutter overlay so it doesn't shift content */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 199, 202, 0.12) transparent;
+  scrollbar-gutter: stable;
+}
+.tr-pane-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.tr-pane-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tr-pane-body::-webkit-scrollbar-thumb {
+  background: rgba(200, 199, 202, 0.1);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  min-height: 32px;
+}
+.tr-pane-body:hover::-webkit-scrollbar-thumb {
+  background: rgba(200, 199, 202, 0.18);
+  background-clip: padding-box;
+}
+.tr-pane-body::-webkit-scrollbar-thumb:hover,
+.tr-pane-body::-webkit-scrollbar-thumb:active {
+  background: rgba(200, 199, 202, 0.28);
+  background-clip: padding-box;
+}
+.tr-pane-body::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.tr-pane-body-list { gap: 10px; }
+.tr-pane-body-detail { gap: 25px; }
+
+.tr-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Section label — Bold 10px, letter-spacing 0.1, opacity 0.4 */
+.tr-section-label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  color: rgba(200, 199, 202, 0.4);
+  line-height: normal;
+}
+
+.tr-pane-empty {
+  color: rgba(200, 199, 202, 0.4);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.tr-pane-empty p { margin: 0; }
+.tr-pane-empty-hint { color: rgba(200, 199, 202, 0.3); margin-top: 4px !important; }
+
+/* ---------- Card-style row ----------
+   Figma: h-40 px-12 rounded-9, projSwitch
+   File row: h-36 px-12 rounded-9
+*/
+.tr-row-wrap {
+  position: relative;
+  display: flex;
+}
+
+.tr-row {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  line-height: normal;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.tr-row-text {
+  flex: 1 0 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-row-glyph,
+.tr-row-chev {
+  flex-shrink: 0;
+  color: var(--text-1);
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+/* Filled variant — bg rgba(200,199,202,0.03) */
+.tr-row-filled {
+  background: rgba(200, 199, 202, 0.03);
+}
+.tr-row-filled:hover {
+  background: rgba(200, 199, 202, 0.06);
+}
+
+/* Outlined variant — border 1px rgba(200,199,202,0.05) */
+.tr-row-outlined {
+  border: 1px solid rgba(200, 199, 202, 0.05);
+}
+.tr-row-outlined:hover {
+  background: rgba(200, 199, 202, 0.04);
+  border-color: rgba(200, 199, 202, 0.1);
+}
+
+/* Active language — filled */
+.tr-row-wrap.is-active .tr-row-outlined {
+  background: rgba(200, 199, 202, 0.03);
+  border-color: transparent;
+}
+
+/* File row — Figma: h-36, transparent by default, bg-0.03 only when active */
+.tr-row-file {
+  height: 36px;
+  background: transparent;
+}
+.tr-row-file:hover {
+  background: rgba(200, 199, 202, 0.04);
+}
+.tr-row-file.is-active {
+  background: rgba(200, 199, 202, 0.03);
+}
+.tr-row-file.is-active:hover {
+  background: rgba(200, 199, 202, 0.06);
+}
+
+/* Folder row in tree — Figma: transparent by default */
+.tr-row-folder {
+  height: 36px;
+  background: transparent;
+  gap: 8px;
+}
+.tr-row-folder:hover {
+  background: rgba(200, 199, 202, 0.04);
+}
+.tr-folder-caret {
+  flex-shrink: 0;
+  width: 8px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(200, 199, 202, 0.6);
+  transition: transform 0.15s;
+}
+.tr-folder-caret.is-open {
+  transform: rotate(90deg);
+}
+
+/* Inline glyph slot for folder/file icons */
+.tr-row-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: rgba(200, 199, 202, 0.55);
+  transition: color 0.12s;
+}
+.tr-row:hover .tr-row-icon {
+  color: rgba(200, 199, 202, 0.75);
+}
+.tr-row.is-active .tr-row-icon,
+.tr-row-file.is-active .tr-row-icon {
+  color: var(--text-1);
+}
+/* When the file row carries an icon, ensure it sits next to the text. */
+.tr-row-file.has-icon {
+  gap: 10px;
+}
+
+/* Tree container + nested rows.
+   Figma uses gap-8 between siblings; nested children have a 1px guide line. */
+.tr-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.tr-tree-row {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.tr-tree-row .tr-row-wrap {
+  display: flex;
+}
+/* Vertical guide line for nested levels (per Figma: rgba(200,199,202,0.05)) */
+.tr-tree-row[style*="padding-left"]::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(200, 199, 202, 0.05);
+}
+
+/* Status dot — Figma 5x5 ellipse, no border, solid colour */
+.tr-row-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(200, 199, 202, 0.3);
+  transition: opacity 0.12s;
+}
+.tr-row-dot.is-pending { background: rgba(200, 199, 202, 0.3); }
+.tr-row-dot.is-empty   { background: var(--status-danger); }
+.tr-row-dot.is-partial { background: var(--status-warn); }
+.tr-row-dot.is-done    { background: var(--status-ok); }
+
+/* On hover, fade the dot out so the X can take its slot cleanly. */
+.tr-row-wrap:hover .tr-row-dot {
+  opacity: 0;
+}
+
+/* Delete X — fills the same slot as the dot, no gradient overlay */
+.tr-row-actions {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.tr-row-wrap:hover .tr-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.tr-row-actions .tr-icon-btn {
+  width: 20px;
+  height: 20px;
+  color: rgba(200, 199, 202, 0.5);
+}
+.tr-row-actions .tr-icon-btn:hover {
+  background: transparent;
+  color: var(--status-danger);
+}
+
+/* "..." menu wrap on language rows */
+.tr-row-menu-wrap {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tr-row-wrap:hover .tr-row-menu-wrap { opacity: 1; }
+.tr-row-menu-btn {
+  background: rgba(200, 199, 202, 0.05);
+}
+
+.tr-icon-btn {
+  background: transparent;
+  border: 0;
+  color: rgba(200, 199, 202, 0.5);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.tr-icon-btn:hover {
+  background: rgba(200, 199, 202, 0.08);
+  color: var(--text-1);
+}
+
+/* ---------- Pane footer (col3Bottom) ----------
+   Figma: pt-16 pb-25 px-25, single CTA Preferences/Import
+*/
+.tr-pane-footer {
+  padding: 16px 25px 25px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+/* Primary CTA — bg 0.05, h-40, rounded-11, SemiBold 13 */
+.tr-cta {
+  flex: 1 0 0;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: rgba(200, 199, 202, 0.05);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  line-height: normal;
+  transition: background 0.12s;
+}
+.tr-cta:hover { background: rgba(200, 199, 202, 0.09); }
+
+.tr-cta-icon {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: rgba(200, 199, 202, 0.05);
+  color: var(--text-1);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.tr-cta-icon:hover { background: rgba(200, 199, 202, 0.09); }
+
+.tr-project-menu-pop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 4;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.tr-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--text-1);
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.tr-menu-item:hover { background: rgba(200, 199, 202, 0.08); }
+.tr-menu-item.is-danger { color: var(--status-danger); }
+
+.tr-icon-btn {
+  background: transparent;
+  border: 0;
+  color: var(--text-2);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+}
+.tr-icon-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-1);
+}
+
+/* ---------- Unified sidebar (drill-down: projects ⇄ files) ---------- */
+
+.tr-sidebar {
+  position: relative;
+}
+.tr-sidebar.is-drag-over {
+  background: var(--bg-card);
+}
+
+.tr-back-btn {
+  font-size: 22px !important;
+  line-height: 1 !important;
+  width: 26px;
+  margin-right: 2px;
+}
+.tr-pane-eyebrow-proj {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.tr-pane-eyebrow-proj .tr-eyebrow-name {
+  color: var(--text-1);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.tr-pane-eyebrow-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tr-project-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 8px;
+  position: relative;
+}
+.tr-project-row:hover { background: var(--bg-card); }
+
+.tr-project-main {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--text-1);
+  padding: 10px 36px 10px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.tr-project-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.tr-project-icon.tr-project-lang {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-1);
+  background: linear-gradient(135deg,
+    rgba(200, 199, 202, 0.08),
+    rgba(200, 199, 202, 0.02));
+}
+.tr-project-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.tr-project-name {
+  font-size: 13px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-project-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tr-project-sub .tr-dot,
+.tr-folder-item-meta .tr-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-4);
+  flex-shrink: 0;
+}
+.tr-project-chevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-4);
+  font-size: 16px;
+  pointer-events: none;
+  transition: transform 0.12s, color 0.12s;
+}
+.tr-project-row:hover .tr-project-chevron {
+  color: var(--text-2);
+  transform: translateY(-50%) translateX(2px);
+}
+
+.tr-project-menu-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+  gap: 2px;
+}
+.tr-project-menu-floating {
+  position: absolute;
+  right: 32px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding-right: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+  background: var(--bg-card-hover);
+  border-radius: 6px;
+}
+.tr-project-row:hover .tr-project-menu-floating { opacity: 1; }
+.tr-project-menu-pop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 4;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.tr-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--text-1);
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.tr-menu-item:hover { background: var(--bg-card-hover); }
+.tr-menu-item.is-danger { color: var(--status-danger); }
+
+/* ---------- Files inside a project (drill-down view) ---------- */
+
+.tr-file-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 8px;
+  position: relative;
+}
+.tr-file-row:hover { background: var(--bg-card); }
+.tr-file-row.is-active { background: var(--bg-card-hover); }
+.tr-file-row + .tr-file-row { margin-top: 1px; }
+
+.tr-file-main {
+  flex: 1;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--text-1);
+  padding: 9px 10px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.tr-file-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tr-file-name {
+  font-size: 13px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.tr-file-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.tr-file-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.tr-file-progress {
+  flex: 1;
+  height: 3px;
+  background: rgba(200, 199, 202, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+.tr-file-progress > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--status-ok);
+  border-radius: 999px;
+  transition: width 0.18s ease;
+}
+.tr-file-row.is-complete .tr-file-progress > span { background: var(--status-ok); }
+.tr-file-pct {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+
+.tr-file-actions {
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.tr-file-row:hover .tr-file-actions,
+.tr-file-row.is-active .tr-file-actions { opacity: 1; }
+.tr-file-actions .tr-icon-btn:hover { color: var(--status-danger); }
+
+.tr-pane-empty {
+  margin: auto;
+  padding: 32px 20px;
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.6;
+}
+.tr-pane-empty p { margin: 0 0 12px; }
+
+/* ---------- Editor (right pane) ---------- */
+
+.tr-detail {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-canvas);
+}
+
+.tr-empty {
+  margin: auto;
+  padding: 40px;
+  text-align: center;
+  color: var(--text-3);
+  max-width: 480px;
+}
+.tr-empty h2 {
+  color: var(--text-1);
+  margin: 0 0 8px;
+  font-weight: 500;
+  font-size: 18px;
+}
+.tr-empty p { margin: 0 0 16px; }
+
+.tr-editor-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ----- Editor header (col3Head) -----
+   Figma: h-72, px-25 py-24, border-b rgba(0.05), single row justify-between.
+*/
+
+.tr-ed-head {
+  height: 72px;
+  flex-shrink: 0;
+  padding: 24px 25px;
+  border-bottom: 1px solid rgba(200, 199, 202, 0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.tr-ed-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ----- Breadcrumb: lang / folder.../ filename ----- */
+
+.tr-ed-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+.tr-bc-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.tr-bc-root {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tr-bc-item {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.tr-bc-current {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+/* Slash separator — plain "/" character, styled to match Figma's thin
+   rotated line. Keeping it as text means it copies cleanly when the user
+   selects the breadcrumb. */
+.tr-bc-sep {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(200, 199, 202, 0.35);
+  user-select: none;
+  line-height: 1;
+}
+
+/* ----- Mini progress bar (right side) ----- */
+
+.tr-ed-mini-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+.tr-mini-pct {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--status-danger);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 24px;
+  text-align: right;
+}
+.tr-mini-pct.is-complete { color: var(--status-ok); }
+.tr-mini-bar {
+  width: 79px;
+  height: 4px;
+  background: rgba(217, 217, 217, 0.05);
+  border-radius: 27px;
+  overflow: hidden;
+  position: relative;
+}
+.tr-mini-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--status-danger);
+  border-radius: 27px;
+  transition: width 0.18s ease, background 0.18s ease;
+}
+.tr-mini-bar-fill.is-complete {
+  background: var(--status-ok);
+}
+
+/* ----- Editor toolbar -----
+   Figma: h-75, pt-18 pb-17 pl-21 pr-25, bg rgba(217,217,217,0.02),
+   no border, gap-133 between search and chips (we use space-between).
+*/
+
+.tr-ed-toolbar {
+  height: 75px;
+  flex-shrink: 0;
+  padding: 18px 25px 17px 21px;
+  background: rgba(217, 217, 217, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+/* ----- Search input (Figma: 415px h-40 px-12 rounded-8 bg-0.03) ----- */
+
+.tr-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  width: 100%;
+  max-width: 415px;
+  flex: 1 1 auto;
+  min-width: 200px;
+  padding: 0 12px;
+  background: rgba(200, 199, 202, 0.03);
+  border-radius: 8px;
+  cursor: text;
+  transition: background 0.12s;
+}
+.tr-search:hover {
+  background: rgba(200, 199, 202, 0.05);
+}
+.tr-search:focus-within {
+  background: rgba(200, 199, 202, 0.06);
+}
+.tr-search-input {
+  flex: 1 1 0;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: normal;
+}
+.tr-search-input::placeholder {
+  color: rgba(200, 199, 202, 0.4);
+  font-weight: 500;
+}
+.tr-kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  background: rgba(200, 199, 202, 0.07);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(200, 199, 202, 0.5);
+  letter-spacing: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ----- Filter chips (Figma: gap-5 between chips, h-40 px-15 rounded-9) ----- */
+
+.tr-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.tr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 15px;
+  border-radius: 9px;
+  border: 0;
+  background: rgba(200, 199, 202, 0.03);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(200, 199, 202, 0.4);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: normal;
+  transition: background 0.12s, color 0.12s;
+}
+.tr-chip:hover {
+  background: rgba(200, 199, 202, 0.06);
+}
+.tr-chip.is-active {
+  background: rgba(200, 199, 202, 0.1);
+  color: var(--text-1);
+}
+.tr-chip.is-active .tr-chip-label {
+  opacity: 0.7;
+}
+.tr-chip-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(200, 199, 202, 0.9);
+  font-variant-numeric: tabular-nums;
+}
+.tr-chip.is-active .tr-chip-count {
+  color: var(--text-1);
+  opacity: 1;
+}
+
+/* ----- Rows / cards body ----- */
+
+.tr-rows {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 25px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 199, 202, 0.12) transparent;
+}
+.tr-rows::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.tr-rows::-webkit-scrollbar-track { background: transparent; }
+.tr-rows::-webkit-scrollbar-thumb {
+  background: rgba(200, 199, 202, 0.1);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  min-height: 40px;
+}
+.tr-rows:hover::-webkit-scrollbar-thumb {
+  background: rgba(200, 199, 202, 0.18);
+  background-clip: padding-box;
+}
+.tr-rows::-webkit-scrollbar-thumb:hover,
+.tr-rows::-webkit-scrollbar-thumb:active {
+  background: rgba(200, 199, 202, 0.28);
+  background-clip: padding-box;
+}
+
+.tr-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Group divider — Telegram-style centered label with hairlines on either
+   side. Not sticky, scrolls with content. Sits above its group's rows. */
+.tr-group-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 8px 6px;
+  user-select: none;
+}
+.tr-group + .tr-group .tr-group-divider {
+  /* extra breathing room when divider follows another group */
+  padding-top: 22px;
+}
+.tr-group-divider-line {
+  flex: 1 1 0;
+  height: 1px;
+  background: rgba(200, 199, 202, 0.06);
+}
+.tr-group-divider-label {
+  flex-shrink: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(200, 199, 202, 0.35);
+}
+
+/* String card — same visual language as toolbar (bg 0.03, rounded-9, no
+   coloured borders). No more left status bar — status is conveyed by the
+   pill on the right of the head.
+*/
+
+.tr-card {
+  background: rgba(200, 199, 202, 0.03);
+  border-radius: 9px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  transition: background 0.12s;
+}
+.tr-card:hover {
+  background: rgba(200, 199, 202, 0.05);
+}
+.tr-card.is-focused {
+  background: rgba(200, 199, 202, 0.06);
+}
+.tr-card.is-done {
+  background: rgba(141, 153, 130, 0.04);
+}
+.tr-card.is-done:hover {
+  background: rgba(141, 153, 130, 0.07);
+}
+
+.tr-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Source path locator — flat label, no pill background */
+.tr-card-loc {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(200, 199, 202, 0.4);
+  display: inline-flex;
+  align-items: center;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+.tr-card-loc .tr-loc-line {
+  color: rgba(200, 199, 202, 0.3);
+}
+.tr-card-spacer { flex: 1; }
+
+/* Status pill — chip-style: same as toolbar chips, just smaller */
+.tr-card-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(200, 199, 202, 0.03);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(200, 199, 202, 0.4);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.tr-card-status-pill:hover:not(:disabled) {
+  background: rgba(200, 199, 202, 0.08);
+}
+.tr-card-status-pill:disabled { cursor: default; opacity: 0.6; }
+.tr-card-status-pill .pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(200, 199, 202, 0.4);
+  flex-shrink: 0;
+}
+.tr-card-status-pill.is-empty .pill-dot { background: rgba(200, 199, 202, 0.4); }
+.tr-card-status-pill.is-draft {
+  background: rgba(168, 152, 130, 0.08);
+  color: var(--status-warn);
+}
+.tr-card-status-pill.is-draft .pill-dot { background: var(--status-warn); }
+.tr-card-status-pill.is-done {
+  background: rgba(141, 153, 130, 0.1);
+  color: var(--status-ok);
+}
+.tr-card-status-pill.is-done .pill-dot { background: var(--status-ok); }
+
+/* Source text — flat, no left border */
+.tr-card-source {
+  color: rgba(200, 199, 202, 0.7);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 0;
+}
+.renpy-tag {
+  color: var(--role-editor);
+  background: rgba(141, 153, 130, 0.08);
+  padding: 0 3px;
+  border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.tr-card-target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Textarea — same look as the toolbar search: bg-0.03, rounded-8, no border.
+   Auto-grows with content via useLayoutEffect in StringRow; manual resize
+   is disabled so the height is purely content-driven. */
+.tr-textarea {
+  width: 100%;
+  resize: none;
+  overflow: hidden;
+  background: rgba(200, 199, 202, 0.03);
+  color: var(--text-1);
+  border: 0;
+  outline: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  line-height: 1.55;
+  min-height: 40px;
+  display: block;
+  box-sizing: border-box;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.tr-textarea::placeholder {
+  color: rgba(200, 199, 202, 0.35);
+  font-weight: 500;
+}
+.tr-textarea:hover {
+  background: rgba(200, 199, 202, 0.05);
+}
+.tr-textarea:focus {
+  background: rgba(200, 199, 202, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(200, 199, 202, 0.12);
+}
+.tr-textarea[readonly] {
+  background: transparent;
+  color: rgba(200, 199, 202, 0.7);
+}
+.tr-textarea[readonly]:hover { background: transparent; }
+
+.tr-card-hint {
+  font-size: 11px;
+  color: rgba(200, 199, 202, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0;
+}
+.tr-card-hint kbd {
+  background: rgba(200, 199, 202, 0.07);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(200, 199, 202, 0.5);
+}
+
+/* Import dialog */
+
+.tr-dlg-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tr-dlg-file-row .tr-file-name {
+  color: var(--text-2);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+.tr-import-preview {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ---------- Sidebar dropzone (empty state) & drag overlay ---------- */
+
+.tr-dropzone {
+  margin: 8px 4px;
+  padding: 28px 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg-card);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.tr-dropzone-icon {
+  font-size: 26px;
+  color: var(--text-3);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+.tr-dropzone-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+}
+.tr-dropzone-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.tr-dropzone-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tr-drag-overlay {
+  position: absolute;
+  inset: 48px 6px 6px 6px;
+  background: rgba(19, 20, 22, 0.85);
+  backdrop-filter: blur(2px);
+  border: 1px dashed var(--text-2);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  z-index: 5;
+  pointer-events: none;
+  animation: tr-fade-in 0.12s ease;
+}
+.tr-drag-overlay-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-1);
+  font-size: 13px;
+}
+.tr-drag-overlay-icon {
+  font-size: 32px;
+  color: var(--text-2);
+}
+@keyframes tr-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ---------- Import bar (bottom of files list) ---------- */
+
+.tr-import-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px;
+  background: transparent;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+}
+.tr-import-bar-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-3);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 9px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.tr-import-bar-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+.tr-ib-glyph {
+  font-size: 14px;
+  color: var(--text-3);
+}
+.tr-import-bar-btn:hover .tr-ib-glyph { color: var(--text-1); }
+
+/* ---------- Folder import dialog ---------- */
+
+.tr-folder-modal {
+  width: min(640px, 92vw);
+}
+.tr-folder-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 60vh;
+}
+.tr-folder-loading {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.tr-folder-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.tr-folder-summary strong {
+  color: var(--text-1);
+  font-weight: 500;
+}
+.tr-folder-langs {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.tr-folder-summary-into {
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tr-folder-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.tr-folder-checkall {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.tr-folder-checkall input[type="checkbox"] { accent-color: var(--text-1); }
+
+.tr-folder-override {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tr-folder-override-label {
+  margin: 0 !important;
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tr-folder-override-input {
+  width: 140px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.tr-folder-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  min-height: 200px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 199, 202, 0.12) transparent;
+}
+.tr-folder-list::-webkit-scrollbar { width: 8px; }
+.tr-folder-list::-webkit-scrollbar-track { background: transparent; }
+.tr-folder-list::-webkit-scrollbar-thumb {
+  background: rgba(200, 199, 202, 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.tr-folder-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 199, 202, 0.25);
+  background-clip: padding-box;
+}
+.tr-folder-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.tr-folder-item:hover { background: var(--bg-card); }
+.tr-folder-item.is-disabled { opacity: 0.55; cursor: not-allowed; }
+.tr-folder-item.is-done { background: rgba(141, 153, 130, 0.06); }
+.tr-folder-item.is-importing { background: rgba(168, 152, 130, 0.08); }
+.tr-folder-item.is-error { background: rgba(168, 112, 128, 0.08); }
+.tr-folder-item input[type="checkbox"] {
+  accent-color: var(--text-1);
+  margin-top: 2px;
+}
+.tr-folder-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tr-folder-item-name {
+  font-size: 13px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-folder-item-path {
+  color: rgba(200, 199, 202, 0.45);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  margin-right: 1px;
+}
+.tr-folder-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.tr-folder-item-error {
+  font-size: 11.5px;
+  color: var(--status-danger);
+}
+.tr-folder-warn { color: var(--status-warn); }
+.tr-folder-item-status {
+  font-size: 11px;
+  color: var(--text-3);
+  flex-shrink: 0;
+  align-self: center;
+  min-width: 60px;
+  text-align: right;
+}
+.tr-folder-ok { color: var(--status-ok); font-size: 14px; }
+.tr-folder-err { color: var(--status-danger); font-weight: 700; }

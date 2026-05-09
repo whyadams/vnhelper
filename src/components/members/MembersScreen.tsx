@@ -5,11 +5,12 @@ import { useKanban } from "../../state/kanbanStore";
 import { UsersFilledIcon } from "../kanban/SidebarIcons";
 import { useDialog } from "../ui/Dialog";
 
-type Role = "owner" | "editor" | "viewer";
+type Role = "owner" | "editor" | "viewer" | "translator";
 
 interface MemberRow {
   user_id: string;
   role: Role;
+  target_language: string | null;
   profile: { id: string; email: string | null; name: string | null } | null;
   created_at?: string;
 }
@@ -18,6 +19,7 @@ interface InvitationRow {
   id: string;
   email: string;
   role: Role;
+  target_language: string | null;
   invited_user_id: string | null;
   created_at: string;
 }
@@ -44,6 +46,7 @@ export function MembersScreen() {
   const [showInvite, setShowInvite] = useState(false);
   const [email, setEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("editor");
+  const [inviteLang, setInviteLang] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -55,11 +58,15 @@ export function MembersScreen() {
     const [membersRes, invitesRes] = await Promise.all([
       supabase
         .from("workspace_members")
-        .select("user_id, role, created_at, profiles(id, email, name)")
+        .select(
+          "user_id, role, target_language, created_at, profiles(id, email, name)",
+        )
         .eq("workspace_id", state.workspaceId),
       supabase
         .from("workspace_invitations")
-        .select("id, email, role, invited_user_id, created_at")
+        .select(
+          "id, email, role, target_language, invited_user_id, created_at",
+        )
         .eq("workspace_id", state.workspaceId)
         .order("created_at", { ascending: false }),
     ]);
@@ -69,6 +76,7 @@ export function MembersScreen() {
         (membersRes.data ?? []).map((r) => ({
           user_id: r.user_id,
           role: r.role as Role,
+          target_language: r.target_language ?? null,
           created_at: r.created_at,
           profile: (r as { profiles: MemberRow["profile"] }).profiles,
         })),
@@ -81,6 +89,7 @@ export function MembersScreen() {
           id: r.id,
           email: r.email,
           role: r.role as Role,
+          target_language: r.target_language ?? null,
           invited_user_id: r.invited_user_id,
           created_at: r.created_at,
         })),
@@ -125,7 +134,7 @@ export function MembersScreen() {
   }, [state.workspaceId]);
 
   const counts = useMemo(() => {
-    const c = { all: members.length, owner: 0, editor: 0, viewer: 0 };
+    const c = { all: members.length, owner: 0, editor: 0, viewer: 0, translator: 0 };
     for (const m of members) c[m.role]++;
     return c;
   }, [members]);
@@ -146,18 +155,46 @@ export function MembersScreen() {
     if (!state.workspaceId) return;
     setError(null);
     setInfo(null);
+    if (inviteRole === "translator" && !inviteLang.trim()) {
+      setError("Language is required for translator invitations.");
+      return;
+    }
     setBusy(true);
-    const { error } = await supabase.rpc("invite_to_workspace", {
+    const { data: invRow, error } = await supabase.rpc("invite_to_workspace", {
       _workspace_id: state.workspaceId,
       _email: email.trim(),
       _role: inviteRole,
     });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setError(error.message);
       return;
     }
+    if (inviteRole === "translator") {
+      const lang = inviteLang.trim().toLowerCase();
+      const invitationId = (invRow as { id?: string } | null)?.id ?? null;
+      if (!invitationId) {
+        setBusy(false);
+        setError(
+          "Invitation created but its id was not returned — language could not be set.",
+        );
+        return;
+      }
+      const { error: updErr } = await supabase
+        .from("workspace_invitations")
+        .update({ target_language: lang })
+        .eq("id", invitationId);
+      if (updErr) {
+        setBusy(false);
+        setError(
+          "Invitation created but language could not be set — ask a workspace admin.",
+        );
+        return;
+      }
+    }
+    setBusy(false);
     setEmail("");
+    setInviteLang("");
     setShowInvite(false);
     setInfo(`Invitation sent to ${email}.`);
     void refresh();
@@ -272,7 +309,18 @@ export function MembersScreen() {
             >
               <option value="editor">Editor</option>
               <option value="viewer">Viewer</option>
+              <option value="translator">Translator</option>
             </select>
+            {inviteRole === "translator" && (
+              <input
+                type="text"
+                required
+                value={inviteLang}
+                placeholder="english"
+                aria-label="Language"
+                onChange={(e) => setInviteLang(e.target.value)}
+              />
+            )}
             <button type="submit" className="hbtn is-primary" disabled={busy}>
               {busy ? "…" : "Send invite"}
             </button>
@@ -316,8 +364,13 @@ export function MembersScreen() {
                   <span className={"ws-role ws-role-" + m.role}>
                     <span className="ws-role-dot" />
                     {m.role}
+                    {m.role === "translator" && m.target_language && (
+                      <span className="ws-role-lang">
+                        · {m.target_language}
+                      </span>
+                    )}
                   </span>
-                  {isOwner && m.role !== "owner" && (
+                  {isOwner && m.role !== "owner" && m.role !== "translator" && (
                     <select
                       className="ws-role-edit"
                       value={m.role}
@@ -371,6 +424,11 @@ export function MembersScreen() {
                     <span className={"ws-role ws-role-" + inv.role}>
                       <span className="ws-role-dot" />
                       {inv.role}
+                      {inv.role === "translator" && inv.target_language && (
+                        <span className="ws-role-lang">
+                          · {inv.target_language}
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="ws-td col-joined" />

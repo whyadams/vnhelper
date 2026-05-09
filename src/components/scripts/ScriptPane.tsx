@@ -22,6 +22,7 @@ import {
   MMenuPageTrigger,
   MMenuSeparator,
 } from "../ui/MMenu";
+import { SkeletonStack } from "../ui/Skeleton";
 
 type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
 type DropZone = "before" | "after" | "into";
@@ -405,15 +406,19 @@ export function ScriptPane({
         style={{ ["--tree-indent" as never]: `${TREE_INDENT}px` }}
         {...tree.getContainerProps()}
       >
-        {!scripts.activeProjectId ? (
-          <div className="notes-empty">
+        {!scripts.projectsReady ? (
+          <SkeletonStack count={6} height={32} rounded={8} />
+        ) : !scripts.activeProjectId ? (
+          <div className="notes-empty fade-in">
             <div style={{ marginBottom: 6 }}>No script project yet.</div>
             <button type="button" className="hbtn" onClick={onCreateProject}>
               + Create your first script
             </button>
           </div>
+        ) : !scripts.contentReady ? (
+          <SkeletonStack count={8} height={32} rounded={8} />
         ) : visibleItems.length === 0 ? (
-          <div className="notes-empty">
+          <div className="notes-empty fade-in">
             No scenes yet — click + to add a chapter or scene
           </div>
         ) : (

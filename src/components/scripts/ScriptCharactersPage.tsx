@@ -10,6 +10,7 @@ import {
 } from "../../lib/avatarUpload";
 import { UsersFilledIcon } from "../kanban/SidebarIcons";
 import { useDialog } from "../ui/Dialog";
+import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
 
 type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
 
@@ -76,7 +77,8 @@ export function ScriptCharactersPage({
     if (id) setEditingLocId(id);
   };
 
-  if (!scripts.activeProjectId) {
+  // Loading: skeleton instead of empty-state flash on workspace switch.
+  if (!scripts.projectsReady) {
     return (
       <main className="main vn-main">
         <div className="topbar tmt-bar vn-cast-topbar">
@@ -93,6 +95,32 @@ export function ScriptCharactersPage({
           <span className="tmt-title">Cast</span>
         </div>
         <div className="notes-empty-doc">
+          <SkeletonBox style={{ width: 320, maxWidth: "60%" }}>
+            <SkeletonBlock height={20} width="80%" />
+            <SkeletonBlock height={14} width="60%" style={{ marginTop: 12 }} />
+          </SkeletonBox>
+        </div>
+      </main>
+    );
+  }
+
+  if (!scripts.activeProjectId) {
+    return (
+      <main className="main vn-main">
+        <div className="topbar tmt-bar vn-cast-topbar">
+          <button
+            type="button"
+            className="vn-cast-back"
+            onClick={onBack}
+            aria-label="Back to script"
+            title="Back to script"
+          >
+            ←
+          </button>
+          <UsersFilledIcon size={20} className="tmt-ico" />
+          <span className="tmt-title">Cast</span>
+        </div>
+        <div className="notes-empty-doc fade-in">
           <p>Pick or create a script project first.</p>
         </div>
       </main>

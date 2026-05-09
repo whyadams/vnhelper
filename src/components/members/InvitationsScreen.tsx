@@ -77,6 +77,11 @@ export function InvitationsScreen() {
                   <span className={"ws-role ws-role-" + inv.role}>
                     <span className="ws-role-dot" />
                     {inv.role}
+                    {inv.role === "translator" && inv.target_language && (
+                      <span className="ws-role-lang">
+                        · {inv.target_language}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="ws-td col-joined" />

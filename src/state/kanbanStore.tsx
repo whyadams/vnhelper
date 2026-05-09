@@ -27,13 +27,14 @@ import { supabase } from "../lib/supabase";
 import type { Tables, TablesUpdate } from "../lib/database.types";
 
 export type SortMode = "default" | "date-desc" | "date-asc" | "title-asc";
-export type WorkspaceRole = "owner" | "editor" | "viewer";
+export type WorkspaceRole = "owner" | "editor" | "viewer" | "translator";
 
 export interface WorkspaceListItem {
   id: string;
   name: string;
   role: WorkspaceRole;
   avatar_url: string | null;
+  target_language: string | null;
 }
 
 export interface IncomingInvitation {
@@ -43,6 +44,7 @@ export interface IncomingInvitation {
   inviter_name: string | null;
   inviter_email: string | null;
   role: WorkspaceRole;
+  target_language: string | null;
   created_at: string;
 }
 
@@ -64,6 +66,7 @@ export interface KanbanState {
   boardId: string | null;
   boardName: string;
   myRole: WorkspaceRole | null;
+  myTargetLanguage: string | null;
   columnIdByKey: Partial<Record<ColumnKey, string>>;
   ready: boolean;
 
@@ -103,6 +106,7 @@ type RemoteAction =
       boardId: string;
       boardName: string;
       myRole: WorkspaceRole;
+      myTargetLanguage: string | null;
       columns: ColumnData[];
       columnIdByKey: Partial<Record<ColumnKey, string>>;
     }
@@ -135,6 +139,7 @@ const initialState: KanbanState = {
   boardId: null,
   boardName: "Board",
   myRole: null,
+  myTargetLanguage: null,
   columnIdByKey: {},
   ready: false,
   incomingInvitations: [],
@@ -160,6 +165,9 @@ function reducer(state: KanbanState, action: Action): KanbanState {
       // If active workspace was removed, drop it
       const stillActive =
         state.workspaceId && list.some((w) => w.id === state.workspaceId);
+      const activeWs = stillActive
+        ? list.find((w) => w.id === state.workspaceId)
+        : list[0];
       return {
         ...state,
         workspaces: list,
@@ -168,6 +176,7 @@ function reducer(state: KanbanState, action: Action): KanbanState {
           ? state.workspaceName
           : (list[0]?.name ?? "Workspace"),
         myRole: stillActive ? state.myRole : (list[0]?.role ?? null),
+        myTargetLanguage: activeWs?.target_language ?? null,
       };
     }
 
@@ -182,6 +191,7 @@ function reducer(state: KanbanState, action: Action): KanbanState {
         workspaceId: action.id,
         workspaceName: ws?.name ?? state.workspaceName,
         myRole: ws?.role ?? null,
+        myTargetLanguage: ws?.target_language ?? null,
         boardId: null,
         columns: [],
         columnIdByKey: {},
@@ -198,6 +208,7 @@ function reducer(state: KanbanState, action: Action): KanbanState {
         boardId: action.boardId,
         boardName: action.boardName,
         myRole: action.myRole,
+        myTargetLanguage: action.myTargetLanguage,
         columns: action.columns,
         columnIdByKey: action.columnIdByKey,
         focusedId: state.focusedId ?? action.columns[0]?.cards[0]?.id ?? null,
@@ -491,21 +502,24 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
             .order("created_at", { ascending: true }),
           supabase
             .from("workspace_members")
-            .select("workspace_id, role")
+            .select("workspace_id, role, target_language")
             .eq("user_id", user.id),
         ]);
       if (wsErr) throw wsErr;
       if (mErr) throw mErr;
 
       const roleByWs = new Map<string, WorkspaceRole>();
+      const langByWs = new Map<string, string | null>();
       for (const m of mems ?? []) {
         roleByWs.set(m.workspace_id, m.role as WorkspaceRole);
+        langByWs.set(m.workspace_id, m.target_language ?? null);
       }
       const list: WorkspaceListItem[] = (ws ?? []).map((w) => ({
         id: w.id,
         name: w.name,
         role: roleByWs.get(w.id) ?? "viewer",
         avatar_url: w.avatar_url ?? null,
+        target_language: langByWs.get(w.id) ?? null,
       }));
 
       if (list.length === 0) {
@@ -535,6 +549,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
             name: created.name,
             role: "owner",
             avatar_url: null,
+            target_language: null,
           });
         }
       }
@@ -582,7 +597,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from("workspace_invitations")
       .select(
-        "id, workspace_id, role, created_at, workspaces(name), profiles!workspace_invitations_invited_by_fkey(name, email)",
+        "id, workspace_id, role, target_language, created_at, workspaces(name), profiles!workspace_invitations_invited_by_fkey(name, email)",
       )
       .order("created_at", { ascending: false });
     if (error) {
@@ -593,14 +608,12 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
       id: string;
       workspace_id: string;
       role: WorkspaceRole;
+      target_language: string | null;
       created_at: string;
       workspaces: { name: string } | null;
       profiles: { name: string | null; email: string | null } | null;
     };
     const rows = (data ?? []) as unknown as Row[];
-    // Filter to invitations actually for this user (RLS already does, but
-    // also exclude any whose workspace_id matches a workspace the user is
-    // already a member of — defensive).
     const myWsIds = new Set(stateRef.current.workspaces.map((w) => w.id));
     const list: IncomingInvitation[] = rows
       .filter((r) => !myWsIds.has(r.workspace_id))
@@ -611,6 +624,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         inviter_name: r.profiles?.name ?? null,
         inviter_email: r.profiles?.email ?? null,
         role: r.role,
+        target_language: r.target_language ?? null,
         created_at: r.created_at,
       }));
     baseDispatch({ type: "SET_INVITATIONS", list });
@@ -651,6 +665,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         );
         const workspaceName = ws?.name ?? "Workspace";
         const myRole: WorkspaceRole = ws?.role ?? "viewer";
+        const myTargetLanguage: string | null = ws?.target_language ?? null;
 
         // Find or create board
         const { data: boards, error: bErr } = await supabase
@@ -738,6 +753,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
           boardId,
           boardName,
           myRole,
+          myTargetLanguage,
           columns,
           columnIdByKey,
         });
@@ -836,6 +852,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
               boardId: row.id,
               boardName: row.name,
               myRole: stateRef.current.myRole ?? "viewer",
+              myTargetLanguage: stateRef.current.myTargetLanguage,
               columns: stateRef.current.columns,
               columnIdByKey: stateRef.current.columnIdByKey,
             });

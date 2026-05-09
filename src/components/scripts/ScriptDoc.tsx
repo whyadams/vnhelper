@@ -18,6 +18,7 @@ import {
 import { ScriptTable } from "./ScriptTable";
 import { ScriptImportModal } from "./ScriptImportModal";
 import { useDialog } from "../ui/Dialog";
+import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
 
 type ScriptViewMode = "doc" | "table";
 
@@ -185,14 +186,55 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     );
   }, [node?.pov, scripts.characters]);
 
-  if (!scripts.activeProjectId) {
+  // Pre-data state: render a skeleton instead of empty-state messages so
+  // workspace switching doesn't flash "Pick or create a project" for a frame.
+  if (!scripts.projectsReady) {
     return (
       <main className="main">
         <div className="topbar notes-topbar">
           <span className="crumb">Script</span>
         </div>
         <div className="notes-empty-doc">
+          <SkeletonBox style={{ width: 320, maxWidth: "60%" }}>
+            <SkeletonBlock height={20} width="80%" />
+            <SkeletonBlock height={14} width="60%" style={{ marginTop: 12 }} />
+            <SkeletonBlock height={14} width="50%" style={{ marginTop: 8 }} />
+          </SkeletonBox>
+        </div>
+      </main>
+    );
+  }
+
+  if (!scripts.activeProjectId) {
+    return (
+      <main className="main">
+        <div className="topbar notes-topbar">
+          <span className="crumb">Script</span>
+        </div>
+        <div className="notes-empty-doc fade-in">
           <p>Pick or create a script project from the sidebar.</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!scripts.contentReady) {
+    return (
+      <main className="main">
+        <div className="topbar notes-topbar">
+          <span className="crumb">Script</span>
+          <span className="crumb-sep">/</span>
+          <span className="crumb is-current">
+            {scripts.activeProject?.title ?? ""}
+          </span>
+        </div>
+        <div className="notes-empty-doc">
+          <SkeletonBox style={{ width: 360, maxWidth: "70%" }}>
+            <SkeletonBlock height={24} width="70%" />
+            <SkeletonBlock height={14} width="90%" style={{ marginTop: 14 }} />
+            <SkeletonBlock height={14} width="80%" style={{ marginTop: 8 }} />
+            <SkeletonBlock height={14} width="60%" style={{ marginTop: 8 }} />
+          </SkeletonBox>
         </div>
       </main>
     );
@@ -208,7 +250,7 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
             {scripts.activeProject?.title ?? "Untitled"}
           </span>
         </div>
-        <div className="notes-empty-doc">
+        <div className="notes-empty-doc fade-in">
           <p>Select a scene from the sidebar, or create a new one.</p>
           <div style={{ display: "flex", gap: 8 }}>
             <button

@@ -21,5 +21,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
+  "exclude": ["src/lib/renpy/__fixtures__/roundtrip.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
