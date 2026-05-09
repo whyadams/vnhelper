@@ -27,3 +27,22 @@ translate russian strings:
     old "No dialogue history yet"
     new ""
 
+# TODO: Translation updated at 2025-11-14 09:00
+
+# game/chapters/ch1/ch1.rpy:36
+translate russian detective_0ae9bcd0:
+
+    # ""
+    ""
+
+# game/chapters/ch1/ch1.rpy:46
+translate russian detective_eb96d781:
+
+    # dg "Hmm..."
+    dg "Хмм..."
+
+# game/chapters/ch1/ch1.rpy:49
+translate russian detective_b95048ed:
+
+    # dm "Now do you understand the seriousness of what we are dealing with?"
+    dm "Теперь ты понимаешь серьёзность того, с чем мы имеем дело?"

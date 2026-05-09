@@ -39,6 +39,8 @@ function stringsToParsed(
     sourceLine: s.sourceLine,
     sourceText: s.sourceText,
     translatedText: s.translatedText,
+    translateId: s.translateId,
+    speaker: s.speaker,
   }));
 }
 

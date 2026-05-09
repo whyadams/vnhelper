@@ -153,6 +153,11 @@ export function StringRow({
           {row.sourcePath}
           <span className="tr-loc-line">:{row.sourceLine}</span>
         </span>
+        {row.speaker && (
+          <span className="tr-card-speaker" title="Speaker">
+            {row.speaker}
+          </span>
+        )}
         <span className="tr-card-spacer" />
         <button
           type="button"

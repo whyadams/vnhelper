@@ -36,6 +36,10 @@ export interface TranslationString {
   translatedText: string;
   status: StringStatus;
   updatedAt: string;
+  /** Ren'Py translate-id (`detective_e1d4`); null for strings: rows. */
+  translateId: string | null;
+  /** Speaker prefix (`dg`, `dm`, …); null for narrator / strings: rows. */
+  speaker: string | null;
 }
 
 interface DbStringRow {
@@ -48,6 +52,8 @@ interface DbStringRow {
   translated_text: string;
   status: string;
   updated_at: string;
+  translate_id: string | null;
+  speaker: string | null;
 }
 
 function rowToString(r: DbStringRow): TranslationString {
@@ -61,6 +67,8 @@ function rowToString(r: DbStringRow): TranslationString {
     translatedText: r.translated_text,
     status: (r.status as StringStatus) ?? "empty",
     updatedAt: r.updated_at,
+    translateId: r.translate_id ?? null,
+    speaker: r.speaker ?? null,
   };
 }
 
@@ -234,7 +242,7 @@ export function useTranslations(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("translation_strings")
       .select(
-        "id, file_id, group_label, source_path, source_line, source_text, translated_text, status, updated_at",
+        "id, file_id, group_label, source_path, source_line, source_text, translated_text, status, updated_at, translate_id, speaker",
       )
       .eq("file_id", activeFileId)
       .order("source_path", { ascending: true })
@@ -512,6 +520,8 @@ export function useTranslations(workspaceId: string | null) {
         source_text: s.sourceText,
         translated_text: s.translatedText,
         status: s.translatedText === "" ? "empty" : "done",
+        translate_id: s.translateId,
+        speaker: s.speaker,
       }));
 
       let inserted = 0;

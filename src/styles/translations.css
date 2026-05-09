@@ -1144,6 +1144,20 @@
 .tr-card-loc .tr-loc-line {
   color: rgba(200, 199, 202, 0.3);
 }
+.tr-card-speaker {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgba(141, 153, 130, 0.1);
+  color: var(--role-editor);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 .tr-card-spacer { flex: 1; }
 
 /* Status pill — chip-style: same as toolbar chips, just smaller */
