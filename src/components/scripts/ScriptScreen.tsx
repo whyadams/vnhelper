@@ -8,8 +8,9 @@ import { QuickAddCharacterModal } from "./QuickAddCharacterModal";
 import { ScriptCharactersPage } from "./ScriptCharactersPage";
 import { ScriptDoc } from "./ScriptDoc";
 import { ScriptPane } from "./ScriptPane";
+import { TranslationsScreen } from "./TranslationsScreen";
 
-type View = "scene" | "characters";
+type View = "scene" | "characters" | "translations";
 
 export function ScriptScreen() {
   const { state } = useKanban();
@@ -26,18 +27,29 @@ export function ScriptScreen() {
         onCreateProject={() => setCreateOpen(true)}
         onEditProject={(p) => setEditProject(p)}
         onShowCharacters={() => setView("characters")}
+        onShowTranslations={() => setView("translations")}
         charactersActive={view === "characters"}
+        translationsActive={view === "translations"}
       />
-      {view === "scene" ? (
+      {view === "scene" && (
         <ScriptDoc
           scripts={scripts}
           onAddCharacter={() => setQuickCharOpen(true)}
         />
-      ) : (
+      )}
+      {view === "characters" && (
         <ScriptCharactersPage
           scripts={scripts}
           onBack={() => setView("scene")}
           onAddCharacter={() => setQuickCharOpen(true)}
+        />
+      )}
+      {view === "translations" && (
+        <TranslationsScreen
+          workspaceId={state.workspaceId}
+          projectId={scripts.activeProjectId}
+          projectTitle={scripts.activeProject?.title}
+          onBack={() => setView("scene")}
         />
       )}
       <CreateProjectModal
