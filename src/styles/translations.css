@@ -331,7 +331,8 @@
   opacity: 0;
 }
 
-/* Delete X — fills the same slot as the dot, no gradient overlay */
+/* Inline action group on file rows (dots + delete X). Always visible at
+   reduced opacity so the affordance is discoverable without hovering. */
 .tr-row-actions {
   position: absolute;
   right: 8px;
@@ -339,13 +340,14 @@
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  opacity: 0;
+  gap: 2px;
+  opacity: 0.55;
   transition: opacity 0.12s;
-  pointer-events: none;
-}
-.tr-row-wrap:hover .tr-row-actions {
-  opacity: 1;
   pointer-events: auto;
+}
+.tr-row-wrap:hover .tr-row-actions,
+.tr-row-actions:focus-within {
+  opacity: 1;
 }
 .tr-row-actions .tr-icon-btn {
   width: 20px;
@@ -363,12 +365,18 @@
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  opacity: 0;
+  /* Always visible so the affordance is discoverable without hovering. */
+  opacity: 0.55;
   transition: opacity 0.12s;
 }
-.tr-row-wrap:hover .tr-row-menu-wrap { opacity: 1; }
+.tr-row-wrap:hover .tr-row-menu-wrap,
+.tr-row-menu-wrap:focus-within { opacity: 1; }
 .tr-row-menu-btn {
   background: rgba(200, 199, 202, 0.05);
+}
+/* Make space inside the row for the dots so they don't overlap the chevron. */
+.tr-row-wrap:has(.tr-row-menu-wrap) .tr-row-chev {
+  margin-right: 28px;
 }
 
 .tr-icon-btn {
@@ -1126,6 +1134,49 @@
   gap: 12px;
   position: relative;
   transition: background 0.12s;
+  /* Browser-native virtualization: skip layout & paint for offscreen rows.
+     Estimated row height keeps the scrollbar honest. Without this, rendering
+     a few hundred textareas + status pills on file switch stalls the main
+     thread for 1–3s on large files (700+ rows). */
+  content-visibility: auto;
+  contain-intrinsic-size: 0 120px;
+}
+
+/* ----- Loading skeleton (file switch / first fetch) ----- */
+.tr-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+.tr-card-skeleton {
+  pointer-events: none;
+  /* Skeletons are placeholders — no need for cv:auto and the height hint
+     would conflict with the shorter intrinsic height we want here. */
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
+}
+.tr-skel {
+  background: linear-gradient(
+    90deg,
+    rgba(200, 199, 202, 0.05) 0%,
+    rgba(200, 199, 202, 0.1) 50%,
+    rgba(200, 199, 202, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 6px;
+  animation: tr-skel-pulse 1.4s ease-in-out infinite;
+}
+.tr-skel-head { height: 14px; width: 38%; }
+.tr-skel-line { height: 12px; width: 70%; }
+.tr-skel-short { width: 45%; }
+.tr-skel-textarea { height: 36px; width: 100%; }
+@keyframes tr-skel-pulse {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tr-skel { animation: none; }
 }
 .tr-card:hover {
   background: rgba(200, 199, 202, 0.05);
@@ -1176,6 +1227,21 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+.tr-card-trailing {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgba(168, 152, 130, 0.1);
+  color: var(--status-warn);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: help;
 }
 .tr-card-spacer { flex: 1; }
 

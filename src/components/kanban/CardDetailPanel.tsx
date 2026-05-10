@@ -20,7 +20,13 @@ import {
   ZendeskMini,
 } from "./Icon";
 import { Popover } from "./Popover";
-import { MMenu, MMenuItem, MMenuLabel, MMenuPage } from "../ui/MMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { CommentComposer, renderCommentBody } from "./CommentComposer";
 import { useDialog } from "../ui/Dialog";
 
@@ -74,7 +80,6 @@ export function CardDetailPanel() {
   const cardId = found?.card.id ?? null;
   const detail = useCardDetail(cardId, state.boardId);
 
-  const statusBtnRef = useRef<HTMLButtonElement | null>(null);
   const tagBtnRef = useRef<HTMLButtonElement | null>(null);
   const assignBtnRef = useRef<HTMLButtonElement | null>(null);
   const [statusOpen, setStatusOpen] = useState(false);
@@ -206,48 +211,40 @@ export function CardDetailPanel() {
   return (
     <aside className="card-panel">
       <header className="cp-head">
-        <button
-          ref={statusBtnRef}
-          className="cp-status-btn"
-          type="button"
-          onClick={() => setStatusOpen((v) => !v)}
-        >
-          <StatusDot columnKey={column.key} />
-          {column.title}
-          <svg
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.4}
-            strokeLinecap="round"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
-        <MMenu
-          open={statusOpen}
-          onClose={() => setStatusOpen(false)}
-          anchorRef={statusBtnRef}
-          minWidth={220}
-        >
-          <MMenuPage id="main">
-            <MMenuLabel>Move to status</MMenuLabel>
+        <DropdownMenu open={statusOpen} onOpenChange={setStatusOpen}>
+          <DropdownMenuTrigger asChild>
+            <button className="cp-status-btn" type="button">
+              <StatusDot columnKey={column.key} />
+              {column.title}
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.4}
+                strokeLinecap="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-56">
+            <DropdownMenuLabel>Move to status</DropdownMenuLabel>
             {state.columns.map((col) => (
-              <MMenuItem
+              <DropdownMenuItem
                 key={col.key}
-                className={col.key === column.key ? "is-active" : undefined}
-                onClick={() => moveTo(col.key)}
+                data-active={col.key === column.key || undefined}
+                onSelect={() => moveTo(col.key)}
               >
                 <span className={"col-head cp-menu-dot " + col.key}>
                   <span className="dot" />
                 </span>
                 <span style={{ marginLeft: 8 }}>{col.title}</span>
-              </MMenuItem>
+              </DropdownMenuItem>
             ))}
-          </MMenuPage>
-        </MMenu>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="cp-head-actions">
           <button

@@ -15,13 +15,16 @@ import type { ScriptNodeSummary } from "../../state/scripts";
 import { ChevRight } from "./SharedIcons";
 import { useDialog } from "../ui/Dialog";
 import {
-  MMenu,
-  MMenuItem,
-  MMenuLabel,
-  MMenuPage,
-  MMenuPageTrigger,
-  MMenuSeparator,
-} from "../ui/MMenu";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { SkeletonStack } from "../ui/Skeleton";
 
 type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
@@ -64,14 +67,12 @@ export function ScriptPane({
 }: PaneProps) {
   const dialog = useDialog();
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
-  const projectBtnRef = useRef<HTMLButtonElement | null>(null);
   const [drag, setDrag] = useState<DragState>({
     draggingId: null,
     overId: null,
     zone: null,
   });
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const moreRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
 
   // ---------- Build flat item map for headless-tree ----------
   const itemsMap = useMemo<Record<string, TreeItemData>>(() => {
@@ -286,120 +287,87 @@ export function ScriptPane({
           </button>
         </div>
 
-        <button
-          ref={projectBtnRef}
-          type="button"
-          className="vn-project-switch"
-          onClick={() => setProjectMenuOpen((v) => !v)}
-        >
-          {scripts.activeProject?.cover_image_url ? (
-            <span className="vn-project-av vn-project-av-img">
-              <img
-                src={scripts.activeProject.cover_image_url}
-                alt=""
-                draggable={false}
-              />
-            </span>
-          ) : (
-            <span className="vn-project-av">{projectInitial}</span>
-          )}
-          <span className="vn-project-name">
-            {scripts.activeProject?.title ?? "No project"}
-          </span>
-          <span className="vn-project-chev">›</span>
-        </button>
-      </div>
-      <MMenu
-        open={projectMenuOpen}
-        onClose={() => setProjectMenuOpen(false)}
-        anchorRef={projectBtnRef}
-        align="left"
-        minWidth={240}
-      >
-        <MMenuPage id="main">
-          <MMenuLabel>Projects</MMenuLabel>
-          {scripts.projects.map((p) => (
-            <MMenuItem
-              key={p.id}
-              onClick={() => {
-                scripts.setActiveProjectId(p.id);
-                setProjectMenuOpen(false);
-              }}
-              className={
-                scripts.activeProjectId === p.id ? "is-active" : undefined
-              }
-            >
-              {p.cover_image_url ? (
-                <span className="vn-project-cover-thumb">
-                  <img src={p.cover_image_url} alt="" draggable={false} />
+        <DropdownMenu open={projectMenuOpen} onOpenChange={setProjectMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="vn-project-switch">
+              {scripts.activeProject?.cover_image_url ? (
+                <span className="vn-project-av vn-project-av-img">
+                  <img
+                    src={scripts.activeProject.cover_image_url}
+                    alt=""
+                    draggable={false}
+                  />
                 </span>
               ) : (
-                <span className="vn-project-emoji">{p.cover_emoji ?? "📖"}</span>
+                <span className="vn-project-av">{projectInitial}</span>
               )}
-              <span className="vn-project-name">{p.title}</span>
-              <button
-                type="button"
-                className="vn-project-edit-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setProjectMenuOpen(false);
-                  onEditProject(p);
-                }}
-                aria-label="Edit project"
-                title="Edit"
+              <span className="vn-project-name">
+                {scripts.activeProject?.title ?? "No project"}
+              </span>
+              <span className="vn-project-chev">›</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-60">
+            <DropdownMenuLabel>Projects</DropdownMenuLabel>
+            {scripts.projects.map((p) => (
+              <DropdownMenuItem
+                key={p.id}
+                data-active={
+                  scripts.activeProjectId === p.id ? true : undefined
+                }
+                onSelect={() => scripts.setActiveProjectId(p.id)}
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                {p.cover_image_url ? (
+                  <span className="vn-project-cover-thumb">
+                    <img src={p.cover_image_url} alt="" draggable={false} />
+                  </span>
+                ) : (
+                  <span className="vn-project-emoji">
+                    {p.cover_emoji ?? "📖"}
+                  </span>
+                )}
+                <span className="vn-project-name">{p.title}</span>
+                <button
+                  type="button"
+                  className="vn-project-edit-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProjectMenuOpen(false);
+                    onEditProject(p);
+                  }}
+                  aria-label="Edit project"
+                  title="Edit"
                 >
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-              </button>
-            </MMenuItem>
-          ))}
-          {scripts.projects.length > 0 && <MMenuSeparator />}
-          {scripts.activeProject && (
-            <MMenuItem
-              onClick={() => {
-                setProjectMenuOpen(false);
-                onEditProject(scripts.activeProject);
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ flexShrink: 0 }}
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+              </DropdownMenuItem>
+            ))}
+            {scripts.projects.length > 0 && <DropdownMenuSeparator />}
+            {scripts.activeProject && (
+              <DropdownMenuItem
+                onSelect={() => onEditProject(scripts.activeProject)}
               >
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-              <span>Project settings…</span>
-            </MMenuItem>
-          )}
-          <MMenuItem
-            onClick={() => {
-              setProjectMenuOpen(false);
-              onCreateProject();
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>+</span>
-            <span>New script project</span>
-          </MMenuItem>
-        </MMenuPage>
-      </MMenu>
+                Project settings…
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => onCreateProject()}>
+              + New script project
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <div
         className="vn-tree vn-tree-headless"
@@ -433,7 +401,6 @@ export function ScriptPane({
               onDrop={(s, t, z) => void handleDrop(s, t, z)}
               menuOpenId={menuOpenId}
               setMenuOpenId={setMenuOpenId}
-              moreRefs={moreRefs}
               dialog={dialog}
               setExpandedItems={setExpandedItems}
               setCollapsedChapters={setCollapsedChapters}
@@ -467,7 +434,6 @@ interface RowProps {
   onDrop: (sourceId: string, targetId: string, zone: DropZone) => void;
   menuOpenId: string | null;
   setMenuOpenId: (id: string | null) => void;
-  moreRefs: React.MutableRefObject<Map<string, HTMLButtonElement | null>>;
   dialog: ReturnType<typeof useDialog>;
   setExpandedItems: React.Dispatch<React.SetStateAction<string[]>>;
   setCollapsedChapters: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -482,7 +448,6 @@ function TreeRow({
   onDrop,
   menuOpenId,
   setMenuOpenId,
-  moreRefs,
   dialog,
   setExpandedItems,
   setCollapsedChapters,
@@ -501,12 +466,6 @@ function TreeRow({
   const isDragSource = drag.draggingId === id;
   const isDropTarget = drag.overId === id;
   const dropZone = isDropTarget ? drag.zone : null;
-
-  // Register more-button ref so Popover can anchor.
-  const setMoreRef = (el: HTMLButtonElement | null) => {
-    if (el) moreRefs.current.set(id, el);
-    else moreRefs.current.delete(id);
-  };
 
   // ---------- HTML5 drag events ----------
   const computeZone = (e: DragEvent<HTMLDivElement>): DropZone => {
@@ -631,48 +590,37 @@ function TreeRow({
         {data?.emoji && <span className="vn-row-emoji">{data.emoji}</span>}
         <span className="vn-row-lbl">{data?.name || "Untitled"}</span>
         {isActive && !isChapter && <span className="vn-row-dot" />}
-        <button
-          ref={setMoreRef}
-          className="vn-row-more"
-          onClick={(e) => {
-            e.stopPropagation();
-            setMenuOpenId(menuOpen ? null : id);
-          }}
-          aria-label="Actions"
-          title="Actions"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden
-          >
-            <circle cx="5" cy="12" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="19" cy="12" r="1.6" />
-          </svg>
-        </button>
-        <MMenu
+        <DropdownMenu
           open={menuOpen}
-          onClose={() => setMenuOpenId(null)}
-          anchorRef={{ current: moreRefs.current.get(id) ?? null }}
-          align="right"
-          minWidth={220}
+          onOpenChange={(open) => setMenuOpenId(open ? id : null)}
         >
-          <MMenuPage id="main">
-            <MMenuItem
-              onClick={() => {
-                setMenuOpenId(null);
-                void scripts.togglePin(id);
-              }}
+          <DropdownMenuTrigger asChild>
+            <button
+              className="vn-row-more"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Actions"
+              title="Actions"
             >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden
+              >
+                <circle cx="5" cy="12" r="1.6" />
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="19" cy="12" r="1.6" />
+              </svg>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-56">
+            <DropdownMenuItem onSelect={() => void scripts.togglePin(id)}>
               {data?.pinned ? "Unpin" : "Pin"}
-            </MMenuItem>
-            <MMenuSeparator />
-            <MMenuItem
-              onClick={() => {
-                setMenuOpenId(null);
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => {
                 void scripts.createNode({ parentId: id, kind: "scene" });
                 setExpandedItems((prev) =>
                   prev.includes(id) ? prev : [...prev, id],
@@ -680,10 +628,9 @@ function TreeRow({
               }}
             >
               + Add scene
-            </MMenuItem>
-            <MMenuItem
-              onClick={() => {
-                setMenuOpenId(null);
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
                 void scripts.createNode({ parentId: id, kind: "block" });
                 setExpandedItems((prev) =>
                   prev.includes(id) ? prev : [...prev, id],
@@ -691,23 +638,50 @@ function TreeRow({
               }}
             >
               + Add block
-            </MMenuItem>
-            <MMenuPageTrigger targetId="convert">Convert to…</MMenuPageTrigger>
-            <MMenuSeparator />
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>Convert to…</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-40">
+                {data?.kind !== "chapter" && (
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void scripts.updateNode(id, { kind: "chapter" })
+                    }
+                  >
+                    Chapter
+                  </DropdownMenuItem>
+                )}
+                {data?.kind !== "scene" && (
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void scripts.updateNode(id, { kind: "scene" })
+                    }
+                  >
+                    Scene
+                  </DropdownMenuItem>
+                )}
+                {data?.kind !== "block" && (
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void scripts.updateNode(id, { kind: "block" })
+                    }
+                  >
+                    Block
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
             {data?.parent_id && (
-              <MMenuItem
-                onClick={() => {
-                  setMenuOpenId(null);
-                  void scripts.updateNode(id, { parent_id: null });
-                }}
+              <DropdownMenuItem
+                onSelect={() => void scripts.updateNode(id, { parent_id: null })}
               >
                 Move to root
-              </MMenuItem>
+              </DropdownMenuItem>
             )}
-            <MMenuItem
-              variant="danger"
-              onClick={() => {
-                setMenuOpenId(null);
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => {
                 void (async () => {
                   const ok = await dialog.confirm({
                     title: "Delete",
@@ -722,42 +696,9 @@ function TreeRow({
               }}
             >
               Delete
-            </MMenuItem>
-          </MMenuPage>
-          <MMenuPage id="convert">
-            <MMenuLabel>Convert to</MMenuLabel>
-            {data?.kind !== "chapter" && (
-              <MMenuItem
-                onClick={() => {
-                  setMenuOpenId(null);
-                  void scripts.updateNode(id, { kind: "chapter" });
-                }}
-              >
-                Chapter
-              </MMenuItem>
-            )}
-            {data?.kind !== "scene" && (
-              <MMenuItem
-                onClick={() => {
-                  setMenuOpenId(null);
-                  void scripts.updateNode(id, { kind: "scene" });
-                }}
-              >
-                Scene
-              </MMenuItem>
-            )}
-            {data?.kind !== "block" && (
-              <MMenuItem
-                onClick={() => {
-                  setMenuOpenId(null);
-                  void scripts.updateNode(id, { kind: "block" });
-                }}
-              >
-                Block
-              </MMenuItem>
-            )}
-          </MMenuPage>
-        </MMenu>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
   );
 }

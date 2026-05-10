@@ -1,0 +1,184 @@
+/* Tailwind v4 + shadcn/ui — theme variables and base layer.
+   The legacy CSS files (kanban.css, translations.css, etc.) are unchanged
+   and continue to drive existing screens. New components built on shadcn
+   will use the variables below. */
+
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* ============================================================
+   Project palette bridge — wire shadcn tokens to the existing
+   monochrome design system so shadcn components inherit the
+   project look without touching legacy CSS.
+
+   Loaded after the :root + .dark blocks above so these win.
+   The app is dark-by-default; we apply both selectors so the
+   bridge takes effect regardless of any future .dark toggle.
+   ============================================================ */
+:root,
+.dark {
+  /* Surfaces */
+  --background: #131416;
+  --foreground: #c8c7ca;
+  --card: rgba(200, 199, 202, 0.05);
+  --card-foreground: #c8c7ca;
+  --popover: #1a1b1d;
+  --popover-foreground: #c8c7ca;
+
+  /* Brand / actions */
+  --primary: #c8c7ca;
+  --primary-foreground: #131416;
+  --secondary: rgba(200, 199, 202, 0.05);
+  --secondary-foreground: #c8c7ca;
+
+  /* Hover, mute, borders */
+  --muted: rgba(200, 199, 202, 0.05);
+  --muted-foreground: rgba(200, 199, 202, 0.5);
+  --accent: rgba(200, 199, 202, 0.08);
+  --accent-foreground: #c8c7ca;
+  --border: rgba(200, 199, 202, 0.1);
+  --input: rgba(200, 199, 202, 0.1);
+  --ring: rgba(200, 199, 202, 0.3);
+
+  /* Status */
+  --destructive: #a87080;
+
+  /* Sidebar (used by some shadcn templates) */
+  --sidebar: #131416;
+  --sidebar-foreground: #c8c7ca;
+  --sidebar-primary: #c8c7ca;
+  --sidebar-primary-foreground: #131416;
+  --sidebar-accent: rgba(200, 199, 202, 0.08);
+  --sidebar-accent-foreground: #c8c7ca;
+  --sidebar-border: rgba(200, 199, 202, 0.1);
+  --sidebar-ring: rgba(200, 199, 202, 0.3);
+}
+
+/* Tailwind v4's `border` utility no longer sets a default border-color
+   (the v3 `border-gray-200` default is gone). Without this, every shadcn
+   component that uses `border` falls back to currentColor — for the
+   DropdownMenu that's the popover text, producing a very visible light
+   1px outline. Setting it once here matches shadcn's official recipe.
+   Legacy CSS that uses the `border: <w> solid <color>` shorthand still
+   wins because shorthand resets border-color. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans:
+    "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}

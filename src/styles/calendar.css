@@ -48,12 +48,12 @@
 }
 
 .cal-today-btn {
-  height: 26px;
+  height: 30px;
   padding: 0 12px;
   background: transparent;
-  border: 1px solid rgba(200, 199, 202, 0.08);
   border-radius: 8px;
   color: rgba(200, 199, 202, 0.7);
+  background: rgba(200, 199, 202, 0.05);
   font-family: inherit;
   font-size: 11.5px;
   font-weight: 600;
@@ -61,7 +61,7 @@
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .cal-today-btn:hover {
-  background: rgba(200, 199, 202, 0.05);
+  background: rgba(200, 199, 202, 0.10);
   color: var(--text-1);
   border-color: rgba(200, 199, 202, 0.18);
 }
@@ -73,6 +73,11 @@
   min-height: 0;
   padding: 20px 32px 24px;
   gap: 16px;
+}
+
+.fix-hbtn {
+  height: 32px !important;
+  padding: 0px 15px !important;
 }
 
 .cal-grid-wrap {

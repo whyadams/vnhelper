@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import type { TagColor } from "../../data/kanban";
 import { useKanban, type SortMode } from "../../state/kanbanStore";
 import { FilterIcon, SortIcon } from "./Icon";
 import {
-  MMenu,
-  MMenuItem,
-  MMenuLabel,
-  MMenuPage,
-  MMenuSeparator,
-} from "../ui/MMenu";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { useDialog } from "../ui/Dialog";
 
 const tagOptions: { color: TagColor; label: string }[] = [
   { color: "pink", label: "Branding" },
@@ -35,17 +38,17 @@ const subTabs: { key: string; label: string; available: boolean }[] = [
 ];
 
 export function ProjectHeader() {
-  const { state, dispatch, renameBoard } = useKanban();
-  const filterRef = useRef<HTMLButtonElement | null>(null);
-  const sortRef = useRef<HTMLButtonElement | null>(null);
-  const [openFilter, setOpenFilter] = useState(false);
-  const [openSort, setOpenSort] = useState(false);
+  const { state, dispatch, renameBoard, clearBoardCards, resetBoardColumns } =
+    useKanban();
+  const dialog = useDialog();
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(state.boardName);
   useEffect(() => {
     setTitleDraft(state.boardName);
   }, [state.boardName]);
+
+  const canEdit = state.myRole === "owner" || state.myRole === "editor";
 
   const commitTitle = () => {
     setEditingTitle(false);
@@ -98,25 +101,22 @@ export function ProjectHeader() {
         </div>
 
         <div className="header-toolbar">
-          <button
-            className={"hbtn" + (filterCount ? " is-active" : "")}
-            type="button"
-            ref={filterRef}
-            onClick={() => setOpenFilter((v) => !v)}
-          >
-            <FilterIcon className="ico" />
-            <span>Filter</span>
-            {filterCount > 0 && <span className="hbtn-count">{filterCount}</span>}
-          </button>
-          <MMenu
-            open={openFilter}
-            onClose={() => setOpenFilter(false)}
-            anchorRef={filterRef}
-            minWidth={260}
-          >
-            <MMenuPage id="main">
-              <MMenuLabel>Filter by tag</MMenuLabel>
-              <div className="menu-tags mmenu-anim" style={{ padding: "0 12px 8px" }}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={"hbtn" + (filterCount ? " is-active" : "")}
+                type="button"
+              >
+                <FilterIcon className="ico" />
+                <span>Filter</span>
+                {filterCount > 0 && (
+                  <span className="hbtn-count">{filterCount}</span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-64">
+              <DropdownMenuLabel>Filter by tag</DropdownMenuLabel>
+              <div className="flex flex-wrap gap-1.5 px-2 pb-2">
                 {tagOptions.map((t) => {
                   const active = state.filterTags.includes(t.color);
                   return (
@@ -133,52 +133,98 @@ export function ProjectHeader() {
                   );
                 })}
               </div>
-              <MMenuSeparator />
-              <MMenuItem
-                onClick={() => {
-                  dispatch({ type: "CLEAR_FILTERS" });
-                  setOpenFilter(false);
-                }}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => dispatch({ type: "CLEAR_FILTERS" })}
               >
                 Clear all
-              </MMenuItem>
-            </MMenuPage>
-          </MMenu>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          <button
-            className={"hbtn" + (state.sort !== "default" ? " is-active" : "")}
-            type="button"
-            ref={sortRef}
-            onClick={() => setOpenSort((v) => !v)}
-          >
-            <SortIcon className="ico" />
-            <span>Sort</span>
-            {state.sort !== "default" && (
-              <span className="hbtn-count">{sortLabel?.split(" ")[0]}</span>
-            )}
-          </button>
-          <MMenu
-            open={openSort}
-            onClose={() => setOpenSort(false)}
-            anchorRef={sortRef}
-            minWidth={220}
-          >
-            <MMenuPage id="main">
-              <MMenuLabel>Sort by</MMenuLabel>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={
+                  "hbtn" + (state.sort !== "default" ? " is-active" : "")
+                }
+                type="button"
+              >
+                <SortIcon className="ico" />
+                <span>Sort</span>
+                {state.sort !== "default" && (
+                  <span className="hbtn-count">{sortLabel?.split(" ")[0]}</span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-56">
+              <DropdownMenuLabel>Sort by</DropdownMenuLabel>
               {sortOptions.map((o) => (
-                <MMenuItem
+                <DropdownMenuItem
                   key={o.value}
-                  className={state.sort === o.value ? "is-active" : undefined}
-                  onClick={() => {
-                    dispatch({ type: "SET_SORT", sort: o.value });
-                    setOpenSort(false);
-                  }}
+                  data-active={state.sort === o.value || undefined}
+                  onSelect={() => dispatch({ type: "SET_SORT", sort: o.value })}
                 >
                   {o.label}
-                </MMenuItem>
+                </DropdownMenuItem>
               ))}
-            </MMenuPage>
-          </MMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {canEdit && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="hbtn hbtn-icon"
+                  aria-label="Project settings"
+                  title="Project settings"
+                >
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                <DropdownMenuLabel>Board</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setEditingTitle(true)}>
+                  Rename board
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    void (async () => {
+                      const ok = await dialog.confirm({
+                        title: "Clear all cards",
+                        message: `Delete every card on "${state.boardName}"? Columns are kept. This cannot be undone.`,
+                        variant: "danger",
+                        confirmLabel: "Clear cards",
+                      });
+                      if (ok) await clearBoardCards();
+                    })();
+                  }}
+                >
+                  Clear all cards
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Columns</DropdownMenuLabel>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => {
+                    void (async () => {
+                      const ok = await dialog.confirm({
+                        title: "Reset columns to defaults",
+                        message:
+                          "Delete every existing column (and its cards) and recreate the four defaults: To do, In progress, Review, Done. This cannot be undone.",
+                        variant: "danger",
+                        confirmLabel: "Reset columns",
+                      });
+                      if (ok) await resetBoardColumns();
+                    })();
+                  }}
+                >
+                  Reset columns to defaults
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,15 @@
 import { useMemo, useState } from "react";
 import type { ScriptCharacter, ScriptContent } from "../../state/scripts";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+
+// Sentinel for "no emotion" — Radix Select rejects empty-string values.
+const EMOTION_NONE = "__none__";
 
 type RowKind =
   | "dialogue"
@@ -493,28 +503,39 @@ export function ScriptTable({
                   </td>
                   <td>
                     {r.kind === "dialogue" ? (
-                      <select
-                        className="vn-table-select"
-                        value={r.emotion}
-                        onChange={(e) =>
-                          r.path.kind === "block" &&
+                      <Select
+                        value={r.emotion === "" ? EMOTION_NONE : r.emotion}
+                        onValueChange={(v) => {
+                          if (r.path.kind !== "block") return;
                           updateBlockAttr(
                             r.path.blockIndex,
                             "emotion",
-                            e.target.value,
-                          )
-                        }
+                            v === EMOTION_NONE ? "" : v,
+                          );
+                        }}
                       >
-                        {EMOTION_OPTIONS.map((o) => (
-                          <option key={o.value || "_none"} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                        {r.emotion &&
-                          !EMOTION_OPTIONS.some(
-                            (o) => o.value === r.emotion,
-                          ) && <option value={r.emotion}>{r.emotion}</option>}
-                      </select>
+                        <SelectTrigger className="vn-table-select">
+                          <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EMOTION_OPTIONS.map((o) => (
+                            <SelectItem
+                              key={o.value || "_none"}
+                              value={o.value === "" ? EMOTION_NONE : o.value}
+                            >
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                          {r.emotion &&
+                            !EMOTION_OPTIONS.some(
+                              (o) => o.value === r.emotion,
+                            ) && (
+                              <SelectItem value={r.emotion}>
+                                {r.emotion}
+                              </SelectItem>
+                            )}
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <span className="vn-table-na">—</span>
                     )}

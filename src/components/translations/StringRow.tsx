@@ -1,6 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { Role } from "../../lib/roles";
-import { useKanban } from "../../state/kanbanStore";
 import type {
   StringStatus,
   TranslationString,
@@ -10,10 +9,15 @@ interface Props {
   row: TranslationString;
   fileTargetLang: string;
   role: Role;
+  /** Translator's assigned language; null for non-translators. */
+  myTargetLanguage: string | null;
   isFocused: boolean;
-  onUpdate: (patch: { translatedText?: string; status?: StringStatus }) => Promise<void>;
-  onFocus: () => void;
-  onAdvance: () => void;
+  onUpdate: (
+    id: string,
+    patch: { translatedText?: string; status?: StringStatus },
+  ) => Promise<void>;
+  onFocus: (id: string) => void;
+  onAdvance: (id: string) => void;
 }
 
 const STATUS_ORDER: Record<StringStatus, StringStatus> = {
@@ -38,29 +42,29 @@ function renderSourceWithTags(text: string) {
   });
 }
 
-export function StringRow({
+function StringRowImpl({
   row,
   fileTargetLang,
   role,
+  myTargetLanguage,
   isFocused,
   onUpdate,
   onFocus,
   onAdvance,
 }: Props) {
-  const { state } = useKanban();
   const [draft, setDraft] = useState(row.translatedText);
   const debounceRef = useRef<number | null>(null);
   const lastSentRef = useRef(row.translatedText);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
-  const translatorLang = state.myTargetLanguage;
+  const translatorLang = myTargetLanguage;
 
-  // Auto-grow textarea to fit its content. Runs synchronously after every
-  // DOM mutation so the height never lags a frame behind the typed text.
-  useLayoutEffect(() => {
+  // Auto-grow textarea after paint. useEffect (not useLayoutEffect) so
+  // mounting hundreds of rows on file switch doesn't trigger 800 sync
+  // layouts before the first paint.
+  useEffect(() => {
     const el = taRef.current;
     if (!el) return;
     el.style.height = "auto";
-    // +2 absorbs sub-pixel rounding so the last line never gets cut off.
     el.style.height = `${el.scrollHeight + 2}px`;
   }, [draft]);
 
@@ -94,7 +98,7 @@ export function StringRow({
   const flush = (value: string) => {
     if (value === lastSentRef.current) return;
     lastSentRef.current = value;
-    void onUpdate({ translatedText: value });
+    void onUpdate(row.id, { translatedText: value });
   };
 
   const onChange = (value: string) => {
@@ -113,11 +117,10 @@ export function StringRow({
 
   const cycleStatus = () => {
     if (readOnly) return;
-    void onUpdate({ status: STATUS_ORDER[row.status] });
+    void onUpdate(row.id, { status: STATUS_ORDER[row.status] });
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Ctrl/Cmd+Enter — flush, mark done, jump to next.
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !readOnly) {
       e.preventDefault();
       if (debounceRef.current !== null) {
@@ -126,9 +129,9 @@ export function StringRow({
       }
       flush(draft);
       if (row.status !== "done") {
-        void onUpdate({ status: "done" });
+        void onUpdate(row.id, { status: "done" });
       }
-      onAdvance();
+      onAdvance(row.id);
     }
   };
 
@@ -158,6 +161,14 @@ export function StringRow({
             {row.speaker}
           </span>
         )}
+        {row.trailing && (
+          <span
+            className="tr-card-trailing"
+            title="Trailing Ren'Py modifier — preserved automatically on export"
+          >
+            {row.trailing}
+          </span>
+        )}
         <span className="tr-card-spacer" />
         <button
           type="button"
@@ -182,7 +193,7 @@ export function StringRow({
           readOnly={readOnly}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
-          onFocus={onFocus}
+          onFocus={() => onFocus(row.id)}
           onKeyDown={onKeyDown}
           rows={1}
           placeholder={readOnly ? "" : "Type translation…"}
@@ -198,3 +209,5 @@ export function StringRow({
     </div>
   );
 }
+
+export const StringRow = memo(StringRowImpl);

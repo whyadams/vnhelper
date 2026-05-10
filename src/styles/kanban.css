@@ -13,7 +13,9 @@
   --text-2: rgba(200, 199, 202, 0.7);
   --text-3: rgba(200, 199, 202, 0.5);
   --text-4: rgba(200, 199, 202, 0.3);
-  --accent: #c8c7ca;
+  /* Renamed from --accent to avoid clashing with shadcn's --accent
+     (which is a subtle hover bg, not a strong outline color). */
+  --accent-strong: #c8c7ca;
 
   /* Muted role/status accents */
   --role-owner: #a89882;
@@ -608,18 +610,23 @@ html, body, #root {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-1);
 }
-.col-head-add {
+/* Specificity bumped (.col-head .actions <class>) so the styled buttons
+   beat the generic `.col-head .actions button` rule above. */
+.col-head .actions .col-head-add,
+.col-head .actions .col-head-more {
   width: 26px;
   height: 26px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--text-3);
+  color: var(--text-2);
   cursor: pointer;
   display: grid;
   place-items: center;
 }
-.col-head-add:hover {
+.col-head .actions .col-head-add:hover,
+.col-head .actions .col-head-more:hover,
+.col-head .actions .col-head-more[data-state="open"] {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-1);
 }
@@ -656,9 +663,7 @@ html, body, #root {
   border-color: var(--border-strong);
   transform: translateY(-1px);
 }
-.card.is-focus {
-  border-color: rgba(255, 255, 255, 0.12);
-}
+
 
 .card-head {
   display: flex;
@@ -709,11 +714,16 @@ html, body, #root {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.12s;
+  opacity: 0.5;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
 }
-.card:hover .card-more { opacity: 1; }
-.card-more:hover {
+.card:hover .card-more,
+.card-more:hover,
+.card-more[data-state="open"] {
+  opacity: 1;
+}
+.card-more:hover,
+.card-more[data-state="open"] {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-1);
 }
@@ -975,6 +985,19 @@ html, body, #root {
 }
 .menu-item.is-danger { color: #d77878; }
 .menu-item.is-danger:hover { background: rgba(215, 120, 120, 0.1); }
+
+.hbtn.is-danger {
+    color: #a87080;
+    background: #a870801f !important;
+    border: none !important;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 20px;
+}
+
+.hbtn.is-danger:hover {
+    background: #a8708033 !important;
+}
 
 .menu-tags {
   display: flex;
@@ -1649,7 +1672,7 @@ html, body, #root {
   font-size: 13px;
   font-weight: 500;
   background: transparent;
-  border: 1px dashed var(--text-3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   padding: 2px 6px;
   color: var(--text-1);
@@ -1666,9 +1689,9 @@ html, body, #root {
   padding-top: 28px; /* roughly aligns with col-head */
 }
 .col-add-btn {
-  width: 240px;
+  width: 100%;
   background: transparent;
-  border: 1px dashed var(--border-strong);
+  border: 1px var(--border-strong);
   border-radius: 10px;
   color: var(--text-3);
   font-size: 12.5px;
@@ -2251,12 +2274,12 @@ html, body, #root {
   align-items: center;
   gap: 6px;
   height: 32px;
-  padding: 0 12px;
+  padding: 20px;
   border-radius: 8px;
   background: var(--bg-card);
-  border: 1px solid var(--border);
   color: var(--text-2);
-  font-size: 12.5px;
+  font-size: 14px;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
@@ -2275,6 +2298,15 @@ html, body, #root {
   height: 14px;
   opacity: 0.85;
 }
+/* Icon-only header button — keeps the same affordance as .hbtn but without
+   horizontal padding so single icons (e.g. project-settings ⋯) sit square. */
+.hbtn-icon {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+.hbtn-icon svg { opacity: 0.85; }
+.hbtn-icon:hover svg { opacity: 1; }
 .hbtn-count {
   background: var(--bg-elevated);
   color: var(--text-2);
@@ -2527,7 +2559,10 @@ html, body, #root {
    Kanban — Figma 1509:4230 (tmt topbar + columns + cards)
    ============================================================ */
 
-/* Topbar "tmt" — task view only */
+/* Topbar "tmt" — task view only.
+   Subtle diagonal stripes mark this header as a project banner without
+   distracting from content. Two stops keep the contrast just above the
+   noise floor on the canvas (#131416). */
 .topbar.tmt-bar {
   height: 60px;
   padding: 16px 32px;
@@ -2535,6 +2570,14 @@ html, body, #root {
   border-bottom: 1px solid rgba(200, 199, 202, 0.05);
   display: flex;
   align-items: center;
+  background-color: var(--bg-canvas);
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.005) 0px,
+    rgba(255, 255, 255, 0.005) 10px,
+    transparent 10px,
+    transparent 20px
+  );
 }
 .tmt-ico {
   flex-shrink: 0;
@@ -2559,6 +2602,26 @@ html, body, #root {
   white-space: nowrap;
 }
 .tmt-spacer { flex: 1; }
+/* Pin-board-on-desktop button — opens the always-on-top widget window. */
+.tmt-widget {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 6px;
+  background: rgba(200, 199, 202, 0.04);
+  border: 1px solid rgba(200, 199, 202, 0.08);
+  border-radius: 8px;
+  color: rgba(200, 199, 202, 0.6);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.tmt-widget:hover {
+  background: rgba(200, 199, 202, 0.08);
+  color: var(--text-1);
+  border-color: rgba(200, 199, 202, 0.16);
+}
 .tmt-add {
   display: inline-flex;
   align-items: center;

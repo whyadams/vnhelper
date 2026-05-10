@@ -7,6 +7,7 @@ import {
   type ReactElement,
 } from "react";
 import type { Role } from "../../lib/roles";
+import { useKanban } from "../../state/kanbanStore";
 import type {
   StringStatus,
   TranslationFile,
@@ -34,11 +35,30 @@ export function TranslationEditor({
   canEdit,
   onExport,
 }: Props) {
+  const { state: kanbanState } = useKanban();
+  const myTargetLanguage = kanbanState.myTargetLanguage;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const rowsRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // Stable callbacks for memoised <StringRow>. The api.updateString reference
+  // changes on every strings mutation, so route through a ref to keep the
+  // prop identity stable across renders. Without this, every keystroke in
+  // any row re-renders all 800 rows.
+  const updateStringRef = useRef(api.updateString);
+  updateStringRef.current = api.updateString;
+  const handleUpdate = useCallback(
+    (
+      id: string,
+      patch: { translatedText?: string; status?: StringStatus },
+    ) => updateStringRef.current(id, patch),
+    [],
+  );
+  const handleFocus = useCallback((id: string) => setFocusedId(id), []);
+  // Visible-list ref so handleAdvance stays stable across re-renders.
+  const visibleRef = useRef<TranslationString[]>([]);
 
   // Progressive rendering. Big translation files (10k+ lines) used to freeze
   // the app: each StringRow mounts a textarea + a useLayoutEffect that forces
@@ -99,6 +119,7 @@ export function TranslationEditor({
       );
     });
   }, [api.strings, search, statusFilter]);
+  visibleRef.current = visible;
 
   // Group consecutive rows by groupLabel — used only as a structural marker
   // for the renderer; the label itself is no longer shown to the user
@@ -133,20 +154,21 @@ export function TranslationEditor({
     });
   }, []);
 
-  const advanceFromRow = useCallback(
+  const handleAdvance = useCallback(
     (id: string) => {
-      const idx = visible.findIndex((s) => s.id === id);
+      const list = visibleRef.current;
+      const idx = list.findIndex((s) => s.id === id);
       if (idx === -1) return;
-      for (let i = idx + 1; i < visible.length; i++) {
-        if (visible[i].status !== "done") {
-          focusRow(visible[i].id);
+      for (let i = idx + 1; i < list.length; i++) {
+        if (list[i].status !== "done") {
+          focusRow(list[i].id);
           return;
         }
       }
-      const next = visible[idx + 1];
+      const next = list[idx + 1];
       if (next) focusRow(next.id);
     },
-    [visible, focusRow],
+    [focusRow],
   );
 
   const project = api.projects.find((p) => p.id === api.activeProjectId);
@@ -276,7 +298,18 @@ export function TranslationEditor({
 
       {/* ===== Strings list ===== */}
       <div className="tr-rows" ref={rowsRef}>
-        {groups.length === 0 ? (
+        {!api.stringsReady ? (
+          <div className="tr-skeleton-list" aria-hidden="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="tr-card tr-card-skeleton">
+                <div className="tr-skel tr-skel-head" />
+                <div className="tr-skel tr-skel-line" />
+                <div className="tr-skel tr-skel-line tr-skel-short" />
+                <div className="tr-skel tr-skel-textarea" />
+              </div>
+            ))}
+          </div>
+        ) : groups.length === 0 ? (
           <div className="tr-empty">
             <p>No strings match the current filter.</p>
           </div>
@@ -313,10 +346,11 @@ export function TranslationEditor({
                       row={row}
                       fileTargetLang={file.target_language}
                       role={role}
+                      myTargetLanguage={myTargetLanguage}
                       isFocused={focusedId === row.id}
-                      onFocus={() => setFocusedId(row.id)}
-                      onAdvance={() => advanceFromRow(row.id)}
-                      onUpdate={(patch) => api.updateString(row.id, patch)}
+                      onFocus={handleFocus}
+                      onAdvance={handleAdvance}
+                      onUpdate={handleUpdate}
                     />
                   ))}
                 </div>,

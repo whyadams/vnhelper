@@ -493,6 +493,8 @@ const KanbanCtx = createContext<{
   removeWorkspaceAvatar: (workspaceId: string) => Promise<void>;
   deleteWorkspace: (id: string) => Promise<void>;
   renameBoard: (name: string) => Promise<void>;
+  clearBoardCards: () => Promise<void>;
+  resetBoardColumns: () => Promise<void>;
   addColumn: (title: string) => Promise<void>;
   renameColumn: (columnId: string, title: string) => Promise<void>;
   deleteColumn: (columnId: string) => Promise<void>;
@@ -1047,6 +1049,45 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
     }
   }, [loadBoard]);
 
+  // Delete every card on the active board, keeping columns intact.
+  const clearBoardCards = useCallback(async () => {
+    const boardId = stateRef.current.boardId;
+    if (!boardId) return;
+    const { error } = await supabase
+      .from("cards")
+      .delete()
+      .eq("board_id", boardId);
+    if (error) {
+      console.error("clearBoardCards", error);
+      return;
+    }
+    const wsId = stateRef.current.workspaceId;
+    if (wsId) void loadBoard(wsId);
+  }, [loadBoard]);
+
+  // Wipe every column (cascade-deletes their cards) and recreate the four
+  // default columns. Used by the "Reset columns to defaults" project action.
+  const resetBoardColumns = useCallback(async () => {
+    const boardId = stateRef.current.boardId;
+    if (!boardId) return;
+    const { error: delErr } = await supabase
+      .from("columns")
+      .delete()
+      .eq("board_id", boardId);
+    if (delErr) {
+      console.error("resetBoardColumns delete", delErr);
+      return;
+    }
+    const { error: insErr } = await supabase
+      .from("columns")
+      .insert(DEFAULT_COLUMNS.map((c) => ({ board_id: boardId, ...c })));
+    if (insErr) {
+      console.error("resetBoardColumns insert", insErr);
+    }
+    const wsId = stateRef.current.workspaceId;
+    if (wsId) void loadBoard(wsId);
+  }, [loadBoard]);
+
   const createWorkspace = useCallback(
     async (name: string): Promise<string | null> => {
       const trimmed = name.trim();
@@ -1137,6 +1178,8 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
       removeWorkspaceAvatar,
       deleteWorkspace,
       renameBoard,
+      clearBoardCards,
+      resetBoardColumns,
       addColumn,
       renameColumn,
       deleteColumn,
@@ -1152,6 +1195,8 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
       removeWorkspaceAvatar,
       deleteWorkspace,
       renameBoard,
+      clearBoardCards,
+      resetBoardColumns,
       addColumn,
       renameColumn,
       deleteColumn,

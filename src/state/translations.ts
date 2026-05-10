@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthProvider";
 import {
   parseRenpyTranslations,
+  serializeRenpyTranslations,
   type ParsedString,
   type ParseWarning,
 } from "../lib/renpy";
@@ -110,6 +111,7 @@ export function useTranslations(workspaceId: string | null) {
   // and avoid empty-state flashes between sync reset and async fetch.
   const [projectsReady, setProjectsReady] = useState(false);
   const [filesReady, setFilesReady] = useState(false);
+  const [stringsReady, setStringsReady] = useState(false);
 
   const activeProjectIdRef = useRef<string | null>(activeProjectId);
   const activeFileIdRef = useRef<string | null>(activeFileId);
@@ -138,9 +140,11 @@ export function useTranslations(workspaceId: string | null) {
     setFilesReady(false);
   }, [activeProjectId]);
 
-  // Synchronously wipe strings on file switch.
+  // Synchronously wipe strings on file switch and mark not-ready so the
+  // editor renders a skeleton instead of the empty-state flash.
   useEffect(() => {
     setStrings([]);
+    setStringsReady(activeFileId === null);
   }, [activeFileId]);
 
   const setActiveProjectId = useCallback((id: string | null) => {
@@ -246,9 +250,11 @@ export function useTranslations(workspaceId: string | null) {
   const fetchStrings = useCallback(async () => {
     if (!activeFileId) {
       setStrings([]);
+      setStringsReady(true);
       return;
     }
     setLoading(true);
+    setStringsReady(false);
     // Supabase enforces a default 1000-row limit when no .range / .limit
     // is set. Big translation files (5k–20k rows) silently get truncated
     // without it. Page through the table in 1000-row windows until exhausted.
@@ -288,10 +294,12 @@ export function useTranslations(workspaceId: string | null) {
     if (error) {
       console.error("translation strings list", error);
       setStrings([]);
+      setStringsReady(true);
       return;
     }
     if (activeFileIdRef.current !== activeFileId) return;
     setStrings(((data ?? []) as DbStringRow[]).map(rowToString));
+    setStringsReady(true);
   }, [activeFileId]);
 
   useEffect(() => {
@@ -479,6 +487,63 @@ export function useTranslations(workspaceId: string | null) {
     [workspaceId, user, setActiveProjectId, setActiveFileId],
   );
 
+  const renameProject = useCallback(
+    async (id: string, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("name required");
+      // Optimistic
+      let snapshot: TranslationProject | undefined;
+      setProjects((cur) =>
+        cur.map((p) => {
+          if (p.id !== id) return p;
+          snapshot = p;
+          return { ...p, name: trimmed };
+        }),
+      );
+      const { error } = await supabase
+        .from("translation_projects")
+        .update({ name: trimmed })
+        .eq("id", id);
+      if (error) {
+        console.error("renameProject (translations)", error);
+        if (snapshot) {
+          const restored = snapshot;
+          setProjects((cur) => cur.map((p) => (p.id === id ? restored : p)));
+        }
+        throw error;
+      }
+    },
+    [],
+  );
+
+  const renameFile = useCallback(
+    async (id: string, filename: string) => {
+      const trimmed = filename.trim();
+      if (!trimmed) throw new Error("filename required");
+      let snapshot: TranslationFile | undefined;
+      setFiles((cur) =>
+        cur.map((f) => {
+          if (f.id !== id) return f;
+          snapshot = f;
+          return { ...f, filename: trimmed };
+        }),
+      );
+      const { error } = await supabase
+        .from("translation_files")
+        .update({ filename: trimmed })
+        .eq("id", id);
+      if (error) {
+        console.error("renameFile (translations)", error);
+        if (snapshot) {
+          const restored = snapshot;
+          setFiles((cur) => cur.map((f) => (f.id === id ? restored : f)));
+        }
+        throw error;
+      }
+    },
+    [],
+  );
+
   const deleteProject = useCallback(
     async (id: string) => {
       // Optimistic removal.
@@ -607,6 +672,72 @@ export function useTranslations(workspaceId: string | null) {
     [setActiveFileId],
   );
 
+  // Serialize every file in the active project and yield {filename, content}
+  // pairs so the caller can drive downloads. Strings are paged in 1000-row
+  // windows to avoid the default PostgREST limit. Returns [] if no project.
+  const buildProjectExport = useCallback(async (): Promise<
+    { filename: string; folderPath: string; content: string }[]
+  > => {
+    if (!activeProjectId) return [];
+    const project = projects.find((p) => p.id === activeProjectId);
+    if (!project) return [];
+
+    const projectFiles = files;
+    if (projectFiles.length === 0) return [];
+
+    const fileIds = projectFiles.map((f) => f.id);
+    const PAGE = 1000;
+    const collected: DbStringRow[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("translation_strings")
+        .select(
+          "id, file_id, group_label, source_path, source_line, source_text, translated_text, status, updated_at, translate_id, speaker, trailing",
+        )
+        .in("file_id", fileIds)
+        .order("file_id", { ascending: true })
+        .order("source_path", { ascending: true })
+        .order("source_line", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error) {
+        console.error("buildProjectExport fetch", error);
+        throw error;
+      }
+      const rows = (data ?? []) as DbStringRow[];
+      collected.push(...rows);
+      if (rows.length < PAGE) break;
+      from += PAGE;
+    }
+
+    const byFile = new Map<string, TranslationString[]>();
+    for (const row of collected) {
+      const arr = byFile.get(row.file_id) ?? [];
+      arr.push(rowToString(row));
+      byFile.set(row.file_id, arr);
+    }
+
+    return projectFiles.map((f) => {
+      const rows = byFile.get(f.id) ?? [];
+      const parsed: ParsedString[] = rows.map((s) => ({
+        groupLabel: s.groupLabel,
+        targetLanguage: f.target_language,
+        sourcePath: s.sourcePath,
+        sourceLine: s.sourceLine,
+        sourceText: s.sourceText,
+        translatedText: s.translatedText,
+        translateId: s.translateId,
+        speaker: s.speaker,
+        trailing: s.trailing,
+      }));
+      return {
+        filename: f.filename,
+        folderPath: f.folder_path,
+        content: serializeRenpyTranslations(parsed),
+      };
+    });
+  }, [activeProjectId, projects, files]);
+
   const updateString = useCallback(
     async (
       id: string,
@@ -664,11 +795,15 @@ export function useTranslations(workspaceId: string | null) {
     fileStats: liveFileStats,
     projectsReady,
     filesReady,
+    stringsReady,
     createProject,
+    renameProject,
     deleteProject,
     importRpyFile,
+    renameFile,
     deleteFile,
     updateString,
+    buildProjectExport,
   };
 }
 

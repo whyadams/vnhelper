@@ -6,6 +6,15 @@ import {
   type AISettings,
   type ModelInfo,
 } from "../../lib/aiClient";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+
+const MODEL_NONE = "__none__";
 
 interface Props {
   open: boolean;
@@ -102,29 +111,27 @@ export function AISettingsModal({ open, onClose }: Props) {
         <label className="auth-field">
           <span>Model</span>
           {models.length > 0 ? (
-            <select
-              value={settings.model}
-              onChange={(e) =>
-                setSettings({ ...settings, model: e.target.value })
+            <Select
+              value={settings.model || MODEL_NONE}
+              onValueChange={(v) =>
+                setSettings({
+                  ...settings,
+                  model: v === MODEL_NONE ? "" : v,
+                })
               }
-              style={{
-                background: "var(--bg-input)",
-                border: "1px solid var(--border-strong)",
-                color: "var(--text-1)",
-                borderRadius: 8,
-                padding: "10px 12px",
-                fontSize: 13,
-                fontFamily: "inherit",
-                outline: "none",
-              }}
             >
-              <option value="">— pick one —</option>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.id}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder="— pick one —" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={MODEL_NONE}>— pick one —</SelectItem>
+                {models.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
             <input
               type="text"

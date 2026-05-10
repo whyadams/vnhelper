@@ -19,6 +19,16 @@ import { ScriptTable } from "./ScriptTable";
 import { ScriptImportModal } from "./ScriptImportModal";
 import { useDialog } from "../ui/Dialog";
 import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "../ui/select";
+
+// Radix Select rejects empty-string item values, so we use a sentinel for
+// the "none" option and translate at the boundary.
+const NONE_VALUE = "__none__";
 
 type ScriptViewMode = "doc" | "table";
 
@@ -76,7 +86,7 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
 
   const [titleDraft, setTitleDraft] = useState("");
   const [emojiDraft, setEmojiDraft] = useState("");
-  const [editingEmoji, setEditingEmoji] = useState(false);
+  const [, setEditingEmoji] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
   const [savedAgo, setSavedAgo] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ScriptViewMode>("doc");
@@ -277,12 +287,6 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     setTitleDraft(v);
     scheduleMetaSave(v, emojiDraft);
   };
-  const onEmojiCommit = (v: string) => {
-    const next = v.trim().slice(0, 4);
-    setEmojiDraft(next);
-    setEditingEmoji(false);
-    scheduleMetaSave(titleDraft, next);
-  };
 
   const handleDelete = async () => {
     const ok = await dialog.confirm({
@@ -375,82 +379,56 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
               Table
             </button>
           </div>
-          <button
-            className="hbtn"
-            type="button"
-            onClick={() => setImportOpen(true)}
-            title="Import plain-text script and auto-format"
-          >
-            Import
-          </button>
-          <button
-            className={"hbtn icon-only" + (node.pinned ? " is-active" : "")}
-            type="button"
-            aria-label={node.pinned ? "Unpin" : "Pin"}
-            onClick={() => void scripts.togglePin(node.id)}
-            title={node.pinned ? "Unpin" : "Pin"}
-          >
-            <StarIcon />
-          </button>
-          <button
-            className="hbtn icon-only"
-            type="button"
-            aria-label="Delete"
-            onClick={() => void handleDelete()}
-            title="Delete"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <span className="topbar-sep" aria-hidden />
+          <div className="topbar-group">
+            <button
+              className="hbtn fix-hbtn"
+              type="button"
+              onClick={() => setImportOpen(true)}
+              title="Import plain-text script and auto-format"
             >
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-          </button>
+              Import
+            </button>
+          </div>
+          <span className="topbar-sep" aria-hidden />
+          <div className="topbar-group">
+            <button
+              className={"hbtn icon-only" + (node.pinned ? " is-active" : "")}
+              type="button"
+              aria-label={node.pinned ? "Unpin" : "Pin"}
+              onClick={() => void scripts.togglePin(node.id)}
+              title={node.pinned ? "Unpin" : "Pin"}
+            >
+              <StarIcon />
+            </button>
+            <button
+              className="hbtn icon-only"
+              type="button"
+              aria-label="Delete"
+              onClick={() => void handleDelete()}
+              title="Delete"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="doc-scroll">
         <div className="doc">
           <div className="doc-emoji-row">
-            {editingEmoji ? (
-              <input
-                className="doc-emoji-input"
-                autoFocus
-                value={emojiDraft}
-                onChange={(e) => setEmojiDraft(e.target.value)}
-                onBlur={(e) => onEmojiCommit(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter")
-                    (e.target as HTMLInputElement).blur();
-                  if (e.key === "Escape") {
-                    setEmojiDraft(node.emoji ?? "");
-                    setEditingEmoji(false);
-                  }
-                }}
-                placeholder="🎬"
-                maxLength={4}
-              />
-            ) : (
-              <button
-                type="button"
-                className="doc-emoji-wrap doc-emoji-btn"
-                onClick={() => setEditingEmoji(true)}
-                title="Set emoji"
-              >
-                {emojiDraft ? (
-                  <span className="doc-emoji-large">{emojiDraft}</span>
-                ) : (
-                  <span className="doc-emoji-placeholder">+ Emoji</span>
-                )}
-              </button>
-            )}
             <input
               className="doc-title-input"
               value={titleDraft}
@@ -461,87 +439,87 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
           </div>
 
           <div className="vn-meta-row">
-            <span className="vn-meta-chip vn-meta-status">
-              <span className="vn-meta-dot" />
-              {STATUS_OPTIONS.find((s) => s.key === node.status)?.label ??
-                "Draft"}
-              <select
-                className="vn-meta-overlay"
-                value={node.status}
-                onChange={(e) => setStatus(e.target.value)}
+            <Select value={node.status} onValueChange={setStatus}>
+              <SelectTrigger
+                chevron={false}
                 aria-label="Status"
+                className="vn-meta-chip vn-meta-status"
               >
+                <span className="vn-meta-dot" />
+                {STATUS_OPTIONS.find((s) => s.key === node.status)?.label ??
+                  "Draft"}
+              </SelectTrigger>
+              <SelectContent>
                 {STATUS_OPTIONS.map((s) => (
-                  <option key={s.key} value={s.key}>
+                  <SelectItem key={s.key} value={s.key}>
                     {s.label}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </span>
+              </SelectContent>
+            </Select>
             <span className="vn-meta-sep">·</span>
-            {povCharacter ? (
-              <span className="vn-meta-pill">
-                <span
-                  className="vn-meta-pov-chip"
-                  style={{ background: povCharacter.color }}
-                >
-                  {(povCharacter.short_name ?? povCharacter.name)
-                    .slice(0, 1)
-                    .toUpperCase()}
-                </span>
-                <span className="vn-meta-pov-name">{povCharacter.name}</span>
-                <select
-                  className="vn-meta-overlay"
-                  value={node.pov ?? ""}
-                  onChange={(e) => setPov(e.target.value || null)}
-                  aria-label="POV"
-                >
-                  <option value="">— POV —</option>
-                  {scripts.characters.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            ) : (
-              <span className="vn-meta-chip vn-meta-empty">
-                — POV —
-                <select
-                  className="vn-meta-overlay"
-                  value={node.pov ?? ""}
-                  onChange={(e) => setPov(e.target.value || null)}
-                  aria-label="POV"
-                >
-                  <option value="">— POV —</option>
-                  {scripts.characters.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            )}
-            <span className="vn-meta-sep">·</span>
-            <span className="vn-meta-chip">
-              {location
-                ? `${location.name}${location.mood ? " · " + location.mood : ""}`
-                : "— location —"}
-              <select
-                className="vn-meta-overlay"
-                value={node.location_id ?? ""}
-                onChange={(e) => setLocation(e.target.value || null)}
-                aria-label="Location"
+            <Select
+              value={node.pov ?? NONE_VALUE}
+              onValueChange={(v) => setPov(v === NONE_VALUE ? null : v)}
+            >
+              <SelectTrigger
+                chevron={false}
+                aria-label="POV"
+                className={povCharacter ? "vn-meta-pill" : "vn-meta-chip vn-meta-empty"}
               >
-                <option value="">— location —</option>
+                {povCharacter ? (
+                  <>
+                    <span
+                      className="vn-meta-pov-chip"
+                      style={{ background: povCharacter.color }}
+                    >
+                      {(povCharacter.short_name ?? povCharacter.name)
+                        .slice(0, 1)
+                        .toUpperCase()}
+                    </span>
+                    <span className="vn-meta-pov-name">
+                      {povCharacter.name}
+                    </span>
+                  </>
+                ) : (
+                  "— POV —"
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_VALUE}>— POV —</SelectItem>
+                {scripts.characters.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="vn-meta-sep">·</span>
+            <Select
+              value={node.location_id ?? NONE_VALUE}
+              onValueChange={(v) =>
+                setLocation(v === NONE_VALUE ? null : v)
+              }
+            >
+              <SelectTrigger
+                chevron={false}
+                aria-label="Location"
+                className="vn-meta-chip"
+              >
+                {location
+                  ? `${location.name}${location.mood ? " · " + location.mood : ""}`
+                  : "— location —"}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_VALUE}>— location —</SelectItem>
                 {scripts.locations.map((l) => (
-                  <option key={l.id} value={l.id}>
+                  <SelectItem key={l.id} value={l.id}>
                     {l.name}
                     {l.mood ? ` · ${l.mood}` : ""}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </span>
+              </SelectContent>
+            </Select>
             <span className="vn-meta-sep">·</span>
             <span className="vn-meta-stat" title="Words">
               {stats.words} words

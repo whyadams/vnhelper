@@ -1,7 +1,13 @@
-import { useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { useState, type DragEvent, type MouseEvent } from "react";
 import type { CardData, CardPriority } from "../../data/kanban";
 import { useKanban } from "../../state/kanbanStore";
-import { MMenu, MMenuItem, MMenuPage, MMenuSeparator } from "../ui/MMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { CommentIcon, MoreHIcon } from "./Icon";
 import { useDialog } from "../ui/Dialog";
 
@@ -29,7 +35,6 @@ export function Card({ data }: { data: CardData }) {
 
   const [dragging, setDragging] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const moreRef = useRef<HTMLButtonElement | null>(null);
 
   const onDragStart = (e: DragEvent<HTMLElement>) => {
     e.dataTransfer.setData("text/plain", data.id);
@@ -70,39 +75,31 @@ export function Card({ data }: { data: CardData }) {
           <span className="tag-more">+{tags.length - 2}</span>
         )}
         <span className="card-top-spacer" />
-        <button
-          className="card-more"
-          type="button"
-          aria-label="More"
-          ref={moreRef}
-          onClick={(e) => {
-            e.stopPropagation();
-            setMenuOpen((v) => !v);
-          }}
-        >
-          <MoreHIcon />
-        </button>
-        <MMenu
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          anchorRef={moreRef}
-          align="right"
-          minWidth={180}
-        >
-          <MMenuPage id="main">
-            <MMenuItem
-              onClick={() => {
-                dispatch({ type: "FOCUS_CARD", id: data.id });
-                setMenuOpen(false);
-              }}
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="card-more"
+              type="button"
+              aria-label="More"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHIcon />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="min-w-44"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem
+              onSelect={() => dispatch({ type: "FOCUS_CARD", id: data.id })}
             >
               Open
-            </MMenuItem>
-            <MMenuSeparator />
-            <MMenuItem
-              variant="danger"
-              onClick={() => {
-                setMenuOpen(false);
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => {
                 void (async () => {
                   const ok = await dialog.confirm({
                     title: "Delete card",
@@ -115,9 +112,9 @@ export function Card({ data }: { data: CardData }) {
               }}
             >
               Delete
-            </MMenuItem>
-          </MMenuPage>
-        </MMenu>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="card-title">{title}</div>

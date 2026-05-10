@@ -70,7 +70,6 @@ export function Sidebar() {
     (user?.user_metadata?.name as string | undefined) ??
     user?.email?.split("@")[0] ??
     "Me";
-  const initials = userName.slice(0, 2).toUpperCase();
   const pendingInvites = state.incomingInvitations.length;
   const unreadNotifs = notifications.unreadCount;
 
@@ -204,7 +203,6 @@ export function Sidebar() {
 
       {/* User card */}
       <div className="user-chip">
-        <div className="avatar">{initials}</div>
         <div className="user-chip-info">
           <div className="user-chip-name" title={user?.email ?? ""}>
             {userName}

@@ -333,6 +333,35 @@
   align-items: center;
   gap: 8px;
 }
+/* Tight cluster of related buttons within the topbar (e.g. icon buttons). */
+.topbar-right .topbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Vertical hairline separating logical groups in the topbar. */
+.topbar-right .topbar-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(200, 199, 202, 0.12);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+/* All interactive controls in the right cluster share the same 32px height
+   so the baseline is dead level, regardless of icon-only / labelled / toggle
+   shape. The legacy view toggle was 28px (24px button + 2*2 padding); bump
+   to 32px so it matches `.hbtn`. */
+.topbar-right .vn-view-toggle {
+  height: 32px;
+  padding: 3px;
+}
+.topbar-right .vn-view-toggle-btn {
+  height: 26px;
+}
+.topbar-right .hbtn,
+.topbar-right .hbtn.icon-only {
+  height: 32px;
+}
 .saved {
   font-size: 11.5px;
   color: var(--text-3);

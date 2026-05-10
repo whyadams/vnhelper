@@ -229,6 +229,68 @@ export function TranslationsSidebar({
     }
   };
 
+  const onExportProject = async (name: string) => {
+    setMenuFor(null);
+    try {
+      const files = await api.buildProjectExport();
+      if (files.length === 0) {
+        void dialog.alert({
+          title: "Nothing to export",
+          message: `"${name}" has no files yet.`,
+        });
+        return;
+      }
+      // Trigger one download per file. Most browsers permit this from a
+      // single user gesture; we space them out to avoid being throttled.
+      let i = 0;
+      const tick = () => {
+        const f = files[i++];
+        if (!f) return;
+        const blob = new Blob([f.content], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        // Folder structure is preserved in the suggested filename so users
+        // who want a tree can sort by name; some browsers ignore '/' in
+        // download attribute, so we use ' — ' as a separator.
+        a.download = f.folderPath
+          ? `${f.folderPath.replace(/\//g, " — ")} — ${f.filename}`
+          : f.filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        if (i < files.length) setTimeout(tick, 120);
+      };
+      tick();
+    } catch {
+      void dialog.alert({
+        title: "Export failed",
+        message: "Could not export the translation. Check the console.",
+      });
+    }
+  };
+
+  const onRenameProject = async (id: string, currentName: string) => {
+    setMenuFor(null);
+    const next = await dialog.prompt({
+      title: "Rename translation",
+      message: "Translation name (usually the target language).",
+      placeholder: "russian",
+      defaultValue: currentName,
+      confirmLabel: "Rename",
+    });
+    if (!next || next.trim() === currentName.trim()) return;
+    try {
+      await api.renameProject(id, next);
+    } catch {
+      void dialog.alert({
+        title: "Rename failed",
+        message: "Could not rename the translation.",
+      });
+    }
+  };
+
   const onDeleteFile = async (id: string, filename: string) => {
     const ok = await dialog.confirm({
       title: "Delete file",
@@ -243,6 +305,25 @@ export function TranslationsSidebar({
       void dialog.alert({
         title: "Delete failed",
         message: "Could not delete the file.",
+      });
+    }
+  };
+
+  const onRenameFile = async (id: string, currentName: string) => {
+    const next = await dialog.prompt({
+      title: "Rename file",
+      message: "New filename. Keep the .rpy extension so Ren'Py can pick it up.",
+      placeholder: "screens.rpy",
+      defaultValue: currentName,
+      confirmLabel: "Rename",
+    });
+    if (!next || next.trim() === currentName.trim()) return;
+    try {
+      await api.renameFile(id, next);
+    } catch {
+      void dialog.alert({
+        title: "Rename failed",
+        message: "Could not rename the file.",
       });
     }
   };
@@ -408,6 +489,23 @@ export function TranslationsSidebar({
                         <div className="tr-project-menu-pop">
                           <button
                             type="button"
+                            className="tr-menu-item"
+                            onClick={() => onRenameProject(p.id, p.name)}
+                          >
+                            Rename…
+                          </button>
+                          <button
+                            type="button"
+                            className="tr-menu-item"
+                            onClick={() => {
+                              api.setActiveProjectId(p.id);
+                              void onExportProject(p.name);
+                            }}
+                          >
+                            Export all files…
+                          </button>
+                          <button
+                            type="button"
                             className="tr-menu-item is-danger"
                             onClick={() => onDeleteProject(p.id, p.name)}
                           >
@@ -469,6 +567,7 @@ export function TranslationsSidebar({
                     canEdit={canEdit}
                     isActive={api.activeFileId === f.id}
                     onDelete={() => onDeleteFile(f.id, f.filename)}
+                    onRename={() => onRenameFile(f.id, f.filename)}
                   />
                 ))}
               </section>
@@ -492,6 +591,7 @@ export function TranslationsSidebar({
                   canEdit={canEdit}
                   activeFileId={api.activeFileId}
                   onDeleteFile={onDeleteFile}
+                  onRenameFile={onRenameFile}
                 />
               )}
             </section>
@@ -545,6 +645,7 @@ interface FileRowProps {
   canEdit: boolean;
   isActive: boolean;
   onDelete: () => void;
+  onRename: () => void;
   /** Show a file glyph to the left of the filename (used in the tree). */
   showIcon?: boolean;
 }
@@ -555,6 +656,7 @@ function FileRow({
   canEdit,
   isActive,
   onDelete,
+  onRename,
   showIcon,
 }: FileRowProps) {
   const stats = api.fileStats[file.id];
@@ -599,9 +701,24 @@ function FileRow({
           <button
             type="button"
             className="tr-icon-btn"
+            title="Rename file"
+            aria-label="Rename file"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRename();
+            }}
+          >
+            <PencilIcon />
+          </button>
+          <button
+            type="button"
+            className="tr-icon-btn"
             title="Delete file"
             aria-label="Delete file"
-            onClick={onDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
           >
             <CrossIcon />
           </button>
@@ -670,6 +787,7 @@ interface FilesTreeProps {
   canEdit: boolean;
   activeFileId: string | null;
   onDeleteFile: (id: string, filename: string) => void;
+  onRenameFile: (id: string, filename: string) => void;
 }
 
 function FilesTree({
@@ -678,6 +796,7 @@ function FilesTree({
   canEdit,
   activeFileId,
   onDeleteFile,
+  onRenameFile,
 }: FilesTreeProps) {
   const tree = useMemo(() => buildFilesTree(files), [files]);
 
@@ -729,6 +848,7 @@ function FilesTree({
           canEdit={canEdit}
           activeFileId={activeFileId}
           onDeleteFile={onDeleteFile}
+          onRenameFile={onRenameFile}
           expanded={expanded}
           onToggle={toggle}
           isFirst={i === 0}
@@ -745,6 +865,7 @@ interface TreeNodeViewProps {
   canEdit: boolean;
   activeFileId: string | null;
   onDeleteFile: (id: string, filename: string) => void;
+  onRenameFile: (id: string, filename: string) => void;
   expanded: Set<string>;
   onToggle: (path: string) => void;
   isFirst: boolean;
@@ -757,6 +878,7 @@ function TreeNodeView({
   canEdit,
   activeFileId,
   onDeleteFile,
+  onRenameFile,
   expanded,
   onToggle,
 }: TreeNodeViewProps) {
@@ -769,6 +891,7 @@ function TreeNodeView({
           canEdit={canEdit}
           isActive={activeFileId === node.file.id}
           onDelete={() => onDeleteFile(node.file.id, node.file.filename)}
+          onRename={() => onRenameFile(node.file.id, node.file.filename)}
           showIcon
         />
       </div>
@@ -815,6 +938,7 @@ function TreeNodeView({
             canEdit={canEdit}
             activeFileId={activeFileId}
             onDeleteFile={onDeleteFile}
+            onRenameFile={onRenameFile}
             expanded={expanded}
             onToggle={onToggle}
             isFirst={false}
@@ -884,6 +1008,26 @@ function DotsIcon() {
       <circle cx="1.5" cy="1.5" r="1.2" />
       <circle cx="7" cy="1.5" r="1.2" />
       <circle cx="12.5" cy="1.5" r="1.2" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 11 11"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M7.4 1.6L9.4 3.6M1.5 9.5L3.5 9.1L9.4 3.2C9.7 2.9 9.7 2.4 9.4 2.1L8.9 1.6C8.6 1.3 8.1 1.3 7.8 1.6L1.9 7.5L1.5 9.5Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

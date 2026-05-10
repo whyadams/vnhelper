@@ -1,4 +1,9 @@
 import { useEffect } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+// Tailwind first so the preflight reset is overridden by the legacy CSS
+// that follows. shadcn variables are loaded but no global element styles
+// are applied beyond preflight — existing screens are unaffected.
+import "./styles/tailwind.css";
 import "./styles/kanban.css";
 import "./styles/tiptap.css";
 import "./styles/scripts.css";
@@ -11,6 +16,7 @@ import "./styles/members.css";
 import "./styles/workspace.css";
 import "./styles/translations.css";
 import "./styles/skeleton.css";
+import "./styles/widget.css";
 import { AutoUpdater } from "./components/AutoUpdater";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { CalendarScreen } from "./components/calendar/CalendarScreen";
@@ -27,10 +33,30 @@ import { ScriptScreen } from "./components/scripts/ScriptScreen";
 import { TranslationsScreen } from "./components/translations/TranslationsScreen";
 import { ComingSoonScreen } from "./components/ui/ComingSoonScreen";
 import { DialogProvider } from "./components/ui/Dialog";
+import { KanbanWidget } from "./components/widget/KanbanWidget";
 import { AuthProvider, useAuth } from "./state/AuthProvider";
 import { KanbanProvider, useKanban } from "./state/kanbanStore";
 import { useTrayTasks } from "./state/useTrayTasks";
 import { canSeeNav, type Role } from "./lib/roles";
+
+// Tauri window label is fixed at construction time. Read it once so the
+// React tree can route to the right shell on first paint without a flash.
+const WINDOW_LABEL = (() => {
+  try {
+    return getCurrentWindow().label;
+  } catch {
+    return "main";
+  }
+})();
+const IS_WIDGET = WINDOW_LABEL === "widget";
+
+// Widget mode needs transparent <html>/<body> so the rounded shell sits over
+// the desktop. Mark the root nodes once at boot — pure DOM, no React state.
+if (IS_WIDGET && typeof document !== "undefined") {
+  document.documentElement.classList.add("is-widget");
+  document.body.classList.add("is-widget");
+  document.getElementById("root")?.classList.add("is-widget");
+}
 
 function GlobalShortcuts() {
   useEffect(() => {
@@ -130,7 +156,38 @@ function AuthGate() {
   );
 }
 
+function WidgetApp() {
+  // Compact always-on-top kanban widget. Reuses the same Supabase auth
+  // (shared via WebView2 storage) and KanbanProvider so realtime updates
+  // mirror the main window without any cross-window IPC.
+  return (
+    <DialogProvider>
+      <AuthProvider>
+        <WidgetGate />
+      </AuthProvider>
+    </DialogProvider>
+  );
+}
+
+function WidgetGate() {
+  const { session, loading } = useAuth();
+  if (loading) {
+    return <div className="widget-shell widget-loading">Loading…</div>;
+  }
+  if (!session) {
+    return (
+      <div className="widget-shell widget-loading">Sign in in the main window first.</div>
+    );
+  }
+  return (
+    <KanbanProvider>
+      <KanbanWidget />
+    </KanbanProvider>
+  );
+}
+
 export default function App() {
+  if (IS_WIDGET) return <WidgetApp />;
   return (
     <DialogProvider>
       <AutoUpdater />

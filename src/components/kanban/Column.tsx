@@ -9,7 +9,13 @@ import type { ColumnData } from "../../data/kanban";
 import { useKanban } from "../../state/kanbanStore";
 import { Card } from "./Card";
 import { MoreHIcon, PlusIcon } from "./Icon";
-import { MMenu, MMenuItem, MMenuPage, MMenuSeparator } from "../ui/MMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { useDialog } from "../ui/Dialog";
 
 export function Column({ data }: { data: ColumnData }) {
@@ -17,13 +23,11 @@ export function Column({ data }: { data: ColumnData }) {
   const dialog = useDialog();
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const moreRef = useRef<HTMLButtonElement | null>(null);
 
   const [dragOver, setDragOver] = useState(false);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState(data.title);
 
@@ -98,7 +102,6 @@ export function Column({ data }: { data: ColumnData }) {
   };
 
   const handleDelete = async () => {
-    setMenuOpen(false);
     const cardCount = data.cards.length;
     const msg =
       cardCount > 0
@@ -151,44 +154,33 @@ export function Column({ data }: { data: ColumnData }) {
           >
             <PlusIcon size={12} />
           </button>
-          <button
-            ref={moreRef}
-            type="button"
-            aria-label="More"
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <MoreHIcon />
-          </button>
-          <MMenu
-            open={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            anchorRef={moreRef}
-            align="right"
-            minWidth={200}
-          >
-            <MMenuPage id="main">
-              <MMenuItem
-                onClick={() => {
-                  setMenuOpen(false);
-                  setRenaming(true);
-                }}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="col-head-more"
+                type="button"
+                aria-label="Column actions"
+                title="Column actions"
               >
+                <MoreHIcon />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-48">
+              <DropdownMenuItem onSelect={() => setRenaming(true)}>
                 Rename
-              </MMenuItem>
-              <MMenuItem
-                onClick={() => {
-                  setMenuOpen(false);
-                  setAdding(true);
-                }}
-              >
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setAdding(true)}>
                 Add card
-              </MMenuItem>
-              <MMenuSeparator />
-              <MMenuItem variant="danger" onClick={() => void handleDelete()}>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => void handleDelete()}
+              >
                 Delete column
-              </MMenuItem>
-            </MMenuPage>
-          </MMenu>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <div

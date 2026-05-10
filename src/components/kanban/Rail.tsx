@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   useKanban,
   type WorkspaceListItem,
@@ -9,11 +9,12 @@ import { useDialog } from "../ui/Dialog";
 import { SettingsModal } from "../settings/SettingsModal";
 import { EditWorkspaceModal } from "../workspace/EditWorkspaceModal";
 import {
-  MMenu,
-  MMenuItem,
-  MMenuPage,
-  MMenuSeparator,
-} from "../ui/MMenu";
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../ui/context-menu";
 
 export function Rail() {
   const {
@@ -31,8 +32,6 @@ export function Rail() {
   const [editWorkspace, setEditWorkspace] = useState<WorkspaceListItem | null>(
     null,
   );
-  const [menuFor, setMenuFor] = useState<WorkspaceListItem | null>(null);
-  const menuAnchorRef = useRef<HTMLElement | null>(null);
 
   const onCreate = async () => {
     if (busy) return;
@@ -51,12 +50,14 @@ export function Rail() {
     }
   };
 
-  const openMenuFor = (
-    ws: WorkspaceListItem,
-    el: HTMLElement,
-  ) => {
-    menuAnchorRef.current = el;
-    setMenuFor(ws);
+  const onDeleteWorkspace = async (ws: WorkspaceListItem) => {
+    const ok = await dialog.confirm({
+      title: "Delete workspace",
+      message: `Delete "${ws.name}" and everything inside it? This cannot be undone.`,
+      variant: "danger",
+      confirmLabel: "Delete forever",
+    });
+    if (ok) await deleteWorkspace(ws.id);
   };
 
   return (
@@ -74,36 +75,51 @@ export function Rail() {
         {state.workspaces.length > 0 && <span className="rail-divider" />}
         <div className="rail-list">
           {state.workspaces.map((ws) => (
-            <button
-              key={ws.id}
-              className={
-                "rail-app" +
-                (state.workspaceId === ws.id ? " is-active" : "") +
-                (ws.avatar_url ? " has-avatar" : "")
-              }
-              title={`${ws.name} · ${ws.role} · right-click for settings`}
-              type="button"
-              onClick={() =>
-                dispatch({ type: "SET_ACTIVE_WORKSPACE", id: ws.id })
-              }
-              onContextMenu={(e) => {
-                e.preventDefault();
-                openMenuFor(ws, e.currentTarget);
-              }}
-            >
-              {ws.avatar_url ? (
-                <img
-                  src={ws.avatar_url}
-                  alt=""
-                  className="rail-app-img"
-                  draggable={false}
-                />
-              ) : (
-                <span className="rail-glyph">
-                  {ws.name.trim().charAt(0).toUpperCase() || "W"}
-                </span>
-              )}
-            </button>
+            <ContextMenu key={ws.id}>
+              <ContextMenuTrigger asChild>
+                <button
+                  className={
+                    "rail-app" +
+                    (state.workspaceId === ws.id ? " is-active" : "") +
+                    (ws.avatar_url ? " has-avatar" : "")
+                  }
+                  title={`${ws.name} · ${ws.role} · right-click for settings`}
+                  type="button"
+                  onClick={() =>
+                    dispatch({ type: "SET_ACTIVE_WORKSPACE", id: ws.id })
+                  }
+                >
+                  {ws.avatar_url ? (
+                    <img
+                      src={ws.avatar_url}
+                      alt=""
+                      className="rail-app-img"
+                      draggable={false}
+                    />
+                  ) : (
+                    <span className="rail-glyph">
+                      {ws.name.trim().charAt(0).toUpperCase() || "W"}
+                    </span>
+                  )}
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="min-w-52">
+                <ContextMenuItem onSelect={() => setEditWorkspace(ws)}>
+                  Workspace settings…
+                </ContextMenuItem>
+                {ws.role === "owner" && (
+                  <>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      variant="destructive"
+                      onSelect={() => void onDeleteWorkspace(ws)}
+                    >
+                      Delete workspace…
+                    </ContextMenuItem>
+                  </>
+                )}
+              </ContextMenuContent>
+            </ContextMenu>
           ))}
         </div>
       </div>
@@ -120,50 +136,6 @@ export function Rail() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
-      <MMenu
-        open={menuFor !== null}
-        onClose={() => setMenuFor(null)}
-        anchorRef={menuAnchorRef as React.RefObject<HTMLElement>}
-        align="left"
-        minWidth={200}
-      >
-        <MMenuPage id="main">
-          <MMenuItem
-            onClick={() => {
-              if (menuFor) {
-                setEditWorkspace(menuFor);
-              }
-              setMenuFor(null);
-            }}
-          >
-            <span>Workspace settings…</span>
-          </MMenuItem>
-          {menuFor?.role === "owner" && (
-            <>
-              <MMenuSeparator />
-              <MMenuItem
-                variant="danger"
-                onClick={() => {
-                  const ws = menuFor;
-                  setMenuFor(null);
-                  if (!ws) return;
-                  void (async () => {
-                    const ok = await dialog.confirm({
-                      title: "Delete workspace",
-                      message: `Delete "${ws.name}" and everything inside it? This cannot be undone.`,
-                      variant: "danger",
-                      confirmLabel: "Delete forever",
-                    });
-                    if (ok) await deleteWorkspace(ws.id);
-                  })();
-                }}
-              >
-                Delete workspace…
-              </MMenuItem>
-            </>
-          )}
-        </MMenuPage>
-      </MMenu>
       <EditWorkspaceModal
         open={editWorkspace !== null}
         workspace={editWorkspace}
