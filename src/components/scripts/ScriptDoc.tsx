@@ -15,8 +15,9 @@ import {
   ScriptEditor,
   useScriptStats,
 } from "./ScriptEditor";
-import { ScriptTable } from "./ScriptTable";
+import { RenpyTable } from "./RenpyTable";
 import { ScriptImportModal } from "./ScriptImportModal";
+import type { RpyBlocks } from "../../lib/renpy/blocks";
 import { useDialog } from "../ui/Dialog";
 import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
 import {
@@ -30,7 +31,7 @@ import {
 // the "none" option and translate at the boundary.
 const NONE_VALUE = "__none__";
 
-type ScriptViewMode = "doc" | "table";
+type ScriptViewMode = "doc" | "renpy";
 
 type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
 
@@ -169,6 +170,85 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
       void scripts.updateNode(node.id, { content });
     }, CONTENT_SAVE_DEBOUNCE_MS);
   };
+
+  // Renpy-tab save shares the same debounce slot as Doc — only one of the two
+  // tabs is visible at a time, so a pending save from the other never races.
+  const onRpyBlocksChange = (rpy_blocks: RpyBlocks) => {
+    if (!node) return;
+    if (contentSaveTimeoutRef.current)
+      clearTimeout(contentSaveTimeoutRef.current);
+    contentSaveTimeoutRef.current = setTimeout(() => {
+      void scripts.updateNode(node.id, { rpy_blocks });
+    }, CONTENT_SAVE_DEBOUNCE_MS);
+  };
+
+  // Bulk operations (paste-import, clear-all, replace-via-import) bypass the
+  // debounce so the save lands before any other UI event can race against it.
+  // The debounce is for keystroke-level edits — bulk replacements need to be
+  // atomic and immediate.
+  const onRpyBlocksReplace = async (rpy_blocks: RpyBlocks) => {
+    if (!node) return;
+    if (contentSaveTimeoutRef.current) {
+      clearTimeout(contentSaveTimeoutRef.current);
+      contentSaveTimeoutRef.current = null;
+    }
+    await scripts.updateNode(node.id, { rpy_blocks });
+  };
+
+  /** Build the project's .rpy and trigger a browser download. */
+  const onClickExportRpy = async () => {
+    const result = await scripts.exportRpyProject();
+    if (!result) {
+      void dialog.alert({
+        title: "Export failed",
+        message: "Could not load project scenes. Try refreshing the app.",
+      });
+      return;
+    }
+    if (result.sceneCount === 0) {
+      void dialog.alert({
+        title: "Nothing to export",
+        message:
+          "No scenes have Ren'Py content yet. Open a scene's Renpy tab and write or paste some content first.",
+      });
+      return;
+    }
+    const blob = new Blob([result.text], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = result.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    if (result.warnings.length > 0) {
+      void dialog.alert({
+        title: `Exported ${result.sceneCount} scene(s) — with warnings`,
+        message:
+          result.warnings.slice(0, 6).join("\n") +
+          (result.warnings.length > 6
+            ? `\n…and ${result.warnings.length - 6} more`
+            : ""),
+      });
+    }
+  };
+
+  // All Ren'Py-labels available across the project — feeds jump/call
+  // autocompletion in RenpyTable so the user can pick existing targets
+  // and broken jumps light up immediately when a target is missing.
+  const projectLabels = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of scripts.nodes) {
+      if (n.kind === "scene" && n.rpy_label?.trim()) {
+        set.add(n.rpy_label.trim());
+      }
+    }
+    return Array.from(set).sort();
+  }, [scripts.nodes]);
 
   const editorInitial = useMemo(() => {
     if (!node) return null;
@@ -369,14 +449,14 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
             <button
               type="button"
               role="tab"
-              aria-selected={viewMode === "table"}
+              aria-selected={viewMode === "renpy"}
               className={
-                "vn-view-toggle-btn" + (viewMode === "table" ? " is-active" : "")
+                "vn-view-toggle-btn" + (viewMode === "renpy" ? " is-active" : "")
               }
-              onClick={() => setViewMode("table")}
-              title="Table view"
+              onClick={() => setViewMode("renpy")}
+              title="Ren'Py block view (independent of Doc)"
             >
-              Table
+              Renpy
             </button>
           </div>
           <span className="topbar-sep" aria-hidden />
@@ -389,6 +469,16 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
             >
               Import
             </button>
+            {viewMode === "renpy" && (
+              <button
+                className="hbtn fix-hbtn"
+                type="button"
+                onClick={() => void onClickExportRpy()}
+                title="Export the whole project as a compilable .rpy file"
+              >
+                Export .rpy
+              </button>
+            )}
           </div>
           <span className="topbar-sep" aria-hidden />
           <div className="topbar-group">
@@ -566,12 +656,15 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
             />
           )}
 
-          {editorInitial && viewMode === "table" && (
-            <ScriptTable
-              key={editorInitial.nodeId + ":" + externalRevision}
-              initialContent={editorInitial.initialContent}
+          {editorInitial && viewMode === "renpy" && (
+            <RenpyTable
+              key={editorInitial.nodeId + ":renpy:" + externalRevision}
+              nodeId={editorInitial.nodeId}
+              initialBlocks={node.rpy_blocks}
               characters={scripts.characters}
-              onChange={onContentChange}
+              projectLabels={projectLabels}
+              onChange={onRpyBlocksChange}
+              onReplace={onRpyBlocksReplace}
             />
           )}
 

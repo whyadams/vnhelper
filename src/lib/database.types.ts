@@ -419,6 +419,9 @@ export type Database = {
           emoji: string | null
           body: string
           content: Json | null
+          rpy_blocks: Json | null
+          rpy_label: string | null
+          source_kind: string
           tags: string[]
           status: string
           pov: string | null
@@ -440,6 +443,9 @@ export type Database = {
           emoji?: string | null
           body?: string
           content?: Json | null
+          rpy_blocks?: Json | null
+          rpy_label?: string | null
+          source_kind?: string
           tags?: string[]
           status?: string
           pov?: string | null
@@ -461,6 +467,9 @@ export type Database = {
           emoji?: string | null
           body?: string
           content?: Json | null
+          rpy_blocks?: Json | null
+          rpy_label?: string | null
+          source_kind?: string
           tags?: string[]
           status?: string
           pov?: string | null
@@ -481,6 +490,7 @@ export type Database = {
           workspace_id: string
           name: string
           short_name: string | null
+          rpy_var: string | null
           color: string
           emoji: string | null
           pronouns: string | null
@@ -501,6 +511,7 @@ export type Database = {
           workspace_id: string
           name: string
           short_name?: string | null
+          rpy_var?: string | null
           color?: string
           emoji?: string | null
           pronouns?: string | null
@@ -521,6 +532,7 @@ export type Database = {
           workspace_id?: string
           name?: string
           short_name?: string | null
+          rpy_var?: string | null
           color?: string
           emoji?: string | null
           pronouns?: string | null

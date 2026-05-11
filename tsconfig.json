@@ -26,6 +26,9 @@
     }
   },
   "include": ["src"],
-  "exclude": ["src/lib/renpy/__fixtures__/roundtrip.ts"],
+  "exclude": [
+    "src/lib/renpy/__fixtures__/roundtrip.ts",
+    "src/lib/renpy/__fixtures__/sceneRoundtrip.ts"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

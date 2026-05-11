@@ -377,6 +377,13 @@
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+.cal-side-event-creator {
+  font-size: 10.5px;
+  color: rgba(200, 199, 202, 0.45);
+  margin-top: 6px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
 .cal-side-event-desc {
   font-size: 11px;
   color: rgba(200, 199, 202, 0.5);

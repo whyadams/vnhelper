@@ -2,9 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./AuthProvider";
 import type { Json } from "../lib/database.types";
+import type { RpyBlocks } from "../lib/renpy/blocks";
 
 export type NodeKind = "chapter" | "scene" | "block";
 export type ScriptContent = Json;
+
+/** Origin of a scene's Renpy-blocks: authored in VnHelper, or imported from .rpy. */
+export type ScriptSourceKind = "vnhelper" | "rpy_import";
 
 export interface ScriptProject {
   id: string;
@@ -31,12 +35,22 @@ export interface ScriptNodeSummary {
   pov: string | null;
   location_id: string | null;
   tags: string[];
+  /** Project-unique Ren'Py label — used for jump/call autocompletion across
+   * the editor without having to fetch each scene's full body. */
+  rpy_label: string | null;
   updated_at: string;
 }
 
 export interface ScriptNodeFull extends ScriptNodeSummary {
   body: string;
+  /** Doc-tab content (TipTap doc). Independent from `rpy_blocks`. */
   content: ScriptContent | null;
+  /** Renpy-tab content (structured Ren'Py blocks). Independent from `content`. */
+  rpy_blocks: RpyBlocks | null;
+  /** Project-unique Ren'Py label for this scene. Used by Graph to resolve jumps. */
+  rpy_label: string | null;
+  /** Where this scene's `rpy_blocks` came from. */
+  source_kind: ScriptSourceKind;
   workspace_id: string;
   created_by: string | null;
   created_at: string;
@@ -48,6 +62,9 @@ export interface ScriptCharacter {
   workspace_id?: string;
   name: string;
   short_name: string | null;
+  /** Ren'Py variable name (e.g. "mc", "eileen"). Project-unique. Falls back
+   * to a slug of `name` at serialise time when null. */
+  rpy_var: string | null;
   color: string;
   emoji: string | null;
   pronouns: string | null;
@@ -216,7 +233,7 @@ export function useScripts(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("script_nodes")
       .select(
-        "id, project_id, parent_id, kind, title, emoji, pinned, position, status, pov, location_id, tags, updated_at",
+        "id, project_id, parent_id, kind, title, emoji, pinned, position, status, pov, location_id, tags, rpy_label, updated_at",
       )
       .eq("project_id", myProject)
       .order("pinned", { ascending: false })
@@ -238,7 +255,7 @@ export function useScripts(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("script_characters")
       .select(
-        "id, project_id, workspace_id, name, short_name, color, emoji, pronouns, age, role, voice_notes, traits, aliases, avatar_url, position",
+        "id, project_id, workspace_id, name, short_name, rpy_var, color, emoji, pronouns, age, role, voice_notes, traits, aliases, avatar_url, position",
       )
       .eq("project_id", myProject)
       .order("position", { ascending: true });
@@ -277,7 +294,7 @@ export function useScripts(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("script_nodes")
       .select(
-        "id, project_id, workspace_id, parent_id, kind, title, emoji, body, content, tags, status, pov, location_id, pinned, position, updated_at, created_by, created_at",
+        "id, project_id, workspace_id, parent_id, kind, title, emoji, body, content, rpy_blocks, rpy_label, source_kind, tags, status, pov, location_id, pinned, position, updated_at, created_by, created_at",
       )
       .eq("id", id)
       .single();
@@ -288,7 +305,18 @@ export function useScripts(workspaceId: string | null) {
       return;
     }
     if (activeNodeIdRef.current === id) {
-      setActiveNode(data as ScriptNodeFull);
+      // rpy_blocks comes back as Json; cast to our typed shape. Empty/null
+      // is normalised to null so the editor can render its empty state.
+      const row = data as Omit<ScriptNodeFull, "rpy_blocks" | "source_kind"> & {
+        rpy_blocks: Json | null;
+        source_kind: string;
+      };
+      setActiveNode({
+        ...row,
+        rpy_blocks: (row.rpy_blocks as RpyBlocks | null) ?? null,
+        source_kind:
+          row.source_kind === "rpy_import" ? "rpy_import" : "vnhelper",
+      });
     }
   }, []);
 
@@ -632,6 +660,7 @@ export function useScripts(workspaceId: string | null) {
         pov: null,
         location_id: null,
         tags: [],
+        rpy_label: null,
         updated_at: now,
       };
       // Optimistic: insert into the local tree before the round-trip.
@@ -671,6 +700,9 @@ export function useScripts(workspaceId: string | null) {
           | "title"
           | "body"
           | "content"
+          | "rpy_blocks"
+          | "rpy_label"
+          | "source_kind"
           | "emoji"
           | "pinned"
           | "tags"
@@ -712,9 +744,13 @@ export function useScripts(workspaceId: string | null) {
             : n,
         ),
       );
+      // `rpy_blocks` is typed as `Json` at the DB boundary; our typed
+      // `RpyBlocks` is a more specific shape and TS won't narrow it down
+      // automatically. The `as never` is Supabase-SDK's escape hatch for
+      // intentional updates whose payload shape is wider than the row.
       const { error } = await supabase
         .from("script_nodes")
-        .update({ ...patch, updated_by: user.id })
+        .update({ ...patch, updated_by: user.id } as never)
         .eq("id", id);
       if (error) console.error("updateNode", error);
     },
@@ -784,6 +820,7 @@ export function useScripts(workspaceId: string | null) {
         workspace_id: workspaceId,
         name: name.trim() || "Unnamed",
         short_name: null,
+        rpy_var: null,
         color: opts.color ?? "#6aa6ff",
         emoji: opts.emoji ?? null,
         pronouns: null,
@@ -826,6 +863,7 @@ export function useScripts(workspaceId: string | null) {
           ScriptCharacter,
           | "name"
           | "short_name"
+          | "rpy_var"
           | "color"
           | "emoji"
           | "pronouns"
@@ -975,6 +1013,81 @@ export function useScripts(workspaceId: string | null) {
     return { sceneCount, chapterCount, total: nodes.length };
   }, [nodes]);
 
+  /**
+   * Bulk-fetch scene nodes with their `rpy_blocks` and assemble a single
+   * .rpy file. Walks the project tree depth-first to preserve narrative
+   * ordering (chapters → parts → scenes). Returns the serialized text plus
+   * stats / warnings the caller can surface to the user.
+   */
+  const exportRpyProject = useCallback(async () => {
+    if (!activeProjectId || !activeProject) return null;
+
+    const { data, error } = await supabase
+      .from("script_nodes")
+      .select("id, parent_id, kind, title, position, rpy_label, rpy_blocks")
+      .eq("project_id", activeProjectId)
+      .order("position", { ascending: true });
+    if (error) {
+      console.error("export fetch nodes", error);
+      return null;
+    }
+
+    // Build a parent → children map so we can walk depth-first preserving the
+    // user's ordering inside each level (already sorted by `position` above).
+    type Row = {
+      id: string;
+      parent_id: string | null;
+      kind: "chapter" | "scene" | "block";
+      title: string;
+      position: number;
+      rpy_label: string | null;
+      rpy_blocks: Json | null;
+    };
+    const rows = (data ?? []) as Row[];
+    const childrenOf = new Map<string | null, Row[]>();
+    for (const r of rows) {
+      const arr = childrenOf.get(r.parent_id) ?? [];
+      arr.push(r);
+      childrenOf.set(r.parent_id, arr);
+    }
+
+    const scenes: import("../lib/renpy/projectExport").ExportScene[] = [];
+    const walk = (parent: string | null) => {
+      const kids = childrenOf.get(parent) ?? [];
+      for (const k of kids) {
+        if (k.kind === "scene") {
+          scenes.push({
+            id: k.id,
+            title: k.title,
+            rpy_label: k.rpy_label,
+            rpy_blocks:
+              (k.rpy_blocks as import("../lib/renpy/blocks").RpyBlocks | null) ??
+              null,
+          });
+        }
+        walk(k.id);
+      }
+    };
+    walk(null);
+
+    const linkedCharacters = characters
+      .filter((c) => c.rpy_var && c.rpy_var.trim())
+      .map((c) => ({
+        name: c.name,
+        rpy_var: c.rpy_var!.trim(),
+        color: c.color,
+      }));
+
+    const { buildRenpyProjectFile } = await import(
+      "../lib/renpy/projectExport"
+    );
+    return buildRenpyProjectFile({
+      projectTitle: activeProject.title,
+      scenes,
+      characters: linkedCharacters,
+    });
+  }, [activeProjectId, activeProject, characters]);
+
   return {
     // projects
     projects,
@@ -1011,6 +1124,9 @@ export function useScripts(workspaceId: string | null) {
     createLocation,
     updateLocation,
     deleteLocation,
+
+    // export
+    exportRpyProject,
 
     // misc
     stats,

@@ -6,7 +6,7 @@ import {
 import { PlusIcon } from "./Icon";
 import { SettingsFilledIcon } from "./SidebarIcons";
 import { useDialog } from "../ui/Dialog";
-import { SettingsModal } from "../settings/SettingsModal";
+import { SettingsScreen } from "../settings/SettingsScreen";
 import { EditWorkspaceModal } from "../workspace/EditWorkspaceModal";
 import {
   ContextMenu,
@@ -132,7 +132,7 @@ export function Rail() {
       >
         <SettingsFilledIcon size={22} />
       </button>
-      <SettingsModal
+      <SettingsScreen
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />

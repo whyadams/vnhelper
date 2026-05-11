@@ -42,6 +42,12 @@ export interface CardAssignee {
   email: string | null;
 }
 
+export interface CardCreator {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
+
 export type CardPriority = "low" | "medium" | "high" | "urgent";
 
 export interface CardData {
@@ -56,6 +62,9 @@ export interface CardData {
   date: string;
   description?: string;
   priority?: CardPriority | null;
+  /** Author of the card. May be null if the user was deleted, or until the
+   * realtime payload is enriched with the joined profile. */
+  creator?: CardCreator | null;
   /** DB sync metadata — not used by UI components. */
   position?: number;
   columnId?: string;

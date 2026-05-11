@@ -1,17 +1,19 @@
 {
   "name": "vnhelper",
   "private": true,
-  "version": "0.1.12",
+  "version": "0.1.13",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "renpy:check": "tsx src/lib/renpy/__fixtures__/roundtrip.ts"
+    "renpy:check": "tsx src/lib/renpy/__fixtures__/roundtrip.ts && tsx src/lib/renpy/__fixtures__/sceneRoundtrip.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",
+    "@dnd-kit/helpers": "^0.4.0",
+    "@dnd-kit/react": "^0.4.0",
     "@excalidraw/excalidraw": "^0.18.1",
     "@headless-tree/core": "^1.6.3",
     "@headless-tree/react": "^1.6.3",

@@ -14,6 +14,7 @@ import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import {
   type BrandKey,
   type CardAssignee,
+  type CardCreator,
   type CardData,
   type CardMeta,
   type CardPriority,
@@ -83,7 +84,13 @@ const DEFAULT_COLUMNS = [
 // User-initiated, persisted to DB
 type LocalAction =
   | { type: "MOVE_CARD"; id: string; toColumn: ColumnKey; toIndex: number }
-  | { type: "ADD_CARD"; columnKey: ColumnKey; title: string; cardId?: string }
+  | {
+      type: "ADD_CARD";
+      columnKey: ColumnKey;
+      title: string;
+      cardId?: string;
+      creator?: CardCreator | null;
+    }
   | { type: "DELETE_CARD"; id: string }
   | { type: "UPDATE_CARD"; id: string; patch: Partial<CardData> }
   | { type: "FOCUS_CARD"; id: string | null }
@@ -274,6 +281,7 @@ function reducer(state: KanbanState, action: Action): KanbanState {
           day: "numeric",
           year: "numeric",
         }),
+        creator: action.creator ?? null,
         position: lastPos + 1024,
         columnId: state.columnIdByKey[action.columnKey],
       };
@@ -441,6 +449,9 @@ function mergePreservingTags(local: CardData, incoming: CardData): CardData {
   return {
     ...incoming,
     tags: incoming.tags.length > 0 ? incoming.tags : local.tags,
+    // Realtime payloads don't include the joined creator profile — preserve
+    // the locally resolved one so the author stays visible across updates.
+    creator: incoming.creator ?? local.creator ?? null,
   };
 }
 
@@ -739,7 +750,8 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
             id, key, title, position,
             cards (
               id, title, subtitle, description, brand, brand_fallback,
-              due_date, position, meta, column_id,
+              due_date, position, meta, column_id, created_by,
+              creator:profiles!cards_created_by_fkey ( id, name, email ),
               card_tags ( tags ( id, label, color ) ),
               card_assignees ( user_id, profiles!card_assignees_user_id_fkey ( id, name, email ) ),
               priority
@@ -960,10 +972,25 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
   const dispatch: Dispatch<Action> = useCallback(
     (action) => {
       let normalized: Action = action;
-      if (action.type === "ADD_CARD" && !action.cardId) {
+      if (action.type === "ADD_CARD") {
+        // Inject the current user as the optimistic creator so the detail
+        // panel shows the author immediately, before the realtime echo /
+        // refetch lands. The persisted row uses the same user id below.
+        const creator: CardCreator | null = user
+          ? {
+              id: user.id,
+              name:
+                (user.user_metadata?.name as string | undefined) ?? null,
+              email: user.email ?? null,
+            }
+          : null;
         normalized = {
           ...action,
-          cardId: globalThis.crypto?.randomUUID?.() ?? fallbackUuid(),
+          cardId:
+            action.cardId ??
+            globalThis.crypto?.randomUUID?.() ??
+            fallbackUuid(),
+          creator: action.creator ?? creator,
         };
       }
       baseDispatch(normalized);
@@ -975,7 +1002,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    [user?.id],
+    [user],
   );
 
   // ============================================================
@@ -1239,6 +1266,8 @@ type DbCardRow = Pick<
   | "column_id"
   | "priority"
 > & {
+  created_by?: string | null;
+  creator?: { id: string; name: string | null; email: string | null } | null;
   card_tags?: Array<{
     tags: { id: string; label: string; color: string } | null;
   }>;
@@ -1275,6 +1304,7 @@ function mapDbCard(row: DbCardRow, columnId: string): CardData {
     date: row.due_date ?? "",
     description: row.description ?? undefined,
     priority: (row.priority as CardPriority | null) ?? undefined,
+    creator: row.creator ?? null,
     position: row.position,
     columnId,
   };

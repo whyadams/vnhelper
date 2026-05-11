@@ -1256,6 +1256,10 @@
   border-color: rgba(200, 199, 202, 0.22);
   background: rgba(200, 199, 202, 0.02);
 }
+.vn-input.vn-input-mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
 
 .vn-textarea {
   padding: 10px 12px;
@@ -1437,10 +1441,22 @@
 }
 .vn-modal-head h3 {
   margin: 0;
-  flex: 1;
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+.vn-modal-head-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.vn-modal-head-meta {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 .vn-modal-body {
   padding: 6px 18px 14px;
@@ -3114,3 +3130,1348 @@
   background: rgba(200, 199, 202, 0.04);
   color: var(--text-1);
 }
+
+/* ============================================================
+   Renpy-tab editor — Figma "ADAMS" card-based screenplay.
+   - Label = slim header with hairline divider, not a wrapper card
+   - Each block = self-contained 8px-radius card with kind chip
+   - Cards use subtle rgba(217,217,217,0.02) backgrounds
+   - Scene/Music chips use related warm-tinted neutrals
+   ============================================================ */
+
+.rs-script {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  padding: 14px 24px 32px 24px;
+}
+.rs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+.rs-stats {
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Section (label header + body, no wrapper card) ---- */
+
+.rs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 21px;
+}
+.rs-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.rs-section-label-prefix {
+  font: 500 14px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.4);
+  flex-shrink: 0;
+}
+.rs-label-name {
+  font: 700 14px/normal "Montserrat", system-ui, sans-serif;
+  color: #c8c7ca;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 0 4px;
+  border-radius: 3px;
+  outline: none;
+  flex-shrink: 0;
+  min-width: 100px;
+  width: auto;
+  field-sizing: content;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rs-label-name:hover {
+  background: rgba(200, 199, 202, 0.04);
+}
+.rs-label-name:focus {
+  background: rgba(200, 199, 202, 0.06);
+  border-bottom-color: rgba(200, 199, 202, 0.25);
+}
+.rs-label-name::placeholder {
+  color: var(--text-3);
+  opacity: 0.5;
+  font-style: italic;
+}
+.rs-section-divider {
+  flex: 1;
+  height: 1px;
+  background: rgba(217, 217, 217, 0.05);
+}
+.rs-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 21px;
+}
+.rs-section-add {
+  margin-top: 4px;
+}
+
+/* ---- Universal kind chip ---- */
+
+.rs-chip {
+  display: inline-flex;
+  align-items: center;
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(200, 199, 202, 0.08);
+  color: rgba(200, 199, 202, 0.7);
+  flex-shrink: 0;
+  user-select: none;
+  white-space: nowrap;
+}
+/* Three closely-related warm-muted tones from the Figma palette */
+.rs-chip-music    { background: rgba(141, 153, 130, 0.1); color: #8d9982; }
+.rs-chip-scene    { background: rgba(153, 141, 130, 0.1); color: #998d82; }
+.rs-chip-amber    { background: rgba(168, 152, 130, 0.1); color: #a89882; }
+.rs-chip-show     { background: rgba(141, 153, 130, 0.1); color: #8d9982; }
+.rs-chip-hide     { background: rgba(141, 153, 130, 0.1); color: rgba(141, 153, 130, 0.7); }
+.rs-chip-pause    { background: rgba(141, 152, 168, 0.1); color: #8d98a8; }
+.rs-chip-with     { background: rgba(168, 152, 130, 0.1); color: #a89882; }
+.rs-chip-note     { background: rgba(168, 160, 130, 0.1); color: #a8a082; }
+.rs-chip-narrator { background: rgba(200, 199, 202, 0.06); color: rgba(200, 199, 202, 0.55); }
+.rs-chip-jump,
+.rs-chip-call     { background: rgba(168, 130, 152, 0.12); color: #c898a8; }
+.rs-chip-menu     { background: rgba(180, 152, 130, 0.12); color: #b89882; }
+.rs-chip-choice   { background: rgba(180, 152, 130, 0.08); color: rgba(184, 152, 130, 0.85); }
+.rs-chip-orphan   { background: rgba(168, 130, 130, 0.12); color: #c898a0; }
+.rs-chip-raw      { background: rgba(180, 130, 130, 0.12); color: #c89090; }
+
+/* "Soft" pill chip (transition values like fadein, dissolve, 0.5) */
+.rs-pill {
+  display: inline-flex;
+  align-items: center;
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.7);
+  background: #232426;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: border-color 0.12s;
+}
+.rs-pill input {
+  font: inherit;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  outline: none;
+  padding: 0;
+  width: auto;
+  min-width: 60px;
+  field-sizing: content;
+}
+.rs-pill input::placeholder { opacity: 0.5; }
+.rs-pill:focus-within {
+  border-color: rgba(200, 199, 202, 0.18);
+}
+/* Static (non-editable) variant — used for the fadein/fadeout label
+   half of an audio card, where only the value pill on the other side
+   of the arrow is interactive. */
+.rs-pill-static {
+  background: rgba(217, 217, 217, 0.04);
+  color: rgba(200, 199, 202, 0.55);
+  cursor: default;
+  user-select: none;
+}
+
+/* Editable inline name field (scene name, raw filename, etc.) inside cards */
+.rs-name-field {
+  font: 500 12px/normal ui-monospace, "Cascadia Code", Consolas, monospace;
+  color: rgba(200, 199, 202, 0.7);
+  background: rgba(217, 217, 217, 0.02);
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  outline: none;
+  flex-shrink: 0;
+  field-sizing: content;
+  min-width: 80px;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rs-name-field:hover {
+  background: rgba(217, 217, 217, 0.04);
+}
+.rs-name-field:focus {
+  background: rgba(217, 217, 217, 0.06);
+  border-color: rgba(200, 199, 202, 0.18);
+}
+
+/* ---- Generic card baseline ---- */
+
+.rs-card {
+  position: relative;
+  background: rgba(217, 217, 217, 0.02);
+  border: 1px solid rgba(217, 217, 217, 0.02);
+  border-radius: 8px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.12s, border-color 0.12s;
+  min-height: 61px;
+}
+.rs-card:hover {
+  background: rgba(217, 217, 217, 0.035);
+  border-color: rgba(217, 217, 217, 0.08);
+}
+
+/* ---- Audio card (Music / Sound / Voice / Stop) — with diagonal hatching ----
+   Each variant inherits the base layout but tints background, hatching,
+   chip, and pills in its own warm-or-danger palette so the card kind
+   reads at a glance. */
+
+.rs-card-audio {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.rs-card-audio::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Music variant — sage green */
+.rs-card-audio--music {
+  background: rgba(141, 153, 130, 0.05);
+  border-color: rgba(141, 153, 130, 0.08);
+}
+.rs-card-audio--music::before {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(141, 153, 130, 0.025) 0,
+    rgba(141, 153, 130, 0.025) 2px,
+    transparent 2px,
+    transparent 26px
+  );
+}
+.rs-chip-audio--music {
+  background: rgba(141, 153, 130, 0.1);
+  color: #8d9982;
+}
+.rs-card-audio--music .rs-pill {
+  background: rgba(141, 153, 130, 0.1);
+  color: #8d9982;
+}
+
+/* Sound variant — neutral grey */
+.rs-card-audio--sound {
+  background: rgba(217, 217, 217, 0.02);
+  border-color: rgba(217, 217, 217, 0.04);
+}
+.rs-card-audio--sound::before {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(248, 248, 248, 0.012) 0,
+    rgba(248, 248, 248, 0.012) 2px,
+    transparent 2px,
+    transparent 26px
+  );
+}
+.rs-chip-audio--sound {
+  background: rgba(217, 217, 217, 0.1);
+  color: #d9d9d9;
+}
+.rs-card-audio--sound .rs-pill {
+  background: #232426;
+  color: rgba(200, 199, 202, 0.7);
+}
+
+/* Voice variant — same neutral grey as sound */
+.rs-card-audio--voice {
+  background: rgba(217, 217, 217, 0.02);
+  border-color: rgba(217, 217, 217, 0.04);
+}
+.rs-card-audio--voice::before {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(248, 248, 248, 0.012) 0,
+    rgba(248, 248, 248, 0.012) 2px,
+    transparent 2px,
+    transparent 26px
+  );
+}
+.rs-chip-audio--voice {
+  background: rgba(217, 217, 217, 0.1);
+  color: #d9d9d9;
+}
+.rs-card-audio--voice .rs-pill {
+  background: #232426;
+  color: rgba(200, 199, 202, 0.7);
+}
+
+/* Stop variant — danger pink */
+.rs-card-audio--stop {
+  background: rgba(168, 112, 128, 0.05);
+  border-color: rgba(168, 112, 128, 0.1);
+}
+.rs-card-audio--stop::before {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(168, 112, 128, 0.025) 0,
+    rgba(168, 112, 128, 0.025) 2px,
+    transparent 2px,
+    transparent 26px
+  );
+}
+.rs-chip-audio--stop {
+  background: rgba(168, 112, 128, 0.1);
+  color: #a87080;
+}
+.rs-card-audio--stop .rs-pill {
+  background: rgba(168, 112, 128, 0.1);
+  color: #a87080;
+}
+
+/* Fadein/fadeout toggle button — looks like a regular .rs-pill but
+   communicates "click to toggle" with a pointer cursor and brightness
+   pop on hover. Variant colors are inherited from the parent card. */
+.rs-pill-toggle {
+  cursor: pointer;
+  user-select: none;
+  font: inherit;
+  border: 1px solid transparent;
+  outline: none;
+  transition: filter 0.12s, border-color 0.12s;
+}
+.rs-pill-toggle:hover {
+  filter: brightness(1.2);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.rs-pill-toggle:focus-visible {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.rs-audio-main {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.rs-audio-arg {
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.6);
+  padding: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  outline: none;
+  border-radius: 4px;
+  transition: background 0.12s;
+}
+.rs-audio-arg:hover { background: rgba(200, 199, 202, 0.03); }
+.rs-audio-arg:focus { background: rgba(200, 199, 202, 0.06); }
+.rs-audio-tail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.rs-audio-arrow {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  opacity: 0.4;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+/* ---- Scene container card ---- */
+
+.rs-scene {
+  border: 1px solid rgba(217, 217, 217, 0.02);
+  background: transparent;
+  border-radius: 8px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.rs-scene:hover {
+  border-color: rgba(217, 217, 217, 0.06);
+  background: rgba(217, 217, 217, 0.012);
+}
+.rs-scene-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.rs-scene-head-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.rs-scene-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.rs-stage-kw {
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.7);
+  opacity: 0.7;
+}
+.rs-scene-divider {
+  height: 1px;
+  background: rgba(217, 217, 217, 0.03);
+  border-radius: 1px;
+}
+.rs-scene-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Per-line dialogue / narrator inside a scene — speaker is owned by the
+   scene header, so each line is just a text-only field (Figma 1604:864). */
+.rs-scene-line {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(217, 217, 217, 0.02);
+  border-radius: 8px;
+  padding: 10px;
+  transition: background 0.12s;
+}
+.rs-scene-line:hover {
+  background: rgba(217, 217, 217, 0.04);
+}
+.rs-scene-line-text {
+  flex: 1;
+  font: 500 12px/1.5 "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.7);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 0;
+  resize: none;
+  min-height: 18px;
+}
+.rs-scene-line-text::placeholder {
+  color: rgba(200, 199, 202, 0.35);
+  font-style: italic;
+}
+.rs-scene-line-text:focus {
+  color: var(--text-1);
+}
+.rs-scene-line-narrator .rs-scene-line-text {
+  font-style: italic;
+  color: rgba(200, 199, 202, 0.65);
+}
+
+/* Vertical hairline divider between scene name and speaker pill (Figma 1606:1092) */
+.rs-vdivider {
+  width: 1px;
+  height: 15px;
+  background: rgba(217, 217, 217, 0.05);
+  flex-shrink: 0;
+}
+
+/* Speaker pill (Figma 1606:1101) — avatar + name in a 24px rounded chip */
+.rs-speaker-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px 0 3px;
+  background: rgba(200, 199, 202, 0.07);
+  border-radius: 99px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s;
+}
+.rs-speaker-pill:hover {
+  background: rgba(200, 199, 202, 0.1);
+}
+.rs-speaker-pill.is-editing {
+  background: rgba(200, 199, 202, 0.12);
+  border-color: rgba(200, 199, 202, 0.2);
+}
+.rs-speaker-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font: 800 9px/1 "Montserrat", system-ui, sans-serif;
+  color: #131416;
+  flex-shrink: 0;
+  user-select: none;
+}
+.rs-speaker-name {
+  font: 600 11.5px/normal "Montserrat", system-ui, sans-serif;
+  color: #c8c7ca;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: text;
+  outline: none;
+  font-family: inherit;
+}
+.rs-speaker-name-input {
+  font: 600 11.5px/normal "Montserrat", system-ui, sans-serif;
+  color: #c8c7ca;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  outline: none;
+  min-width: 60px;
+  field-sizing: content;
+}
+.rs-speaker-empty {
+  color: rgba(200, 199, 202, 0.45);
+  font-style: italic;
+}
+.rs-speaker-pill.is-open {
+  background: rgba(200, 199, 202, 0.12);
+  border-color: rgba(200, 199, 202, 0.2);
+}
+
+/* Speaker autocomplete popover */
+.rs-speaker-pop {
+  min-width: 240px;
+  max-width: 320px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 4px 10px rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: "Montserrat", system-ui, sans-serif;
+}
+.rs-speaker-search {
+  width: 100%;
+  background: var(--bg-canvas);
+  border: 1px solid rgba(200, 199, 202, 0.1);
+  color: var(--text-1);
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  padding: 7px 10px;
+  border-radius: 7px;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.rs-speaker-search:focus {
+  border-color: rgba(200, 199, 202, 0.25);
+}
+.rs-speaker-search::placeholder {
+  color: rgba(200, 199, 202, 0.4);
+}
+.rs-speaker-pop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.rs-speaker-pop-group {
+  font: 500 9.5px/normal "Montserrat", system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(200, 199, 202, 0.4);
+  padding: 8px 8px 4px;
+}
+.rs-speaker-pop-group-warn {
+  color: rgba(216, 168, 152, 0.55);
+}
+.rs-speaker-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text-1);
+  transition: background 0.1s;
+  width: 100%;
+}
+.rs-speaker-pop-item:hover {
+  background: rgba(200, 199, 202, 0.06);
+}
+.rs-speaker-pop-item.is-active {
+  background: rgba(200, 199, 202, 0.1);
+}
+.rs-speaker-pop-item-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.rs-speaker-pop-item-disabled:hover {
+  background: transparent;
+}
+.rs-speaker-pop-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font: 800 10px/1 "Montserrat", system-ui, sans-serif;
+  color: #131416;
+  flex-shrink: 0;
+  user-select: none;
+}
+.rs-speaker-pop-avatar-empty {
+  background: rgba(200, 199, 202, 0.1);
+  color: rgba(200, 199, 202, 0.5);
+  font-weight: 500;
+}
+.rs-speaker-pop-name {
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  color: var(--text-1);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rs-speaker-pop-name code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  background: rgba(200, 199, 202, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.rs-speaker-pop-var {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 10.5px;
+  color: rgba(200, 199, 202, 0.4);
+  background: rgba(200, 199, 202, 0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.rs-speaker-pop-hint {
+  font: 500 10px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.35);
+  font-style: italic;
+  flex-shrink: 0;
+}
+.rs-speaker-pop-empty {
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.45);
+  padding: 12px 8px;
+  text-align: center;
+  font-style: italic;
+}
+.rs-speaker-pop-custom {
+  border-top: 1px solid rgba(200, 199, 202, 0.06);
+  margin-top: 2px;
+  padding-top: 8px;
+}
+.rs-speaker-pop-clear {
+  border-top: 1px solid rgba(200, 199, 202, 0.06);
+  margin-top: 2px;
+  padding-top: 8px;
+  color: rgba(200, 199, 202, 0.55);
+}
+
+/* Amber transition pill (Figma 1605:876) */
+.rs-pill-amber {
+  background: rgba(168, 152, 130, 0.1);
+  color: #a89882;
+}
+.rs-scene-empty-hint {
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.35);
+  background: rgba(217, 217, 217, 0.02);
+  padding: 12px 8px;
+  border-radius: 8px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Keyboard shortcut hint under scene card */
+.rs-kbd-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 0;
+}
+.rs-kbd {
+  font: 500 10px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.6);
+  background: rgba(200, 199, 202, 0.03);
+  padding: 5px;
+  border-radius: 5px;
+}
+.rs-kbd-plus,
+.rs-kbd-text {
+  font: 500 10px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.6);
+}
+
+/* ---- Sprite (show/hide) — single-row card ---- */
+
+.rs-card-sprite {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.rs-card-sprite-linked {
+  border-left: 3px solid var(--rs-accent, transparent);
+  padding-left: 12px;
+}
+.rs-sprite-tail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* ---- Pause ---- */
+
+.rs-card-pause {
+  width: fit-content;
+}
+
+/* ---- Note ---- */
+
+.rs-card-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rs-note-text {
+  flex: 1;
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  font-style: italic;
+  color: rgba(200, 199, 202, 0.6);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.rs-note-text:hover { background: rgba(200, 199, 202, 0.03); }
+.rs-note-text:focus { background: rgba(200, 199, 202, 0.05); }
+
+/* ---- Dialogue card ---- */
+
+.rs-card-dialogue {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(217, 217, 217, 0.02);
+  border: 1px solid rgba(217, 217, 217, 0.02);
+  border-left: 3px solid var(--rs-accent, rgba(200, 199, 202, 0.25));
+  border-radius: 0 8px 8px 0;
+  padding: 15px;
+  align-items: stretch;
+  transition: background 0.12s;
+}
+.rs-card-dialogue:hover {
+  background: rgba(217, 217, 217, 0.035);
+}
+.rs-card-dialogue-unlinked {
+  border-left-style: dashed;
+  border-left-color: rgba(200, 130, 130, 0.5);
+}
+.rs-dialogue-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rs-dialogue-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--rs-accent, rgba(200, 199, 202, 0.12));
+  color: var(--bg-canvas);
+  display: grid;
+  place-items: center;
+  font: 700 12px/1 "Montserrat", system-ui, sans-serif;
+  flex-shrink: 0;
+}
+.rs-dialogue-speaker {
+  font: 700 12px/normal ui-monospace, "Cascadia Code", Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rs-accent, var(--text-1));
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 4px 6px;
+  border-radius: 5px;
+  field-sizing: content;
+  min-width: 60px;
+  transition: background 0.12s;
+}
+.rs-dialogue-speaker:hover { background: rgba(200, 199, 202, 0.04); }
+.rs-dialogue-speaker:focus { background: rgba(200, 199, 202, 0.06); }
+.rs-dialogue-expr {
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  font-style: italic;
+  color: rgba(200, 199, 202, 0.5);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 4px 6px;
+  border-radius: 5px;
+  min-width: 60px;
+  field-sizing: content;
+  transition: background 0.12s;
+}
+.rs-dialogue-expr:hover { background: rgba(200, 199, 202, 0.04); }
+.rs-dialogue-expr:focus { background: rgba(200, 199, 202, 0.06); }
+.rs-dialogue-text {
+  font: 500 13px/1.55 "Montserrat", system-ui, sans-serif;
+  color: var(--text-1);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 6px 8px;
+  border-radius: 5px;
+  width: 100%;
+  resize: none;
+  transition: background 0.12s;
+}
+.rs-dialogue-text::placeholder {
+  color: var(--text-3);
+  opacity: 0.45;
+  font-style: italic;
+}
+.rs-dialogue-text:hover { background: rgba(200, 199, 202, 0.03); }
+.rs-dialogue-text:focus { background: rgba(200, 199, 202, 0.05); }
+
+/* ---- Narrator card ---- */
+
+.rs-card-narrator {
+  align-items: stretch;
+  flex-direction: row;
+  gap: 8px;
+}
+.rs-narrator-text {
+  flex: 1;
+  font: 500 13px/1.55 "Montserrat", system-ui, sans-serif;
+  font-style: italic;
+  color: rgba(200, 199, 202, 0.85);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 6px 8px;
+  border-radius: 5px;
+  resize: none;
+  transition: background 0.12s;
+}
+.rs-narrator-text::placeholder { opacity: 0.5; }
+.rs-narrator-text:hover { background: rgba(200, 199, 202, 0.03); }
+.rs-narrator-text:focus { background: rgba(200, 199, 202, 0.05); }
+
+/* ---- Flow (jump/call) ---- */
+
+.rs-card-flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rs-flow-arrow {
+  font-size: 14px;
+  color: rgba(200, 130, 152, 0.6);
+}
+.rs-card-flow.is-broken {
+  border-color: rgba(216, 168, 152, 0.35);
+  background: rgba(216, 168, 152, 0.05);
+}
+.rs-flow-broken {
+  font-size: 13px;
+  color: #d8a890;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+.rs-flow-target {
+  flex-shrink: 1;
+}
+
+/* ---- Label autocomplete (jump/call target) ---- */
+.rs-label-ac {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.rs-label-ac-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 180px;
+  max-width: 280px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 4px 8px rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.rs-label-ac-item {
+  display: block;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: var(--text-1);
+  transition: background 0.1s;
+}
+.rs-label-ac-item:hover,
+.rs-label-ac-item.is-active {
+  background: rgba(200, 199, 202, 0.08);
+}
+.rs-label-ac-item code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text-1);
+}
+
+/* ---- Drag-and-drop reorder ---- */
+
+/* Every reorderable card is positioned so the handle and drop indicators
+   anchor to the card itself. */
+.rs-card,
+.rs-scene,
+.rs-menu,
+.rs-choice,
+.rs-scene-line {
+  position: relative;
+}
+
+/* Handle sits just outside the card on the left at -16px, like Notion's
+   "drag the block from the gutter" pattern. It's hidden by default and
+   slides into view on hover so it doesn't pollute the calm card layout. */
+.rs-drag-handle {
+  position: absolute;
+  top: 12px;
+  left: -18px;
+  width: 14px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: rgba(200, 199, 202, 0.35);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+  padding: 0;
+  z-index: 4;
+}
+.rs-drag-handle:active { cursor: grabbing; }
+.rs-drag-handle:hover {
+  color: rgba(200, 199, 202, 0.85);
+  background: rgba(200, 199, 202, 0.06);
+}
+.rs-card:hover > .rs-drag-handle,
+.rs-scene:hover > .rs-drag-handle,
+.rs-menu:hover > .rs-drag-handle,
+.rs-choice:hover > .rs-drag-handle,
+.rs-scene-line:hover > .rs-drag-handle {
+  opacity: 1;
+}
+/* Inner-cards (inside a scene body) only get a handle, no gutter — push
+   them further left so the handle still has room. */
+.rs-scene-body .rs-drag-handle { left: -16px; }
+
+/* Dim the source row while dragging so the cursor's drag image is the
+   primary visual. The drop indicators (below) light up on the target. */
+.rs-card.is-dragging,
+.rs-scene.is-dragging,
+.rs-menu.is-dragging,
+.rs-choice.is-dragging,
+.rs-scene-line.is-dragging {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* dnd-kit handles the reorder animation via transform — we just dim the
+   source. No drop-indicator lines needed: siblings shift in place to
+   show where the dropped card will land. */
+
+/* ---- Raw (advanced/unparsed) ---- */
+
+.rs-card-raw {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+.rs-raw-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 15px 8px;
+}
+.rs-raw-summary {
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.4);
+}
+.rs-raw-pre {
+  margin: 0;
+  padding: 0 15px 15px;
+  font: 500 11.5px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace;
+  color: rgba(200, 199, 202, 0.85);
+  white-space: pre;
+  overflow-x: auto;
+}
+.rs-raw-area {
+  margin: 0;
+  padding: 4px 15px 15px;
+  font: 500 11.5px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace;
+  color: rgba(200, 199, 202, 0.85);
+  background: transparent;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  width: 100%;
+  white-space: pre;
+  overflow: auto;
+  transition: background 0.12s;
+  field-sizing: content;
+}
+.rs-raw-area::placeholder {
+  color: rgba(200, 199, 202, 0.3);
+  font-style: italic;
+}
+.rs-raw-area:hover {
+  background: rgba(248, 248, 248, 0.012);
+}
+.rs-raw-area:focus {
+  background: rgba(248, 248, 248, 0.025);
+}
+
+/* ---- Menu container ---- */
+
+.rs-menu {
+  border: 1px solid rgba(217, 217, 217, 0.02);
+  background: rgba(180, 152, 130, 0.025);
+  border-radius: 8px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rs-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rs-menu-title {
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.5);
+}
+.rs-menu-divider {
+  height: 1px;
+  background: rgba(217, 217, 217, 0.03);
+}
+.rs-menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rs-menu-empty {
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  color: rgba(200, 199, 202, 0.35);
+  text-align: center;
+  padding: 8px;
+  font-style: italic;
+}
+.rs-menu-add {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed rgba(180, 152, 130, 0.25);
+  color: rgba(200, 168, 130, 0.7);
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.rs-menu-add:hover {
+  background: rgba(180, 152, 130, 0.08);
+  color: rgba(216, 184, 144, 0.95);
+}
+
+/* ---- Choice ---- */
+
+.rs-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(217, 217, 217, 0.012);
+  transition: background 0.12s;
+}
+.rs-choice:hover {
+  background: rgba(217, 217, 217, 0.03);
+}
+.rs-choice-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rs-choice-bullet {
+  color: rgba(200, 168, 130, 0.85);
+  font-size: 11px;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+.rs-choice-text {
+  font: 500 12.5px/normal "Montserrat", system-ui, sans-serif;
+  color: var(--text-1);
+}
+.rs-choice-body {
+  margin-left: 18px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(180, 152, 130, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rs-choice-add {
+  margin-top: 4px;
+}
+
+/* ---- Bare inputs ---- */
+
+.rs-input {
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--text-1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  outline: none;
+  min-width: 60px;
+  field-sizing: content;
+  max-width: 100%;
+  transition: background 0.12s, border-bottom-color 0.12s;
+}
+.rs-input::placeholder {
+  color: var(--text-3);
+  opacity: 0.45;
+}
+.rs-input:hover { background: rgba(200, 199, 202, 0.04); }
+.rs-input:focus {
+  background: rgba(200, 199, 202, 0.06);
+  border-bottom-color: rgba(200, 199, 202, 0.25);
+}
+.rs-input-mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+}
+.rs-input-grow {
+  flex: 1;
+  min-width: 100px;
+}
+
+.rs-area {
+  font: 500 13px/1.55 "Montserrat", system-ui, sans-serif;
+  background: transparent;
+  border: 0;
+  color: var(--text-1);
+  padding: 4px 8px;
+  border-radius: 5px;
+  width: 100%;
+  resize: none;
+  outline: none;
+  min-height: 24px;
+  transition: background 0.12s;
+}
+.rs-area::placeholder {
+  color: var(--text-3);
+  opacity: 0.5;
+  font-style: italic;
+}
+.rs-area:hover { background: rgba(200, 199, 202, 0.03); }
+.rs-area:focus { background: rgba(200, 199, 202, 0.05); }
+
+/* ---- Row actions (hover-revealed) ---- */
+
+.rs-actions {
+  display: inline-flex;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  flex-shrink: 0;
+}
+.rs-card:hover .rs-actions,
+.rs-scene:hover > .rs-scene-head .rs-actions,
+.rs-scene-line:hover .rs-actions,
+.rs-card-dialogue:hover .rs-actions,
+.rs-card-narrator:hover .rs-actions,
+.rs-section-head:hover .rs-actions,
+.rs-menu:hover > .rs-menu-head .rs-actions,
+.rs-choice:hover > .rs-choice-head .rs-actions,
+.rs-card-raw:hover .rs-actions,
+.rs-actions:focus-within {
+  opacity: 1;
+}
+.rs-action {
+  background: transparent;
+  border: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-family: inherit;
+  padding: 0;
+}
+.rs-action:hover {
+  background: rgba(200, 199, 202, 0.08);
+  color: var(--text-1);
+}
+.rs-action-danger:hover {
+  background: rgba(200, 130, 130, 0.12);
+  color: #d8a8b4;
+}
+
+/* ---- Insert picker trigger ---- */
+
+.rs-insert-trigger {
+  background: transparent;
+  border: 1px dashed rgba(200, 199, 202, 0.15);
+  color: var(--text-3);
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.rs-insert-trigger:hover {
+  background: rgba(200, 199, 202, 0.04);
+  color: var(--text-1);
+  border-color: rgba(200, 199, 202, 0.3);
+  border-style: solid;
+}
+
+/* ---- Add scene button ---- */
+
+.rs-add-scene {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed rgba(200, 199, 202, 0.18);
+  color: var(--text-3);
+  font: 500 12px/normal "Montserrat", system-ui, sans-serif;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.rs-add-scene:hover {
+  background: rgba(200, 199, 202, 0.04);
+  color: var(--text-1);
+  border-color: rgba(200, 199, 202, 0.3);
+}
+
+/* ---- Empty state ---- */
+
+.rs-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 32px 4px;
+  align-items: stretch;
+  max-width: 720px;
+}
+.rs-empty-title {
+  margin: 0;
+  font: 600 16px/normal "Montserrat", system-ui, sans-serif;
+  color: var(--text-1);
+}
+.rs-empty-sub {
+  margin: 0;
+  font: 500 13px/1.55 "Montserrat", system-ui, sans-serif;
+  color: var(--text-3);
+}
+.rs-empty-sub code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  background: rgba(200, 199, 202, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text-1);
+}
+.rs-empty-actions { display: flex; gap: 8px; }
+.rs-paste-or {
+  font: 500 11px/normal "Montserrat", system-ui, sans-serif;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 12px;
+}
+.rs-paste {
+  font: 500 12px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace;
+  background: var(--bg-canvas);
+  border: 1px solid rgba(200, 199, 202, 0.12);
+  color: var(--text-1);
+  padding: 12px 14px;
+  border-radius: 10px;
+  resize: vertical;
+  outline: none;
+  min-height: 160px;
+}
+.rs-paste:focus { border-color: rgba(200, 199, 202, 0.25); }
+
+.rs-warnings {
+  font: 500 11.5px/1.55 "Montserrat", system-ui, sans-serif;
+  color: #d8b48c;
+  background: rgba(220, 168, 120, 0.08);
+  border: 1px solid rgba(220, 168, 120, 0.2);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.rs-warnings ul { margin: 4px 0 0; padding-left: 20px; }

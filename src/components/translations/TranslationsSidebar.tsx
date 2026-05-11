@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { readDir, readTextFile } from "@tauri-apps/plugin-fs";
+import { mkdir, readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { Settings } from "lucide-react";
 import { useDialog } from "../ui/Dialog";
 import type { TranslationFile, TranslationsApi } from "../../state/translations";
 import { SkeletonStack } from "../ui/Skeleton";
+import { TranslationSettingsScreen } from "./TranslationSettingsScreen";
 
 // One file in a multi-file import — keeps the relative folder path so the
 // sidebar tree can mirror the source project layout.
@@ -176,6 +178,7 @@ export function TranslationsSidebar({
   );
 
   const [pickerBusy, setPickerBusy] = useState(false);
+  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (!api.activeProjectId && view === "files") setView("projects");
@@ -229,7 +232,10 @@ export function TranslationsSidebar({
     }
   };
 
-  const onExportProject = async (name: string) => {
+  // Exports every file in the active project to a user-picked folder,
+  // preserving the original folder structure. This is the native, single-
+  // click flow — preferred over browser downloads for a desktop app.
+  const onExportProjectToFolder = async (name: string) => {
     setMenuFor(null);
     try {
       const files = await api.buildProjectExport();
@@ -240,8 +246,53 @@ export function TranslationsSidebar({
         });
         return;
       }
-      // Trigger one download per file. Most browsers permit this from a
-      // single user gesture; we space them out to avoid being throttled.
+      const dest = await openDialog({
+        directory: true,
+        multiple: false,
+        title: `Export "${name}" to folder`,
+      });
+      if (!dest || typeof dest !== "string") return;
+
+      const root = dest.replace(/\\/g, "/").replace(/\/+$/, "");
+      const ensured = new Set<string>();
+      let written = 0;
+      for (const f of files) {
+        const dir = f.folderPath
+          ? `${root}/${f.folderPath.replace(/\\/g, "/")}`
+          : root;
+        if (f.folderPath && !ensured.has(dir)) {
+          await mkdir(dir, { recursive: true });
+          ensured.add(dir);
+        }
+        await writeTextFile(`${dir}/${f.filename}`, f.content);
+        written++;
+      }
+      void dialog.alert({
+        title: "Exported",
+        message: `Wrote ${written} file${written === 1 ? "" : "s"} to:\n${root}`,
+      });
+    } catch (e) {
+      console.error("export to folder failed", e);
+      void dialog.alert({
+        title: "Export failed",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
+
+  // Fallback: trigger one browser download per file. Useful when the user
+  // wants to drop files into a non-filesystem destination (e.g., upload form).
+  const onExportProjectAsDownloads = async (name: string) => {
+    setMenuFor(null);
+    try {
+      const files = await api.buildProjectExport();
+      if (files.length === 0) {
+        void dialog.alert({
+          title: "Nothing to export",
+          message: `"${name}" has no files yet.`,
+        });
+        return;
+      }
       let i = 0;
       const tick = () => {
         const f = files[i++];
@@ -250,9 +301,8 @@ export function TranslationsSidebar({
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        // Folder structure is preserved in the suggested filename so users
-        // who want a tree can sort by name; some browsers ignore '/' in
-        // download attribute, so we use ' — ' as a separator.
+        // Browsers strip '/' from the download attribute, so encode the
+        // folder structure into the filename for users who want a tree.
         a.download = f.folderPath
           ? `${f.folderPath.replace(/\//g, " — ")} — ${f.filename}`
           : f.filename;
@@ -499,10 +549,20 @@ export function TranslationsSidebar({
                             className="tr-menu-item"
                             onClick={() => {
                               api.setActiveProjectId(p.id);
-                              void onExportProject(p.name);
+                              void onExportProjectToFolder(p.name);
                             }}
                           >
-                            Export all files…
+                            Export to folder…
+                          </button>
+                          <button
+                            type="button"
+                            className="tr-menu-item"
+                            onClick={() => {
+                              api.setActiveProjectId(p.id);
+                              void onExportProjectAsDownloads(p.name);
+                            }}
+                          >
+                            Export as downloads
                           </button>
                           <button
                             type="button"
@@ -612,11 +672,11 @@ export function TranslationsSidebar({
               <button
                 type="button"
                 className="tr-cta-icon"
-                onClick={onImportFile}
-                title="Import a single .rpy file"
-                aria-label="Import single file"
+                title="Translation settings"
+                aria-label="Translation settings"
+                onClick={() => setProjectSettingsOpen(true)}
               >
-                <PlusIcon />
+                <Settings className="size-4" />
               </button>
             </div>
           )}
@@ -632,6 +692,23 @@ export function TranslationsSidebar({
             <div>Drop .rpy files to import</div>
           </div>
         </div>
+      )}
+
+      {project && (
+        <TranslationSettingsScreen
+          open={projectSettingsOpen}
+          onClose={() => setProjectSettingsOpen(false)}
+          projectName={project.name}
+          filesCount={api.files.length}
+          pct={overallProgress.pct}
+          onImportFile={onImportFile}
+          onExportToFolder={() => void onExportProjectToFolder(project.name)}
+          onExportAsDownloads={() =>
+            void onExportProjectAsDownloads(project.name)
+          }
+          onRename={() => onRenameProject(project.id, project.name)}
+          onDelete={() => onDeleteProject(project.id, project.name)}
+        />
       )}
     </aside>
   );
@@ -662,7 +739,8 @@ function FileRow({
   const stats = api.fileStats[file.id];
   const total = stats?.total ?? 0;
   const done = stats?.done ?? 0;
-  const dotClass =
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  const ringClass =
     total === 0
       ? "is-pending"
       : done === total
@@ -690,10 +768,14 @@ function FileRow({
         <span className="tr-row-text" title={file.filename}>
           {file.filename}
         </span>
-        <span
-          className={"tr-row-dot " + dotClass}
-          title={stats ? `${done} / ${total} translated` : "loading…"}
-          aria-hidden
+        <ProgressRing
+          pct={pct}
+          state={ringClass}
+          title={
+            stats
+              ? `${done} / ${total} translated (${pct}%)`
+              : "loading…"
+          }
         />
       </button>
       {canEdit && (
@@ -1091,6 +1173,44 @@ function FolderIcon({ open = false }: { open?: boolean }) {
         stroke="currentColor"
         strokeWidth="1.2"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Circular progress ring shown on each file row. The track conveys the
+// "empty" state via its colour (muted danger when nothing is translated yet),
+// and the foreground arc fills clockwise as strings are translated.
+function ProgressRing({
+  pct,
+  state,
+  title,
+}: {
+  pct: number;
+  state: string;
+  title: string;
+}) {
+  const r = 5;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference - (circumference * Math.max(0, Math.min(100, pct))) / 100;
+  return (
+    <svg
+      className={"tr-row-ring " + state}
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      aria-hidden
+    >
+      <title>{title}</title>
+      <circle className="tr-row-ring-track" cx="7" cy="7" r={r} />
+      <circle
+        className="tr-row-ring-bar"
+        cx="7"
+        cy="7"
+        r={r}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        transform="rotate(-90 7 7)"
       />
     </svg>
   );

@@ -101,6 +101,7 @@ export function CalendarScreen() {
       event_time: ev.event_time,
       color: ev.color,
       description: ev.description,
+      creator: ev.creator,
     });
     setModalOpen(true);
   };
@@ -296,6 +297,11 @@ export function CalendarScreen() {
                     {ev.description && (
                       <div className="cal-side-event-desc">
                         {ev.description}
+                      </div>
+                    )}
+                    {ev.creator && (
+                      <div className="cal-side-event-creator">
+                        by {ev.creator.name ?? ev.creator.email ?? "Unknown"}
                       </div>
                     )}
                   </div>

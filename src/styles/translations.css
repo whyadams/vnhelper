@@ -2,6 +2,29 @@
    Sidebar 253px wide, dark canvas, padding 24/25 throughout.
 */
 
+/* Translation project settings screen — groups of action rows separated by
+   small uppercase headings. Each group's first row drops its top border so
+   it sits flush under the heading. */
+.tr-set-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tr-set-group-title {
+  margin: 8px 0 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.tr-set-rows {
+  display: flex;
+  flex-direction: column;
+}
+.tr-set-rows .set-row:first-child { border-top: none; }
+
+
 .main.translations {
   display: grid;
   grid-template-columns: 253px 1fr;
@@ -312,27 +335,41 @@
   background: rgba(200, 199, 202, 0.05);
 }
 
-/* Status dot — Figma 5x5 ellipse, no border, solid colour */
-.tr-row-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+/* Translation progress ring — replaces the old solid status dot.
+   Track conveys the empty / pending state via its colour, the bar fills
+   clockwise as strings get translated. 14×14 SVG, 5px-radius circle. */
+.tr-row-ring {
   flex-shrink: 0;
-  background: rgba(200, 199, 202, 0.3);
   transition: opacity 0.12s;
 }
-.tr-row-dot.is-pending { background: rgba(200, 199, 202, 0.3); }
-.tr-row-dot.is-empty   { background: var(--status-danger); }
-.tr-row-dot.is-partial { background: var(--status-warn); }
-.tr-row-dot.is-done    { background: var(--status-ok); }
+.tr-row-ring-track {
+  fill: none;
+  stroke: rgba(200, 199, 202, 0.18);
+  stroke-width: 1.4;
+  transition: stroke 0.12s;
+}
+.tr-row-ring-bar {
+  fill: none;
+  stroke: rgba(200, 199, 202, 0.5);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.25s ease, stroke 0.12s;
+}
+.tr-row-ring.is-pending .tr-row-ring-track { stroke: rgba(200, 199, 202, 0.12); }
+.tr-row-ring.is-pending .tr-row-ring-bar   { stroke: transparent; }
+.tr-row-ring.is-empty .tr-row-ring-track   { stroke: rgba(168, 112, 128, 0.45); }
+.tr-row-ring.is-empty .tr-row-ring-bar     { stroke: transparent; }
+.tr-row-ring.is-partial .tr-row-ring-bar   { stroke: var(--status-warn); }
+.tr-row-ring.is-done .tr-row-ring-bar      { stroke: var(--status-ok); }
 
-/* On hover, fade the dot out so the X can take its slot cleanly. */
-.tr-row-wrap:hover .tr-row-dot {
+/* On hover, fade the ring out so the action icons take its slot cleanly. */
+.tr-row-wrap:hover .tr-row-ring {
   opacity: 0;
 }
 
-/* Inline action group on file rows (dots + delete X). Always visible at
-   reduced opacity so the affordance is discoverable without hovering. */
+/* Inline action group on file rows (rename + delete). Hidden by default —
+   the progress ring occupies that slot. Revealed on hover (or keyboard
+   focus) so they don't clash with the ring visually. */
 .tr-row-actions {
   position: absolute;
   right: 8px;
@@ -341,13 +378,14 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  opacity: 0.55;
+  opacity: 0;
   transition: opacity 0.12s;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .tr-row-wrap:hover .tr-row-actions,
 .tr-row-actions:focus-within {
   opacity: 1;
+  pointer-events: auto;
 }
 .tr-row-actions .tr-icon-btn {
   width: 20px;

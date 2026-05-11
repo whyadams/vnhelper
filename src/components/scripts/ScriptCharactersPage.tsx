@@ -395,6 +395,7 @@ function CharacterEditCardFull({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(character.name);
   const [shortName, setShortName] = useState(character.short_name ?? "");
+  const [rpyVar, setRpyVar] = useState(character.rpy_var ?? "");
   const [color, setColor] = useState(character.color);
   const [emoji, setEmoji] = useState(character.emoji ?? "");
   const [pronouns, setPronouns] = useState(character.pronouns ?? "");
@@ -465,6 +466,7 @@ function CharacterEditCardFull({
     onSave({
       name: name.trim() || character.name,
       short_name: shortName.trim() || null,
+      rpy_var: rpyVar.trim() || null,
       color,
       emoji: emoji.trim() || null,
       pronouns: pronouns.trim() || null,
@@ -531,6 +533,21 @@ function CharacterEditCardFull({
           placeholder="Short name"
           value={shortName}
           onChange={(e) => setShortName(e.target.value)}
+        />
+        <input
+          className="vn-input vn-input-mono"
+          placeholder="Ren'Py var (e.g. mc, eileen)"
+          value={rpyVar}
+          onChange={(e) =>
+            setRpyVar(
+              e.target.value
+                .toLowerCase()
+                .replace(/[^a-z0-9_]/g, "")
+                .slice(0, 32),
+            )
+          }
+          spellCheck={false}
+          title="Lower-case Python identifier used in say blocks. Empty = not linked."
         />
         <input
           className="vn-input"

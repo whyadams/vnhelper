@@ -17,6 +17,7 @@ import "./styles/workspace.css";
 import "./styles/translations.css";
 import "./styles/skeleton.css";
 import "./styles/widget.css";
+import "./styles/settings.css";
 import { AutoUpdater } from "./components/AutoUpdater";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { CalendarScreen } from "./components/calendar/CalendarScreen";

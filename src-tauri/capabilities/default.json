@@ -27,6 +27,7 @@
     "process:allow-restart",
     "dialog:default",
     "dialog:allow-open",
+    "dialog:allow-save",
     "fs:default",
     {
       "identifier": "fs:allow-read-text-file",
@@ -38,6 +39,18 @@
     },
     {
       "identifier": "fs:allow-stat",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-exists",
       "allow": [{ "path": "**" }]
     },
     {

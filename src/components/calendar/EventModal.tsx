@@ -19,6 +19,7 @@ export interface EventDraft {
   event_time: string | null;
   color: TagColor;
   description: string | null;
+  creator?: { id: string; name: string | null; email: string | null } | null;
 }
 
 interface Props {
@@ -118,7 +119,17 @@ export function EventModal({
         aria-modal="true"
       >
         <div className="vn-modal-head">
-          <h3>{isEdit ? "Edit event" : "New event"}</h3>
+          <div className="vn-modal-head-title">
+            <h3>{isEdit ? "Edit event" : "New event"}</h3>
+            {isEdit && initial.creator && (
+              <div className="vn-modal-head-meta">
+                Created by{" "}
+                {initial.creator.name ??
+                  initial.creator.email ??
+                  "Unknown"}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="vn-drawer-close"
