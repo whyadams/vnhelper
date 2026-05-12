@@ -9,6 +9,7 @@ import "./styles/tiptap.css";
 import "./styles/scripts.css";
 import "./styles/graph.css";
 import "./styles/calendar.css";
+import "@xyflow/react/dist/style.css";
 import "./styles/photos.css";
 import "./styles/auth.css";
 import "./styles/mmenu.css";
@@ -21,6 +22,7 @@ import "./styles/settings.css";
 import { AutoUpdater } from "./components/AutoUpdater";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { CalendarScreen } from "./components/calendar/CalendarScreen";
+import { GraphScreen } from "./components/graph/GraphScreen";
 import { Board } from "./components/kanban/Board";
 import { CardDetailPanel } from "./components/kanban/CardDetailPanel";
 import { Rail } from "./components/kanban/Rail";
@@ -105,13 +107,7 @@ function ActiveScreen() {
   if (!state.ready) {
     return <div className="app-splash">Loading workspace…</div>;
   }
-  if (state.activeNav === "graph")
-    return (
-      <ComingSoonScreen
-        title="Graph"
-        description="Story-flow whiteboard временно недоступен. Возвращаем после доработки."
-      />
-    );
+  if (state.activeNav === "graph") return <GraphScreen />;
   if (state.activeNav === "script") return <ScriptScreen />;
   if (state.activeNav === "translations") return <TranslationsScreen />;
   if (state.activeNav === "calendar") return <CalendarScreen />;

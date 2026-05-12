@@ -392,6 +392,16 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Critical for virtualized lists with dynamic measurements:
+     - `overflow-anchor: none` stops the browser from auto-anchoring the
+       scroll position when content above the viewport changes height
+       (TanStack remeasure on scroll-up would otherwise cause jumps).
+     - `contain: layout style paint` isolates this subtree so a single
+       section growing doesn't reflow the whole page. We can't use
+       `contain: strict` here because that would require a fixed size,
+       which conflicts with our flex: 1 + min-height: 0 sizing. */
+  overflow-anchor: none;
+  contain: layout style paint;
 }
 .doc-scroll::-webkit-scrollbar { width: 8px; }
 .doc-scroll::-webkit-scrollbar-thumb {

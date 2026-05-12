@@ -1,5 +1,7 @@
 import {
   createContext,
+  memo,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -12,6 +14,7 @@ import type {
 } from "react";
 import { DragDropProvider } from "@dnd-kit/react";
 import { useSortable as useDndSortable } from "@dnd-kit/react/sortable";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 // Sortable index lookup — dnd-kit's `useSortable` needs each item's index in
 // the flat blocks array. We compute the id→index map once per render in
@@ -23,6 +26,7 @@ function useBlockIndex(id: string): number {
   return map?.get(id) ?? 0;
 }
 import { parseRpyScript } from "../../lib/renpy/scriptParser";
+import { HydrationProvider, LazyHydrate } from "./LazyHydrate";
 import {
   newBlockId,
   type RpyBlock,
@@ -63,7 +67,7 @@ function useSortable(id: string) {
 /** Hover-revealed grip on the left gutter of every reorderable card. The
  * dnd-kit library wires the actual drag gesture to this element via
  * `handleRef`; we just style it. */
-function DragHandle({
+function DragHandleInner({
   setHandleRef,
 }: {
   setHandleRef: (el: HTMLElement | null) => void;
@@ -163,43 +167,73 @@ export function RenpyTable({
     return map;
   }, [characters]);
 
-  const apply = (next: RpyBlocks) => {
-    setBlocks(next);
-    onChange(next);
-  };
+  // All mutators go through `applyFn` with a functional updater so their
+  // closures only depend on `setBlocks` + `onChange` — both stable. Without
+  // this every keystroke recreated `updateById`/`deleteById`/… which broke
+  // `memo` on the hundreds of leaf cards downstream (they re-rendered on
+  // every render of RenpyTable, defeating the optimization).
+  const applyFn = useCallback(
+    (fn: (curr: RpyBlocks) => RpyBlocks) => {
+      setBlocks((prev) => {
+        const next = fn(prev);
+        if (next !== prev) onChange(next);
+        return next;
+      });
+    },
+    [onChange],
+  );
 
-  const updateById = (id: string, mut: (b: RpyBlock) => RpyBlock) => {
-    apply(blocks.map((b) => (b.id === id ? mut(b) : b)));
-  };
+  // Convenience wrapper for callers that already have the next array.
+  const apply = useCallback(
+    (next: RpyBlocks) => {
+      setBlocks(next);
+      onChange(next);
+    },
+    [onChange],
+  );
 
-  const deleteById = (id: string) => {
-    apply(blocks.filter((b) => b.id !== id));
-  };
+  const updateById = useCallback(
+    (id: string, mut: (b: RpyBlock) => RpyBlock) => {
+      applyFn((curr) => curr.map((b) => (b.id === id ? mut(b) : b)));
+    },
+    [applyFn],
+  );
 
-  const duplicateById = (id: string) => {
-    const idx = blocks.findIndex((b) => b.id === id);
-    if (idx === -1) return;
-    const clone: RpyBlock = { ...blocks[idx], id: newBlockId() };
-    const next = blocks.slice();
-    next.splice(idx + 1, 0, clone);
-    apply(next);
-  };
+  const deleteById = useCallback(
+    (id: string) => {
+      applyFn((curr) => curr.filter((b) => b.id !== id));
+    },
+    [applyFn],
+  );
 
-  const insertAfter = (afterId: string | null, newBlocks: RpyBlock[]) => {
-    if (newBlocks.length === 0) return;
-    if (afterId === null) {
-      apply([...blocks, ...newBlocks]);
-      return;
-    }
-    const idx = blocks.findIndex((b) => b.id === afterId);
-    if (idx === -1) {
-      apply([...blocks, ...newBlocks]);
-      return;
-    }
-    const next = blocks.slice();
-    next.splice(idx + 1, 0, ...newBlocks);
-    apply(next);
-  };
+  const duplicateById = useCallback(
+    (id: string) => {
+      applyFn((curr) => {
+        const idx = curr.findIndex((b) => b.id === id);
+        if (idx === -1) return curr;
+        const clone: RpyBlock = { ...curr[idx], id: newBlockId() };
+        const next = curr.slice();
+        next.splice(idx + 1, 0, clone);
+        return next;
+      });
+    },
+    [applyFn],
+  );
+
+  const insertAfter = useCallback(
+    (afterId: string | null, newBlocks: RpyBlock[]) => {
+      if (newBlocks.length === 0) return;
+      applyFn((curr) => {
+        if (afterId === null) return [...curr, ...newBlocks];
+        const idx = curr.findIndex((b) => b.id === afterId);
+        if (idx === -1) return [...curr, ...newBlocks];
+        const next = curr.slice();
+        next.splice(idx + 1, 0, ...newBlocks);
+        return next;
+      });
+    },
+    [applyFn],
+  );
 
   // Map of block id → flat index. Each sortable card looks up its index here
   // to participate in the dnd-kit sortable group; the lookup is O(1) after
@@ -308,20 +342,16 @@ export function RenpyTable({
         </button>
       </div>
 
-      {sections.map((section, si) => (
-        // Pass characters in so deep components (SpeakerPill) can offer Cast-based autocompletion.
-        <SectionView
-          key={section.label?.id ?? `orphan-${si}`}
-          section={section}
-          charByVar={charByVar}
-          characters={characters}
-          knownLabels={knownLabels}
-          onUpdate={updateById}
-          onDelete={deleteById}
-          onDuplicate={duplicateById}
-          onInsertAfter={insertAfter}
-        />
-      ))}
+      <VirtualizedSections
+        sections={sections}
+        charByVar={charByVar}
+        characters={characters}
+        knownLabels={knownLabels}
+        onUpdate={updateById}
+        onDelete={deleteById}
+        onDuplicate={duplicateById}
+        onInsertAfter={insertAfter}
+      />
 
       <button
         type="button"
@@ -340,6 +370,252 @@ export function RenpyTable({
     </div>
     </IndexCtx.Provider>
     </DragDropProvider>
+  );
+}
+
+/**
+ * Virtualized list of SectionView. Each Ren'Py file imported as a single
+ * `script_node` can produce 20-30 sections (one per label), each carrying
+ * 10-100 cards. Mounting them all at once is the dominant cost of opening
+ * the Renpy tab on a real-world `.rpy` import — 500+ cards × dnd-kit
+ * `useSortable` subscriptions × variable layout work.
+ *
+ * `@tanstack/react-virtual` keeps only the sections that intersect the
+ * visible viewport in the DOM. The scroll parent is `.doc-scroll` from
+ * ScriptDoc — we resolve it via `closest()` rather than threading a ref
+ * through props so this component stays drop-in compatible with the
+ * non-virtual call site.
+ *
+ * Trade-off: dnd-kit can't see sections that aren't currently rendered. In
+ * practice that's fine — reorders happen within the visible window; for
+ * cross-window moves the user scrolls to the destination first.
+ */
+function VirtualizedSections({
+  sections,
+  charByVar,
+  characters,
+  knownLabels,
+  onUpdate,
+  onDelete,
+  onDuplicate,
+  onInsertAfter,
+}: {
+  sections: Section[];
+  charByVar: Map<string, ScriptCharacter>;
+  characters: ScriptCharacter[];
+  knownLabels: string[];
+  onUpdate: (id: string, mut: (b: RpyBlock) => RpyBlock) => void;
+  onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  onInsertAfter: (afterId: string | null, newBlocks: RpyBlock[]) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  // Resolve the actual scroll parent AFTER mount and pin it in state — at
+  // first render `containerRef.current` is null, so an inline getter would
+  // return null and the virtualizer would render zero items (blank screen).
+  // Capturing once in a useEffect and re-rendering with the resolved
+  // element is the pattern recommended in @tanstack/react-virtual docs.
+  //
+  // We ALSO need the scroll-relative offset of our container, because the
+  // virtualizer reasons in scroller coordinates while our items are
+  // positioned inside `containerRef` (which sits below a toolbar, meta-row
+  // and other static header content in ScriptDoc). Without
+  // `scrollMargin` the virtualizer mounts items for the wrong scroll range
+  // — typically nothing on screen until the user scrolls a few hundred
+  // pixels down.
+  const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const scroller =
+      el.closest<HTMLElement>(".doc-scroll") ??
+      (document.scrollingElement as HTMLElement | null);
+    setScrollEl(scroller);
+    if (scroller) {
+      // Distance from the top of the scroll content to the top of our
+      // virtualized container. `scrollTop + getBoundingClientRect` is the
+      // standard trick to get the content-space offset.
+      const containerTop = el.getBoundingClientRect().top;
+      const scrollerTop = scroller.getBoundingClientRect().top;
+      setScrollMargin(containerTop - scrollerTop + scroller.scrollTop);
+    }
+  }, []);
+
+  const rowVirtualizer = useVirtualizer({
+    count: sections.length,
+    getScrollElement: () => scrollEl,
+    scrollMargin,
+    // Per-section estimate built by summing per-kind weights for every
+    // block in the section's body, plus a header allowance. Far more
+    // accurate than a flat `body.length * 80` average — sections heavy in
+    // menus/choices/raw blocks (big cards) get a higher estimate, and
+    // sections of pure dialogue (small cards) get a lower one. Accurate
+    // estimates let TanStack put items in the right places on first paint,
+    // which is what prevents the "blank gap on fast scroll" symptom.
+    estimateSize: (i) => estimateSectionHeight(sections[i]),
+    // Tight overscan. Counterintuitively *raising* it makes fast scroll
+    // worse: more mid-scroll mounts per frame == more jank. 3 is enough
+    // to mask normal-speed scroll while keeping mount cost low.
+    overscan: 3,
+    // Stable id per section so measured sizes survive section reorders
+    // and re-renders.
+    getItemKey: (i) => sections[i].label?.id ?? `orphan-${i}`,
+    // Workaround for TanStack Virtual issue #659: when an item above the
+    // viewport gets measured for the first time and is bigger than the
+    // estimate, its growth pushes the visible area downward — visible to
+    // the user as a scroll-up stutter. Caching the previous measurement
+    // when scrolling backward avoids the layout shift. Adopted directly
+    // from the maintainer-acknowledged workaround in that issue.
+    measureElement: (element, _entry, instance) => {
+      const direction = instance.scrollDirection;
+      if (direction === "backward") {
+        const cached = instance.measurementsCache[
+          Number(element.getAttribute("data-index"))
+        ];
+        if (cached) return cached.size;
+      }
+      return element.getBoundingClientRect().height;
+    },
+  });
+
+  const items = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+  // Pulled into a variable so the HydrationProvider re-renders the moment
+  // scroll state flips, telling child LazyHydrates to pause/resume.
+  const isScrolling = rowVirtualizer.isScrolling;
+
+  return (
+    <HydrationProvider isScrolling={isScrolling}>
+    <div
+      ref={containerRef}
+      style={{
+        position: "relative",
+        // Reserve the full virtualized height so the page's own scrollbar
+        // reflects the true content length — the parent .doc-scroll drives
+        // scrolling, this div just creates the right amount of space.
+        height: totalSize,
+        width: "100%",
+      }}
+    >
+      {items.map((vItem) => {
+        const section = sections[vItem.index];
+        const sectionId = section.label?.id ?? `orphan-${vItem.index}`;
+        // `content-visibility: auto` lives INSIDE LazyHydrate now, on a
+        // sibling element to the one TanStack measures (per caveat:
+        // measureElement on a c-v:auto element returns 0 offscreen).
+        // The outer div here is only for absolute positioning + measurement.
+        return (
+          <div
+            key={vItem.key}
+            data-index={vItem.index}
+            ref={rowVirtualizer.measureElement}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              // `vItem.start` is in scroller-space (includes scrollMargin);
+              // our container sits at `scrollMargin` inside that space, so we
+              // subtract it to land at the right offset within our wrapper.
+              transform: `translateY(${vItem.start - scrollMargin}px)`,
+            }}
+          >
+            <LazyHydrate
+              id={sectionId}
+              estimatedHeight={vItem.size}
+              skeleton={<SectionSkeleton section={section} />}
+            >
+              <SectionView
+                section={section}
+                charByVar={charByVar}
+                characters={characters}
+                knownLabels={knownLabels}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onDuplicate={onDuplicate}
+                onInsertAfter={onInsertAfter}
+              />
+            </LazyHydrate>
+          </div>
+        );
+      })}
+    </div>
+    </HydrationProvider>
+  );
+}
+
+/**
+ * Per-kind row-height approximations used by TanStack's `estimateSize`. The
+ * values come from eyeballing the rendered cards in `scripts.css` and aren't
+ * meant to be exact — they only need to be within ~30 % so the virtualizer
+ * sets a reasonable initial scroll height. `measureElement` corrects the
+ * rest once items are on-screen. Distinguishing menu/raw/scene from plain
+ * dialogue is what kills the "fast scroll leaves blank gaps" symptom that
+ * a flat-average estimate produces.
+ */
+function estimateBlockHeight(kind: RpyBlockKind): number {
+  switch (kind) {
+    case "label":
+      return 48;
+    case "scene":
+      return 120;
+    case "show":
+    case "hide":
+      return 80;
+    case "say":
+    case "narrator":
+      return 80;
+    case "menu":
+      return 60;
+    case "choice":
+      return 100;
+    case "jump":
+    case "call":
+      return 64;
+    case "with":
+    case "pause":
+      return 60;
+    case "note":
+      return 88;
+    case "raw":
+      return 180;
+    default:
+      return 100;
+  }
+}
+
+function estimateSectionHeight(section: Section | undefined): number {
+  if (!section) return 200;
+  // Header strip (label name + scene chip + actions) is ~60px regardless
+  // of body contents.
+  let total = 60;
+  for (const b of section.body) {
+    total += estimateBlockHeight(b.kind);
+  }
+  return total;
+}
+
+/**
+ * Lightweight stand-in for a SectionView before it has been visible. Renders
+ * just the label name and a block count — no Radix, no useSortable, no
+ * controlled inputs. Mount cost is essentially zero, so a thousand of these
+ * cost ~the same as one. Replaced with the real SectionView the moment
+ * IntersectionObserver fires on this section.
+ */
+function SectionSkeleton({ section }: { section: Section }) {
+  const name = section.label?.kind === "label" ? section.label.name : "";
+  return (
+    <div className="rs-section-skeleton">
+      <div className="rs-section-skeleton-head">
+        <span className="rs-section-skeleton-label">
+          {name || "(orphan body)"}
+        </span>
+        <span className="rs-section-skeleton-count">
+          {section.body.length} block{section.body.length === 1 ? "" : "s"}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -551,7 +827,7 @@ interface CommonHandlers {
   onInsertAfter: (afterId: string | null, newBlocks: RpyBlock[]) => void;
 }
 
-function SectionView({
+function SectionViewInner({
   section,
   charByVar,
   characters,
@@ -637,7 +913,7 @@ function SectionView({
   );
 }
 
-function SceneItemView({
+function SceneItemViewInner({
   item,
   charByVar,
   characters,
@@ -693,7 +969,7 @@ function SceneItemView({
 
 // -- Scene card (container) -------------------------------------------------
 
-function SceneCard({
+function SceneCardInner({
   scene,
   body,
   charByVar,
@@ -859,7 +1135,7 @@ function SceneCard({
  * input; on blur we resolve the typed `rpy_var` against the cast and apply
  * the new speaker to every say-block in the scene.
  */
-function SpeakerPill({
+function SpeakerPillInner({
   charVar,
   character,
   characters,
@@ -1058,7 +1334,7 @@ function SpeakerPill({
  * One body line of a scene — speaker is owned by the scene header, so a
  * line is just the dialogue text (italic for narrator, plain for say).
  */
-function SceneBodyLine({
+function SceneBodyLineInner({
   block,
   onUpdate,
   onDelete,
@@ -1106,7 +1382,7 @@ function SceneBodyLine({
 
 // -- Single block card dispatch ---------------------------------------------
 
-function SingleBlockCard({
+function SingleBlockCardInner({
   block,
   charByVar,
   knownLabels,
@@ -1216,7 +1492,7 @@ function SingleBlockCard({
 
 interface BlockHandlers extends Omit<CommonHandlers, "onInsertAfter"> {}
 
-function SpriteCard({
+function SpriteCardInner({
   block,
   charByVar,
   onUpdate,
@@ -1297,7 +1573,7 @@ function SpriteCard({
   );
 }
 
-function TransitionCard({
+function TransitionCardInner({
   block,
   onUpdate,
   onDelete,
@@ -1329,7 +1605,7 @@ function TransitionCard({
   );
 }
 
-function PauseCard({
+function PauseCardInner({
   block,
   onUpdate,
   onDelete,
@@ -1371,7 +1647,7 @@ function PauseCard({
   );
 }
 
-function NoteCard({
+function NoteCardInner({
   block,
   onUpdate,
   onDelete,
@@ -1403,7 +1679,7 @@ function NoteCard({
   );
 }
 
-function DialogueCard({
+function DialogueCardInner({
   block,
   charByVar,
   onUpdate,
@@ -1490,7 +1766,7 @@ function DialogueCard({
   );
 }
 
-function NarratorCard({
+function NarratorCardInner({
   block,
   onUpdate,
   onDelete,
@@ -1520,7 +1796,7 @@ function NarratorCard({
   );
 }
 
-function FlowCard({
+function FlowCardInner({
   block,
   knownLabels,
   onUpdate,
@@ -1700,7 +1976,7 @@ function cap(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
-function AudioCard({
+function AudioCardInner({
   block,
   onUpdate,
   onDelete,
@@ -1894,7 +2170,7 @@ function serializeAudio(a: ParsedAudio): string {
   return parts.join(" ");
 }
 
-function RawCard({
+function RawCardInner({
   block,
   onUpdate,
   onDelete,
@@ -1958,7 +2234,7 @@ function RawCard({
 
 // -- Menu container ---------------------------------------------------------
 
-function MenuView({
+function MenuViewInner({
   tree,
   charByVar,
   knownLabels,
@@ -2031,7 +2307,7 @@ function MenuView({
   );
 }
 
-function ChoiceView({
+function ChoiceViewInner({
   entry,
   menu,
   charByVar,
@@ -2456,3 +2732,33 @@ function createEmptyBlock(kind: RpyBlockKind, depth: number): RpyBlock {
       return { id, kind, depth, lines: [""], head: "" };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Memo wrappers
+//
+// Every heavy component in this file is exported only through `memo()` so
+// reorders, edits and drag operations re-render just the affected cards
+// instead of the entire scene (500+ blocks for `Time Heals`-sized scripts).
+// The `*Inner` functions are the implementations; the exported names below
+// are what JSX references. Note: const initialization happens at module load
+// before RenpyTable is ever called, so the JSX usage above resolves cleanly.
+// ---------------------------------------------------------------------------
+
+const DragHandle = memo(DragHandleInner);
+const SectionView = memo(SectionViewInner);
+const SceneItemView = memo(SceneItemViewInner);
+const SceneCard = memo(SceneCardInner);
+const SpeakerPill = memo(SpeakerPillInner);
+const SceneBodyLine = memo(SceneBodyLineInner);
+const SingleBlockCard = memo(SingleBlockCardInner);
+const SpriteCard = memo(SpriteCardInner);
+const TransitionCard = memo(TransitionCardInner);
+const PauseCard = memo(PauseCardInner);
+const NoteCard = memo(NoteCardInner);
+const DialogueCard = memo(DialogueCardInner);
+const NarratorCard = memo(NarratorCardInner);
+const FlowCard = memo(FlowCardInner);
+const AudioCard = memo(AudioCardInner);
+const RawCard = memo(RawCardInner);
+const MenuView = memo(MenuViewInner);
+const ChoiceView = memo(ChoiceViewInner);

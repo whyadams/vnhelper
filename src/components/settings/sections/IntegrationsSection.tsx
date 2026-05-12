@@ -22,23 +22,29 @@ type Status =
       envPath: string;
       command: string;
       desktopJson: string;
-      desktopConfigPath: string;
+      desktopConfigPaths: string[];
     }
   | { kind: "error"; message: string };
 
 /** Best-effort detection of where Claude Desktop's MCP config lives per
- * platform. Used purely as a hint string in the UI — the user copies the
- * JSON snippet and pastes it themselves. */
-function claudeDesktopConfigPath(): string {
+ * platform. On Windows there are TWO valid locations: the regular installer
+ * uses %APPDATA%\Claude\, while the Microsoft Store / UWP build sandboxes
+ * its config under %LOCALAPPDATA%\Packages\Claude_<hash>\… — the UI shows
+ * both and tells the user how to figure out which one applies. */
+function claudeDesktopConfigPaths(): string[] {
   const platform =
     typeof navigator !== "undefined" ? navigator.platform : "Win32";
   if (/Mac/i.test(platform)) {
-    return "~/Library/Application Support/Claude/claude_desktop_config.json";
+    return ["~/Library/Application Support/Claude/claude_desktop_config.json"];
   }
   if (/Linux/i.test(platform)) {
-    return "~/.config/Claude/claude_desktop_config.json";
+    return ["~/.config/Claude/claude_desktop_config.json"];
   }
-  return "%APPDATA%\\Claude\\claude_desktop_config.json";
+  // Windows — both installer and UWP/Store paths.
+  return [
+    "%APPDATA%\\Claude\\claude_desktop_config.json",
+    "%LOCALAPPDATA%\\Packages\\Claude_<hash>\\LocalCache\\Roaming\\Claude\\claude_desktop_config.json",
+  ];
 }
 
 export function IntegrationsSection() {
@@ -129,7 +135,7 @@ export function IntegrationsSection() {
         envPath: envResult.path,
         command: buildCommand(wsId),
         desktopJson: buildDesktopJson(wsId),
-        desktopConfigPath: claudeDesktopConfigPath(),
+        desktopConfigPaths: claudeDesktopConfigPaths(),
       });
     } catch (e) {
       setStatus({
@@ -237,17 +243,40 @@ export function IntegrationsSection() {
                   <div className="set-step-num">1</div>
                   <div className="set-step-body">
                     <div className="set-step-title">
-                      Открой файл (или создай, если его нет):
+                      Открой <code>claude_desktop_config.json</code> (или
+                      создай, если его нет):
                     </div>
-                    <div className="set-cmd">
-                      <pre>{status.desktopConfigPath}</pre>
-                    </div>
+                    {status.desktopConfigPaths.length > 1 ? (
+                      <>
+                        <div
+                          className="set-row-desc"
+                          style={{ marginBottom: 6 }}
+                        >
+                          На Windows два возможных пути в зависимости от
+                          сборки Claude Desktop:
+                        </div>
+                        <div className="set-cmd">
+                          <pre>
+                            {"# installer (claude.ai/download):\n"}
+                            {status.desktopConfigPaths[0]}
+                            {"\n\n# Microsoft Store / UWP:\n"}
+                            {status.desktopConfigPaths[1]}
+                          </pre>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="set-cmd">
+                        <pre>{status.desktopConfigPaths[0]}</pre>
+                      </div>
+                    )}
                     <div
                       className="set-row-desc"
                       style={{ marginTop: 6 }}
                     >
-                      На Windows вставь путь в адресную строку проводника —
-                      <code>%APPDATA%</code> раскроется автоматически.
+                      <strong>Самый надёжный способ найти правильный
+                      файл:</strong> в Claude Desktop открой{" "}
+                      <code>Settings → Developer → Edit Config</code> — он
+                      откроет именно тот файл, который читает твоя сборка.
                     </div>
                   </div>
                 </div>

@@ -1,549 +1,970 @@
-/* ============================================================
-   Story Graph — typed block flow editor
-   ============================================================ */
+/* Story-flow graph view. Derived from script_nodes + rpy_blocks, so the
+   layout is auto (dagre) and the user only positions/zooms the camera. */
 
-.vn-graph-main {
+.graph-main {
+  position: relative;
+  overflow: hidden;
+}
+
+.graph-header {
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-header-title {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  background: var(--bg-canvas);
+  gap: 2px;
+  min-width: 0;
 }
-
-.vn-graph-canvas-wrap {
-  flex: 1;
-  position: relative;
-  min-height: 0;
+.graph-header-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.graph-header-title h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.graph-project-select {
+  height: 32px;
+  padding: 0 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-1);
+  font-family: Montserrat, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(
+      45deg,
+      transparent 50%,
+      var(--text-3) 50%
+    ),
+    linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 9px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+.graph-project-select:hover {
+  border-color: var(--border-strong);
+}
+
+.graph-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.graph-loading,
+.graph-error,
+.graph-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-size: 13px;
+  padding: 32px;
+  gap: 6px;
+}
+.graph-empty p {
+  margin: 0;
+}
+.graph-empty-hint {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.graph-error {
+  color: var(--status-danger);
+}
+
+/* ---- xyflow overrides ---- */
+
+.graph-canvas-wrap .react-flow {
   background: var(--bg-canvas);
+  font-family: Montserrat, sans-serif;
 }
-
-.vn-graph-canvas-loading {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+.graph-canvas-wrap .react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
 }
-
-/* Topbar — uses .topbar.tmt-bar with .vn-graph-topbar additions */
-.vn-graph-topbar {
-  gap: 10px;
+.graph-canvas-wrap .react-flow__controls {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: none;
 }
-.vn-graph-loading {
+.graph-canvas-wrap .react-flow__controls-button {
+  background: var(--bg-elevated);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+}
+.graph-canvas-wrap .react-flow__controls-button:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-1);
+}
+.graph-canvas-wrap .react-flow__controls-button svg {
+  fill: currentColor;
+}
+.graph-canvas-wrap .react-flow__edge-text {
+  font-family: Montserrat, sans-serif;
   font-size: 11px;
-  font-weight: 500;
-  color: rgba(200, 199, 202, 0.4);
+}
+
+/* ---- Label node ----
+   Each node represents one Ren'Py label (project-unique). The label name
+   is the primary identifier — rendered monospace because it's a code token
+   that jump/call references — with the enclosing scene shown as muted
+   secondary context. */
+
+.graph-node {
+  width: 220px;
+  min-height: 84px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-1);
+  font-family: Montserrat, sans-serif;
+  cursor: grab;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  position: relative;
+}
+.graph-node:hover {
+  border-color: var(--border-strong);
+}
+.graph-node.is-selected {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 1px var(--accent-strong);
+}
+.graph-node.is-implicit {
+  border-style: dashed;
+}
+.graph-node-label-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.2;
+}
+.graph-node-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.graph-node-emoji {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.graph-node-scene {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+}
+.graph-node-chapter {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.graph-node-chapter::after {
+  content: "·";
+  margin-left: 6px;
+  color: var(--text-4);
+}
+.graph-node-scene-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.graph-node-counters {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: "JetBrains Mono", monospace;
+  line-height: 1;
+}
+.graph-node-count {
+  color: var(--text-3);
+}
+.graph-node-choices {
+  color: var(--accent-strong);
+  opacity: 0.85;
+}
+.graph-node-choices::before {
+  content: "";
+}
+
+/* Status accent stripe on the left edge — mirrors kanban card status pill */
+.graph-node[data-status="todo"] {
+  border-left: 2px solid var(--text-3);
+}
+.graph-node[data-status="progress"] {
+  border-left: 2px solid var(--status-info);
+}
+.graph-node[data-status="review"] {
+  border-left: 2px solid var(--status-warn);
+}
+.graph-node[data-status="done"] {
+  border-left: 2px solid var(--status-ok);
+}
+
+/* ---- Graph-level signals ---- */
+
+/* Entry point — the first label by tree order. Override the status stripe
+   with a brighter accent so the project's actual start is unmistakable. */
+.graph-node.is-entry {
+  border-left: 3px solid var(--status-ok) !important;
+  box-shadow: 0 0 0 1px rgba(141, 153, 130, 0.25);
+}
+
+/* Unreachable label — no other label jumps/calls/branches into this one.
+   Dim it a touch and stripe in warn-color on the left. */
+.graph-node.is-unreachable {
+  border-left: 2px solid var(--status-warn) !important;
+  opacity: 0.78;
+}
+.graph-node.is-unreachable:hover {
+  opacity: 1;
+}
+
+/* Has broken outbound — at least one jump/call points at a label that
+   doesn't exist in the project. Stripe the right edge in danger-color so
+   the source of the dangling reference is easy to spot. */
+.graph-node.has-broken-out {
+  border-right: 3px solid var(--status-danger);
+}
+.graph-node.is-selected.has-broken-out {
+  border-right-color: var(--status-danger);
+}
+
+/* ---- Badges ---- */
+
+.graph-node-badge {
+  position: absolute;
+  top: -8px;
+  padding: 1px 6px;
+  font-family: Montserrat, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1.4;
+}
+.graph-node-badge-entry {
+  left: 10px;
+  background: var(--status-ok);
+  color: #131416;
+}
+.graph-node-badge-unreachable {
+  left: 10px;
+  background: var(--status-warn);
+  color: #131416;
+}
+.graph-node-badge-broken {
+  right: 10px;
+  background: var(--status-danger);
+  color: #fff;
+}
+
+.graph-node-handle {
+  width: 8px;
+  height: 8px;
+  background: var(--text-3);
+  border: none;
+}
+.graph-node:hover .graph-node-handle {
+  background: var(--accent-strong);
+}
+
+/* ---- Stats overlay ---- */
+
+.graph-stats {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(28, 29, 31, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--text-2);
+  backdrop-filter: blur(8px);
+}
+.graph-stats span {
+  white-space: nowrap;
+}
+.graph-stat-danger {
+  color: var(--status-danger);
+}
+.graph-stat-warn {
+  color: var(--status-warn);
+}
+.graph-stat-reset {
+  margin-left: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: Montserrat, sans-serif;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.graph-stat-reset:hover {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+
+/* ============================================================
+   Label inspector — slide-in panel on the right with details of
+   the selected label: menus + effects, all refs, inbound, flags.
+   ============================================================ */
+
+.graph-inspector {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  font-family: Montserrat, sans-serif;
+  color: var(--text-1);
+  z-index: 5;
+  animation: graph-inspector-in 0.16s ease-out;
+}
+@keyframes graph-inspector-in {
+  from {
+    transform: translateX(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.graph-inspector-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-inspector-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.graph-inspector-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.2;
+  overflow: hidden;
+}
+.graph-inspector-label-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-inspector-scene {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-inspector-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.12s, color 0.12s;
+}
+.graph-inspector-close:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-1);
+}
+
+.graph-inspector-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-flag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+.graph-flag-entry {
+  background: var(--status-ok);
+  color: #131416;
+}
+.graph-flag-unreachable {
+  background: var(--status-warn);
+  color: #131416;
+}
+.graph-flag-broken {
+  background: var(--status-danger);
+  color: #fff;
+}
+.graph-flag-implicit {
+  background: var(--bg-input);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+
+.graph-inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.graph-inspector-body::-webkit-scrollbar {
+  width: 8px;
+}
+.graph-inspector-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.graph-inspector-empty {
+  padding: 16px;
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 0;
+}
+
+.graph-inspector-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-inspector-section:last-child {
+  border-bottom: none;
+}
+.graph-inspector-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.graph-inspector-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--text-2);
+  padding: 1px 6px;
+  background: var(--bg-input);
+  border-radius: 99px;
+  letter-spacing: 0;
+}
+
+/* ---- Choices ---- */
+.graph-inspector-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.graph-inspector-menu + .graph-inspector-menu {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.graph-inspector-choice {
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.graph-inspector-choice-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.35;
+  word-wrap: break-word;
+}
+.graph-inspector-choice-cond {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--status-warn);
+}
+.graph-inspector-choice-out {
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.graph-inspector-choice-out code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-1);
+  background: rgba(200, 199, 202, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.graph-inspector-choice-empty {
+  font-size: 11px;
+  color: var(--text-3);
   font-style: italic;
 }
 
-/* Project switcher pill — inline in topbar */
-.vn-graph-project-btn {
-  display: inline-flex;
+/* ---- Effects (list of $-statements) ---- */
+.graph-inspector-effects {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.graph-inspector-effects li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.graph-inspector-effects li::before {
+  content: "$";
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--accent-strong);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.graph-inspector-effects code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-2);
+  word-break: break-all;
+}
+
+/* ---- Refs (outbound, inbound, conditional targets) ---- */
+.graph-inspector-refs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.graph-inspector-refs li {
+  display: flex;
   align-items: center;
   gap: 8px;
-  height: 28px;
-  padding: 0 10px 0 8px;
-  background: rgba(200, 199, 202, 0.05);
-  border: none;
-  border-radius: 8px;
-  color: var(--text-1);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  transition: background 0.12s;
+  font-size: 11px;
 }
-.vn-graph-project-btn:hover { background: rgba(200, 199, 202, 0.08); }
-.vn-graph-project-emoji {
-  font-size: 13px;
-  line-height: 1;
-}
-.vn-graph-project-name {
-  color: var(--text-1);
-  font-size: 12px;
-  font-weight: 600;
-}
-.vn-graph-project-chev {
-  color: rgba(200, 199, 202, 0.4);
+.graph-inspector-ref-kind {
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
-  margin-left: 2px;
-}
-
-/* ============================================================
-   Story-graph editor (vn-sg-*)
-   ============================================================ */
-
-.vn-sg-shell {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  user-select: none;
-  font-family: "Montserrat", system-ui, -apple-system, sans-serif;
-}
-
-/* ---- palette ---- */
-.vn-sg-palette {
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--bg-input);
+  padding: 1px 6px;
+  border-radius: 3px;
   flex-shrink: 0;
-  background: rgba(200, 199, 202, 0.02);
-  border-right: 1px solid rgba(200, 199, 202, 0.06);
-  display: flex;
-  flex-direction: column;
-  padding: 18px 14px;
-  gap: 10px;
-}
-.vn-sg-palette-section {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: rgba(200, 199, 202, 0.5);
-  font-weight: 700;
-  margin-bottom: 2px;
-}
-.vn-sg-palette-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-.vn-sg-palette-card-wrap {
-  cursor: grab;
-}
-.vn-sg-palette-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(200, 199, 202, 0.04);
-  border: 1px solid rgba(200, 199, 202, 0.08);
-  border-left: 3px solid var(--text-1);
-  border-radius: 6px;
-  padding: 9px 12px;
-  transition: background 0.12s, border-color 0.12s;
-}
-.vn-sg-palette-card-wrap:hover .vn-sg-palette-card {
-  background: rgba(200, 199, 202, 0.07);
-}
-.vn-sg-palette-icon {
-  display: inline-flex;
-  align-items: center;
-}
-.vn-sg-palette-label {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-1);
-  letter-spacing: -0.005em;
-}
-.vn-sg-palette-hint {
-  font-size: 11px;
-  line-height: 1.5;
-  color: rgba(200, 199, 202, 0.35);
-  border-top: 1px solid rgba(200, 199, 202, 0.06);
-  padding-top: 12px;
-}
-
-.vn-sg-palette-ghost {
-  position: fixed;
-  pointer-events: none;
-  z-index: 1000;
-  opacity: 0.85;
-  transform: scale(0.9);
-}
-
-/* ---- canvas ---- */
-.vn-sg-canvas {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  background: var(--bg-canvas);
-  cursor: default;
-}
-.vn-sg-canvas.is-space {
-  cursor: grab;
-}
-.vn-sg-canvas.is-panning {
-  cursor: grabbing;
-}
-
-/* Grid: a single canvas-sized div with a tiled radial-gradient. Scale
-   and offset are driven inline by JS (background-size + background-position),
-   so the dot pattern stays crisp at any zoom and pans pixel-perfectly. */
-.vn-sg-grid {
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(
-    circle,
-    rgba(200, 199, 202, 0.08) 1px,
-    transparent 1px
-  );
-  pointer-events: none;
-}
-.vn-sg-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  font-size: 18px;
-  color: rgba(200, 199, 202, 0.35);
+  min-width: 36px;
   text-align: center;
-  line-height: 1.5;
-  letter-spacing: 0.005em;
-  font-weight: 500;
 }
-.vn-sg-empty span {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(200, 199, 202, 0.28);
-  margin-top: 6px;
-}
-
-.vn-sg-edges {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.vn-sg-edge-label {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  background: var(--bg-canvas);
-  border: 1px solid rgba(200, 199, 202, 0.15);
-  border-radius: 4px;
-  padding: 2px 7px;
+.graph-inspector-refs code {
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
-  font-weight: 500;
-  line-height: 1.3;
   color: var(--text-1);
-  z-index: 4;
-  cursor: pointer;
-  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.vn-sg-edge-label input {
-  background: transparent;
-  border: none;
-  outline: none;
-  color: inherit;
-  font: inherit;
-  width: auto;
-  min-width: 60px;
-  padding: 0;
-}
 
-.vn-sg-endpoint {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--bg-canvas);
-  border: 2px solid var(--text-1);
-  cursor: grab;
-  z-index: 5;
-}
-
-/* ---- nodes ---- */
-.vn-sg-node {
-  position: absolute;
-  background: rgba(200, 199, 202, 0.025);
-  border: 1px solid rgba(200, 199, 202, 0.08);
-  border-left: 3px solid var(--text-1);
-  border-radius: 6px;
-  padding: 12px;
-  overflow: visible;
+/* Clickable jump target — appears in outbound, inbound, conditional, and
+   choice.outgoing rows. Native button, styled to read as a code chip with
+   a hover/active state so it's discoverable as interactive. */
+.graph-inspector-target {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
   color: var(--text-1);
-  font-size: 12px;
-  cursor: grab;
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s,
-    background 0.12s;
+  background: rgba(200, 199, 202, 0.06);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  line-height: 1.4;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  text-align: left;
 }
-.vn-sg-node.is-selected {
-  background: rgba(200, 199, 202, 0.05);
-  box-shadow: 0 0 0 1px rgba(200, 199, 202, 0.15);
+.graph-inspector-target:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-strong);
+  color: var(--text-1);
 }
-.vn-sg-node.is-drop-target {
-  box-shadow: 0 0 0 2px rgba(168, 152, 130, 0.35);
+.graph-inspector-target:active {
+  background: rgba(200, 199, 202, 0.12);
 }
-.vn-sg-node.is-ending {
-  background: rgba(168, 112, 128, 0.05);
-}
-
-.vn-sg-node-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  pointer-events: none;
-}
-.vn-sg-node-icon {
-  display: inline-flex;
-  align-items: center;
-}
-.vn-sg-node-label {
-  font-size: 9.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(200, 199, 202, 0.55);
-  font-weight: 700;
-  flex: 1;
-}
-.vn-sg-node-id {
-  font-size: 9px;
-  color: rgba(200, 199, 202, 0.3);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+/* Broken target — dangling ref, no node to jump to. Visually muted + warn-tinted
+   so the user knows it's a problem, not a missed click target. */
+.graph-inspector-target.is-broken {
+  color: var(--status-danger);
+  background: rgba(168, 112, 128, 0.08);
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-color: rgba(168, 112, 128, 0.5);
 }
 
-.vn-sg-node-body {
+/* ---- Conditional groups ---- */
+.graph-inspector-cond {
+  padding: 8px 10px;
+  background: rgba(168, 152, 130, 0.04);
+  border: 1px solid rgba(168, 152, 130, 0.2);
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  height: calc(100% - 24px);
+}
+.graph-inspector-cond + .graph-inspector-cond {
+  margin-top: 6px;
+}
+.graph-inspector-cond-head code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--status-warn);
 }
 
-.vn-sg-field-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 5px 8px;
-  text-align: left;
-  color: var(--text-1);
-  font: inherit;
-  cursor: text;
-  transition: background 0.12s, border-color 0.12s;
+/* ---- Footer (Open in Script button) ---- */
+.graph-inspector-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
 }
-.vn-sg-field-btn:hover {
-  background: rgba(200, 199, 202, 0.04);
-  border-color: rgba(200, 199, 202, 0.08);
-}
-.vn-sg-field-character {
-  font-weight: 600;
-  font-size: 12.5px;
-  color: var(--text-1);
-}
-.vn-sg-field-text,
-.vn-sg-field-prompt,
-.vn-sg-field-flag,
-.vn-sg-field-ending {
-  font-size: 12px;
-  color: rgba(200, 199, 202, 0.85);
-  white-space: pre-wrap;
-  flex: 1;
-  overflow: hidden;
-}
-.vn-sg-field-text:empty::after,
-.vn-sg-field-prompt:empty::after {
-  content: attr(data-placeholder);
-  color: rgba(200, 199, 202, 0.3);
-}
-
-.vn-sg-input,
-.vn-sg-textarea {
-  background: rgba(200, 199, 202, 0.05);
-  border: 1px solid rgba(200, 199, 202, 0.15);
-  border-radius: 4px;
-  padding: 5px 8px;
-  color: var(--text-1);
-  font: inherit;
-  outline: none;
+.graph-inspector-open {
   width: 100%;
-  resize: none;
+  height: 36px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-1);
+  font-family: Montserrat, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
 }
-.vn-sg-input:focus,
-.vn-sg-textarea:focus {
-  border-color: rgba(200, 199, 202, 0.3);
-  background: rgba(200, 199, 202, 0.08);
+.graph-inspector-open:hover {
+  border-color: var(--accent-strong);
+  background: var(--bg-card-hover);
 }
-.vn-sg-input-character {
-  font-weight: 600;
-  font-size: 12.5px;
-}
-.vn-sg-textarea {
-  flex: 1;
-  min-height: 60px;
+
+/* Floating trigger button for the search palette — discoverable
+   hint for the Ctrl/Cmd+K shortcut. Sits top-right inside the
+   canvas wrap, mirrors the stats plate position on the left. */
+.graph-search-trigger {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(28, 29, 31, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-family: Montserrat, sans-serif;
   font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.12s, color 0.12s;
+}
+.graph-search-trigger:hover {
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.graph-search-trigger-icon {
+  font-size: 14px;
+  color: var(--text-3);
+}
+.graph-search-trigger:hover .graph-search-trigger-icon {
+  color: var(--accent-strong);
+}
+.graph-search-trigger-text {
+  white-space: nowrap;
+}
+.graph-search-trigger-kbd {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
   line-height: 1.4;
 }
 
-/* choice options */
-.vn-sg-options {
+/* ============================================================
+   Label search palette — Cmd/Ctrl+K command palette for jumping
+   to a label by name on large graphs.
+   ============================================================ */
+
+.graph-search-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(19, 20, 22, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 96px;
+  animation: graph-search-fade 0.12s ease-out;
+}
+@keyframes graph-search-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.graph-search {
+  width: 520px;
+  max-width: calc(100% - 32px);
+  max-height: 70vh;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  flex: 1;
+  overflow: hidden;
+  font-family: Montserrat, sans-serif;
+  animation: graph-search-rise 0.14s ease-out;
 }
-.vn-sg-option-row {
+@keyframes graph-search-rise {
+  from {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.graph-search-input-wrap {
   display: flex;
   align-items: center;
-  gap: 4px;
-  height: 28px;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  height: 48px;
 }
-.vn-sg-option-bullet {
-  color: rgba(200, 199, 202, 0.45);
-  font-size: 10px;
-  flex-shrink: 0;
-  width: 10px;
-  text-align: center;
+.graph-search-icon {
+  color: var(--text-3);
+  font-size: 16px;
 }
-.vn-sg-option-btn {
+.graph-search-input {
   flex: 1;
-  font-size: 12px;
-}
-.vn-sg-option-x {
   background: transparent;
   border: none;
-  color: rgba(200, 199, 202, 0.4);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-.vn-sg-option-x:hover {
-  color: var(--status-danger, #a87080);
-  background: rgba(168, 112, 128, 0.1);
-}
-.vn-sg-option-add {
-  background: transparent;
-  border: 1px dashed rgba(200, 199, 202, 0.18);
-  border-radius: 4px;
-  padding: 4px 8px;
-  color: rgba(200, 199, 202, 0.55);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  text-align: left;
-  margin-top: 2px;
-}
-.vn-sg-option-add:hover {
-  background: rgba(200, 199, 202, 0.04);
+  outline: none;
   color: var(--text-1);
-  border-color: rgba(200, 199, 202, 0.3);
+  font-family: Montserrat, sans-serif;
+  font-size: 14px;
+  height: 100%;
 }
-
-/* condition body */
-.vn-sg-cond-hint {
-  font-size: 10.5px;
-  color: rgba(200, 199, 202, 0.5);
-  letter-spacing: 0.04em;
+.graph-search-input::placeholder {
+  color: var(--text-3);
 }
-.vn-sg-cond-legend {
-  display: flex;
-  justify-content: space-between;
-  margin-top: auto;
+.graph-search-hint {
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-.vn-sg-cond-true {
-  color: #7a9994;
-}
-.vn-sg-cond-false {
-  color: #a87080;
+  color: var(--text-3);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
 }
 
-/* ending body */
-.vn-sg-field-ending,
-.vn-sg-input-ending {
-  font-weight: 600;
+.graph-search-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.graph-search-list::-webkit-scrollbar {
+  width: 8px;
+}
+.graph-search-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.graph-search-empty {
+  padding: 24px 16px;
+  color: var(--text-3);
   font-size: 13px;
   text-align: center;
+}
+
+.graph-search-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
   color: var(--text-1);
+  font-family: Montserrat, sans-serif;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.08s, border-color 0.08s;
 }
-
-/* ---- handles ---- */
-.vn-sg-handle {
-  position: absolute;
-  border-radius: 50%;
-  background: var(--bg-canvas);
-  border: 2px solid rgba(200, 199, 202, 0.5);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s, transform 0.1s;
-  z-index: 2;
+.graph-search-row.is-highlighted {
+  background: var(--bg-card-hover);
+  border-left-color: var(--accent-strong);
 }
-.vn-sg-handle.is-out {
-  cursor: crosshair;
-}
-.vn-sg-handle.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-.vn-sg-handle.is-target {
-  opacity: 1;
-  pointer-events: auto;
-  border-color: var(--text-1);
-  background: var(--text-1);
-  transform: scale(1.4);
-}
-.vn-sg-handle.is-out.is-visible:hover {
-  border-color: var(--text-1);
-  transform: scale(1.25);
-}
-
-/* ---- zoom panel ---- */
-.vn-sg-zoom-panel {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
+.graph-search-row-main {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
-  background: rgba(15, 16, 17, 0.85);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(200, 199, 202, 0.1);
-  border-radius: 6px;
-  z-index: 6;
-  font-size: 12.5px;
+  gap: 8px;
+}
+.graph-search-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-1);
-  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.vn-sg-zoom-btn,
-.vn-sg-zoom-pct,
-.vn-sg-zoom-fit {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: var(--text-1);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 5px 9px;
-  line-height: 1;
-  transition: background 0.12s, border-color 0.12s;
+.graph-search-row-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.vn-sg-zoom-btn {
-  width: 26px;
-  font-size: 14px;
-  padding: 0;
-  height: 26px;
+
+.graph-search-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 1.4;
 }
-.vn-sg-zoom-pct {
-  min-width: 52px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
+.graph-search-tag-entry {
+  background: var(--status-ok);
+  color: #131416;
 }
-.vn-sg-zoom-btn:hover,
-.vn-sg-zoom-pct:hover,
-.vn-sg-zoom-fit:hover {
-  background: rgba(200, 199, 202, 0.07);
-  border-color: rgba(200, 199, 202, 0.15);
+.graph-search-tag-unreach {
+  background: var(--status-warn);
+  color: #131416;
 }
-.vn-sg-zoom-sep {
-  width: 1px;
-  height: 18px;
-  background: rgba(200, 199, 202, 0.15);
-  margin: 0 2px;
+.graph-search-tag-broken {
+  background: var(--status-danger);
+  color: #fff;
 }
-.vn-sg-zoom-fit {
-  font-size: 12px;
-  letter-spacing: 0.01em;
+
+.graph-search-footer {
+  display: flex;
+  gap: 14px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: "JetBrains Mono", monospace;
 }

@@ -9,7 +9,6 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { TextSelection } from "@tiptap/pm/state";
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -874,40 +873,5 @@ function ScriptToolbar({
   );
 }
 
-export function useScriptStats(content: ScriptContent | null): {
-  words: number;
-  dialogueLines: number;
-  directions: number;
-  choices: number;
-  speakers: string[];
-} {
-  return useMemo(() => {
-    let words = 0;
-    let dialogueLines = 0;
-    let directions = 0;
-    let choices = 0;
-    const speakers = new Set<string>();
-    const walk = (n: unknown) => {
-      if (!n || typeof n !== "object") return;
-      const obj = n as { type?: string; text?: string; attrs?: { speaker?: string }; content?: unknown[] };
-      if (obj.type === "text" && typeof obj.text === "string") {
-        words += obj.text.trim().split(/\s+/).filter(Boolean).length;
-      }
-      if (obj.type === "dialogue") {
-        dialogueLines++;
-        if (obj.attrs?.speaker) speakers.add(obj.attrs.speaker);
-      }
-      if (obj.type === "direction") directions++;
-      if (obj.type === "choice") choices++;
-      if (Array.isArray(obj.content)) obj.content.forEach(walk);
-    };
-    walk(content);
-    return {
-      words,
-      dialogueLines,
-      directions,
-      choices,
-      speakers: Array.from(speakers),
-    };
-  }, [content]);
-}
+// `useScriptStats` moved to ./scriptStats so the Renpy tab can read counts
+// without static-importing TipTap. Import from "./scriptStats" instead.

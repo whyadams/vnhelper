@@ -11,6 +11,16 @@
       rel="stylesheet"
     />
     <title>VnHelper</title>
+    <style>
+      /* Paint the dark surface before any CSS loads so the webview never
+         flashes its default white background on cold start. The widget
+         window adds `.is-widget` later and overrides this to transparent. */
+      html,
+      body {
+        margin: 0;
+        background-color: #131416;
+      }
+    </style>
   </head>
 
   <body>

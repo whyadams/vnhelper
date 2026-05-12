@@ -1,4 +1,7 @@
 import {
+  Suspense,
+  lazy,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -11,10 +14,14 @@ import type {
   ScriptLocation,
 } from "../../state/scripts";
 import { StarIcon } from "./SharedIcons";
-import {
-  ScriptEditor,
-  useScriptStats,
-} from "./ScriptEditor";
+// ScriptEditor is the TipTap-heavy Doc tab. We `React.lazy` it so the
+// Renpy tab doesn't pay the cost of pulling in @tiptap/* (ProseMirror,
+// extensions, custom VN nodes) just because ScriptDoc renders. Until the
+// user switches to viewMode === "doc", the chunk never loads.
+const ScriptEditor = lazy(() =>
+  import("./ScriptEditor").then((m) => ({ default: m.ScriptEditor })),
+);
+import { useScriptStats } from "./scriptStats";
 import { RenpyTable } from "./RenpyTable";
 import { ScriptImportModal } from "./ScriptImportModal";
 import type { RpyBlocks } from "../../lib/renpy/blocks";
@@ -37,6 +44,17 @@ type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
 
 const META_SAVE_DEBOUNCE_MS = 500;
 const CONTENT_SAVE_DEBOUNCE_MS = 800;
+
+// Persist the active Doc/Renpy tab across screen switches. On large scripts
+// each tab carries a several-second mount cost (TipTap or RenpyTable), so
+// always landing on "doc" forces the user to pay both costs in a row when
+// they actually wanted Renpy.
+const VIEW_MODE_KEY = "vnhelper.script.viewMode";
+function loadViewMode(): ScriptViewMode {
+  if (typeof localStorage === "undefined") return "doc";
+  const v = localStorage.getItem(VIEW_MODE_KEY);
+  return v === "renpy" ? "renpy" : "doc";
+}
 
 const STATUS_OPTIONS: Array<{ key: string; label: string }> = [
   { key: "draft", label: "Draft" },
@@ -90,7 +108,13 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
   const [, setEditingEmoji] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
   const [savedAgo, setSavedAgo] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ScriptViewMode>("doc");
+  const [viewMode, setViewModeState] = useState<ScriptViewMode>(loadViewMode);
+  const setViewMode = (v: ScriptViewMode) => {
+    setViewModeState(v);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(VIEW_MODE_KEY, v);
+    }
+  };
   const [importOpen, setImportOpen] = useState(false);
   // Bumped on every external content replacement (e.g. Import) so the
   // TipTap editor and Table view get fresh `key` and remount with new state.
@@ -162,38 +186,55 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     }, META_SAVE_DEBOUNCE_MS);
   };
 
-  const onContentChange = (content: ScriptContent) => {
-    if (!node) return;
-    if (contentSaveTimeoutRef.current)
-      clearTimeout(contentSaveTimeoutRef.current);
-    contentSaveTimeoutRef.current = setTimeout(() => {
-      void scripts.updateNode(node.id, { content });
-    }, CONTENT_SAVE_DEBOUNCE_MS);
-  };
+  // Memoized save callbacks — RenpyTable + ScriptEditor are wrapped in memo
+  // (or stable-key remount), so a fresh `onChange` reference each render
+  // would either invalidate the memo or trigger a useEffect resync on every
+  // parent re-render. Stable refs guarantee the children only re-render
+  // when their own data actually changes.
+  const onContentChange = useCallback(
+    (content: ScriptContent) => {
+      const id = node?.id;
+      if (!id) return;
+      if (contentSaveTimeoutRef.current)
+        clearTimeout(contentSaveTimeoutRef.current);
+      contentSaveTimeoutRef.current = setTimeout(() => {
+        void scripts.updateNode(id, { content });
+      }, CONTENT_SAVE_DEBOUNCE_MS);
+    },
+    [node?.id, scripts],
+  );
 
   // Renpy-tab save shares the same debounce slot as Doc — only one of the two
   // tabs is visible at a time, so a pending save from the other never races.
-  const onRpyBlocksChange = (rpy_blocks: RpyBlocks) => {
-    if (!node) return;
-    if (contentSaveTimeoutRef.current)
-      clearTimeout(contentSaveTimeoutRef.current);
-    contentSaveTimeoutRef.current = setTimeout(() => {
-      void scripts.updateNode(node.id, { rpy_blocks });
-    }, CONTENT_SAVE_DEBOUNCE_MS);
-  };
+  const onRpyBlocksChange = useCallback(
+    (rpy_blocks: RpyBlocks) => {
+      const id = node?.id;
+      if (!id) return;
+      if (contentSaveTimeoutRef.current)
+        clearTimeout(contentSaveTimeoutRef.current);
+      contentSaveTimeoutRef.current = setTimeout(() => {
+        void scripts.updateNode(id, { rpy_blocks });
+      }, CONTENT_SAVE_DEBOUNCE_MS);
+    },
+    [node?.id, scripts],
+  );
 
   // Bulk operations (paste-import, clear-all, replace-via-import) bypass the
   // debounce so the save lands before any other UI event can race against it.
   // The debounce is for keystroke-level edits — bulk replacements need to be
   // atomic and immediate.
-  const onRpyBlocksReplace = async (rpy_blocks: RpyBlocks) => {
-    if (!node) return;
-    if (contentSaveTimeoutRef.current) {
-      clearTimeout(contentSaveTimeoutRef.current);
-      contentSaveTimeoutRef.current = null;
-    }
-    await scripts.updateNode(node.id, { rpy_blocks });
-  };
+  const onRpyBlocksReplace = useCallback(
+    async (rpy_blocks: RpyBlocks) => {
+      const id = node?.id;
+      if (!id) return;
+      if (contentSaveTimeoutRef.current) {
+        clearTimeout(contentSaveTimeoutRef.current);
+        contentSaveTimeoutRef.current = null;
+      }
+      await scripts.updateNode(id, { rpy_blocks });
+    },
+    [node?.id, scripts],
+  );
 
   /** Build the project's .rpy and trigger a browser download. */
   const onClickExportRpy = async () => {
@@ -641,19 +682,29 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
           )}
 
           {editorInitial && viewMode === "doc" && (
-            <ScriptEditor
-              key={editorInitial.nodeId + ":" + externalRevision}
-              nodeId={editorInitial.nodeId}
-              initialContent={editorInitial.initialContent}
-              initialMarkdown={editorInitial.initialMarkdown}
-              characters={scripts.characters}
-              projectTitle={scripts.activeProject?.title}
-              synopsis={scripts.activeProject?.synopsis}
-              sceneTitle={node.title}
-              povCharacter={povCharacter?.name ?? node.pov ?? null}
-              location={location?.name ?? null}
-              onChange={onContentChange}
-            />
+            <Suspense
+              fallback={
+                <div className="doc-editor-loading">
+                  <SkeletonBlock height={20} width="60%" />
+                  <SkeletonBlock height={14} width="90%" style={{ marginTop: 12 }} />
+                  <SkeletonBlock height={14} width="80%" style={{ marginTop: 8 }} />
+                </div>
+              }
+            >
+              <ScriptEditor
+                key={editorInitial.nodeId + ":" + externalRevision}
+                nodeId={editorInitial.nodeId}
+                initialContent={editorInitial.initialContent}
+                initialMarkdown={editorInitial.initialMarkdown}
+                characters={scripts.characters}
+                projectTitle={scripts.activeProject?.title}
+                synopsis={scripts.activeProject?.synopsis}
+                sceneTitle={node.title}
+                povCharacter={povCharacter?.name ?? node.pov ?? null}
+                location={location?.name ?? null}
+                onChange={onContentChange}
+              />
+            </Suspense>
           )}
 
           {editorInitial && viewMode === "renpy" && (

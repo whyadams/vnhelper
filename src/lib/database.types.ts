@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -43,63 +45,85 @@ export type Database = {
       }
       calendar_events: {
         Row: {
-          id: string
-          workspace_id: string
-          title: string
+          color: string
+          created_at: string
+          created_by: string | null
+          description: string | null
           event_date: string
           event_time: string | null
-          color: string
-          description: string | null
-          created_by: string | null
-          created_at: string
+          id: string
+          title: string
           updated_at: string
+          workspace_id: string
         }
         Insert: {
-          id?: string
-          workspace_id: string
-          title: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
           event_date: string
           event_time?: string | null
-          color?: string
-          description?: string | null
-          created_by?: string | null
-          created_at?: string
+          id?: string
+          title: string
           updated_at?: string
+          workspace_id: string
         }
         Update: {
-          id?: string
-          workspace_id?: string
-          title?: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
           event_date?: string
           event_time?: string | null
-          color?: string
-          description?: string | null
-          created_by?: string | null
-          created_at?: string
+          id?: string
+          title?: string
           updated_at?: string
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       card_assignees: {
         Row: {
-          card_id: string
-          user_id: string
           assigned_by: string | null
+          card_id: string
           created_at: string
+          user_id: string
         }
         Insert: {
-          card_id: string
-          user_id: string
           assigned_by?: string | null
+          card_id: string
           created_at?: string
+          user_id: string
         }
         Update: {
-          card_id?: string
-          user_id?: string
           assigned_by?: string | null
+          card_id?: string
           created_at?: string
+          user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "card_assignees_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "card_assignees_card_id_fkey"
             columns: ["card_id"]
@@ -114,116 +138,100 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      card_comments: {
+        Row: {
+          author_id: string
+          body: string
+          card_id: string
+          created_at: string
+          id: string
+          mentioned_user_ids: string[]
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          card_id: string
+          created_at?: string
+          id?: string
+          mentioned_user_ids?: string[]
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          card_id?: string
+          created_at?: string
+          id?: string
+          mentioned_user_ids?: string[]
+          updated_at?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "card_assignees_assigned_by_fkey"
-            columns: ["assigned_by"]
+            foreignKeyName: "card_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_comments_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_subtasks: {
+        Row: {
+          card_id: string
+          created_at: string
+          created_by: string | null
+          done: boolean
+          id: string
+          label: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          card_id: string
+          created_at?: string
+          created_by?: string | null
+          done?: boolean
+          id?: string
+          label: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          card_id?: string
+          created_at?: string
+          created_by?: string | null
+          done?: boolean
+          id?: string
+          label?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_subtasks_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_subtasks_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
-      }
-      card_comments: {
-        Row: {
-          id: string
-          card_id: string
-          author_id: string
-          body: string
-          mentioned_user_ids: string[]
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          card_id: string
-          author_id: string
-          body: string
-          mentioned_user_ids?: string[]
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          card_id?: string
-          author_id?: string
-          body?: string
-          mentioned_user_ids?: string[]
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          id: string
-          user_id: string
-          kind: string
-          actor_id: string | null
-          workspace_id: string | null
-          card_id: string | null
-          comment_id: string | null
-          body: string
-          read: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          kind: string
-          actor_id?: string | null
-          workspace_id?: string | null
-          card_id?: string | null
-          comment_id?: string | null
-          body: string
-          read?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          kind?: string
-          actor_id?: string | null
-          workspace_id?: string | null
-          card_id?: string | null
-          comment_id?: string | null
-          body?: string
-          read?: boolean
-          created_at?: string
-        }
-        Relationships: []
-      }
-      card_subtasks: {
-        Row: {
-          id: string
-          card_id: string
-          label: string
-          done: boolean
-          position: number
-          created_at: string
-          updated_at: string
-          created_by: string | null
-        }
-        Insert: {
-          id?: string
-          card_id: string
-          label: string
-          done?: boolean
-          position?: number
-          created_at?: string
-          updated_at?: string
-          created_by?: string | null
-        }
-        Update: {
-          id?: string
-          card_id?: string
-          label?: string
-          done?: boolean
-          position?: number
-          created_at?: string
-          updated_at?: string
-          created_by?: string | null
-        }
-        Relationships: []
       }
       card_tags: {
         Row: {
@@ -366,356 +374,132 @@ export type Database = {
           },
         ]
       }
-      script_projects: {
+      graph_layouts: {
         Row: {
-          id: string
-          workspace_id: string
-          title: string
-          synopsis: string
-          cover_emoji: string | null
-          cover_image_url: string | null
-          position: number
-          created_by: string | null
+          label_name: string
+          project_id: string
+          updated_at: string
           updated_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
           workspace_id: string
-          title?: string
-          synopsis?: string
-          cover_emoji?: string | null
-          cover_image_url?: string | null
-          position?: number
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          workspace_id?: string
-          title?: string
-          synopsis?: string
-          cover_emoji?: string | null
-          cover_image_url?: string | null
-          position?: number
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      script_nodes: {
-        Row: {
-          id: string
-          project_id: string
-          workspace_id: string
-          parent_id: string | null
-          kind: "chapter" | "scene" | "block"
-          title: string
-          emoji: string | null
-          body: string
-          content: Json | null
-          rpy_blocks: Json | null
-          rpy_label: string | null
-          source_kind: string
-          tags: string[]
-          status: string
-          pov: string | null
-          location_id: string | null
-          pinned: boolean
-          position: number
-          created_by: string | null
-          updated_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          workspace_id: string
-          parent_id?: string | null
-          kind?: "chapter" | "scene" | "block"
-          title?: string
-          emoji?: string | null
-          body?: string
-          content?: Json | null
-          rpy_blocks?: Json | null
-          rpy_label?: string | null
-          source_kind?: string
-          tags?: string[]
-          status?: string
-          pov?: string | null
-          location_id?: string | null
-          pinned?: boolean
-          position?: number
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          workspace_id?: string
-          parent_id?: string | null
-          kind?: "chapter" | "scene" | "block"
-          title?: string
-          emoji?: string | null
-          body?: string
-          content?: Json | null
-          rpy_blocks?: Json | null
-          rpy_label?: string | null
-          source_kind?: string
-          tags?: string[]
-          status?: string
-          pov?: string | null
-          location_id?: string | null
-          pinned?: boolean
-          position?: number
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      script_characters: {
-        Row: {
-          id: string
-          project_id: string
-          workspace_id: string
-          name: string
-          short_name: string | null
-          rpy_var: string | null
-          color: string
-          emoji: string | null
-          pronouns: string | null
-          age: string | null
-          role: string | null
-          voice_notes: string
-          traits: Json
-          aliases: string[]
-          avatar_url: string | null
-          position: number
-          created_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          workspace_id: string
-          name: string
-          short_name?: string | null
-          rpy_var?: string | null
-          color?: string
-          emoji?: string | null
-          pronouns?: string | null
-          age?: string | null
-          role?: string | null
-          voice_notes?: string
-          traits?: Json
-          aliases?: string[]
-          avatar_url?: string | null
-          position?: number
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          workspace_id?: string
-          name?: string
-          short_name?: string | null
-          rpy_var?: string | null
-          color?: string
-          emoji?: string | null
-          pronouns?: string | null
-          age?: string | null
-          role?: string | null
-          voice_notes?: string
-          traits?: Json
-          aliases?: string[]
-          avatar_url?: string | null
-          position?: number
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      script_locations: {
-        Row: {
-          id: string
-          project_id: string
-          workspace_id: string
-          name: string
-          description: string
-          mood: string | null
-          image_url: string | null
-          position: number
-          created_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          workspace_id: string
-          name: string
-          description?: string
-          mood?: string | null
-          image_url?: string | null
-          position?: number
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          workspace_id?: string
-          name?: string
-          description?: string
-          mood?: string | null
-          image_url?: string | null
-          position?: number
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      graph_nodes: {
-        Row: {
-          id: string
-          project_id: string
-          workspace_id: string
-          kind: "scene" | "choice" | "ending" | "chapter" | "note"
-          title: string
-          subtitle: string
-          ending_kind: string | null
-          linked_scene_id: string | null
           x: number
           y: number
-          width: number | null
-          height: number | null
-          meta: Json
-          created_by: string | null
-          updated_by: string | null
-          created_at: string
-          updated_at: string
         }
         Insert: {
-          id?: string
+          label_name: string
           project_id: string
-          workspace_id: string
-          kind: "scene" | "choice" | "ending" | "chapter" | "note"
-          title?: string
-          subtitle?: string
-          ending_kind?: string | null
-          linked_scene_id?: string | null
-          x?: number
-          y?: number
-          width?: number | null
-          height?: number | null
-          meta?: Json
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
           updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+          x: number
+          y: number
         }
         Update: {
-          id?: string
+          label_name?: string
           project_id?: string
+          updated_at?: string
+          updated_by?: string | null
           workspace_id?: string
-          kind?: "scene" | "choice" | "ending" | "chapter" | "note"
-          title?: string
-          subtitle?: string
-          ending_kind?: string | null
-          linked_scene_id?: string | null
           x?: number
           y?: number
-          width?: number | null
-          height?: number | null
-          meta?: Json
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
-          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "graph_layouts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "script_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_layouts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_layouts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      graph_edges: {
+      notifications: {
         Row: {
+          actor_id: string | null
+          body: string
+          card_id: string | null
+          comment_id: string | null
+          created_at: string
           id: string
-          project_id: string
-          workspace_id: string
-          from_node_id: string
-          to_node_id: string
-          label: string
-          meta: Json
-          created_at: string
-          updated_at: string
+          kind: string
+          read: boolean
+          user_id: string
+          workspace_id: string | null
         }
         Insert: {
-          id?: string
-          project_id: string
-          workspace_id: string
-          from_node_id: string
-          to_node_id: string
-          label?: string
-          meta?: Json
+          actor_id?: string | null
+          body: string
+          card_id?: string | null
+          comment_id?: string | null
           created_at?: string
-          updated_at?: string
+          id?: string
+          kind: string
+          read?: boolean
+          user_id: string
+          workspace_id?: string | null
         }
         Update: {
+          actor_id?: string | null
+          body?: string
+          card_id?: string | null
+          comment_id?: string | null
+          created_at?: string
           id?: string
-          project_id?: string
-          workspace_id?: string
-          from_node_id?: string
-          to_node_id?: string
-          label?: string
-          meta?: Json
-          created_at?: string
-          updated_at?: string
+          kind?: string
+          read?: boolean
+          user_id?: string
+          workspace_id?: string | null
         }
-        Relationships: []
-      }
-      graph_boards: {
-        Row: {
-          project_id: string
-          workspace_id: string
-          data: Json
-          created_by: string | null
-          updated_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          project_id: string
-          workspace_id: string
-          data?: Json
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          project_id?: string
-          workspace_id?: string
-          data?: Json
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "card_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -740,6 +524,340 @@ export type Database = {
           name?: string | null
         }
         Relationships: []
+      }
+      script_characters: {
+        Row: {
+          age: string | null
+          aliases: string[]
+          avatar_url: string | null
+          color: string
+          created_at: string
+          created_by: string | null
+          emoji: string | null
+          id: string
+          name: string
+          position: number
+          project_id: string
+          pronouns: string | null
+          role: string | null
+          rpy_var: string | null
+          short_name: string | null
+          traits: Json
+          updated_at: string
+          voice_notes: string
+          workspace_id: string
+        }
+        Insert: {
+          age?: string | null
+          aliases?: string[]
+          avatar_url?: string | null
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          name: string
+          position?: number
+          project_id: string
+          pronouns?: string | null
+          role?: string | null
+          rpy_var?: string | null
+          short_name?: string | null
+          traits?: Json
+          updated_at?: string
+          voice_notes?: string
+          workspace_id: string
+        }
+        Update: {
+          age?: string | null
+          aliases?: string[]
+          avatar_url?: string | null
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          name?: string
+          position?: number
+          project_id?: string
+          pronouns?: string | null
+          role?: string | null
+          rpy_var?: string | null
+          short_name?: string | null
+          traits?: Json
+          updated_at?: string
+          voice_notes?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "script_characters_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_characters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "script_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_characters_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      script_locations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          image_url: string | null
+          mood: string | null
+          name: string
+          position: number
+          project_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          image_url?: string | null
+          mood?: string | null
+          name: string
+          position?: number
+          project_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          image_url?: string | null
+          mood?: string | null
+          name?: string
+          position?: number
+          project_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "script_locations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_locations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "script_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_locations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      script_nodes: {
+        Row: {
+          body: string
+          content: Json | null
+          created_at: string
+          created_by: string | null
+          emoji: string | null
+          id: string
+          kind: Database["public"]["Enums"]["script_node_kind"]
+          location_id: string | null
+          parent_id: string | null
+          pinned: boolean
+          position: number
+          pov: string | null
+          project_id: string
+          rpy_blocks: Json | null
+          rpy_label: string | null
+          source_kind: string
+          status: string
+          tags: string[]
+          title: string
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          content?: Json | null
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["script_node_kind"]
+          location_id?: string | null
+          parent_id?: string | null
+          pinned?: boolean
+          position?: number
+          pov?: string | null
+          project_id: string
+          rpy_blocks?: Json | null
+          rpy_label?: string | null
+          source_kind?: string
+          status?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          content?: Json | null
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["script_node_kind"]
+          location_id?: string | null
+          parent_id?: string | null
+          pinned?: boolean
+          position?: number
+          pov?: string | null
+          project_id?: string
+          rpy_blocks?: Json | null
+          rpy_label?: string | null
+          source_kind?: string
+          status?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "script_nodes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_nodes_location_fk"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "script_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_nodes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "script_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_nodes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "script_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_nodes_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_nodes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      script_projects: {
+        Row: {
+          cover_emoji: string | null
+          cover_image_url: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          position: number
+          synopsis: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cover_emoji?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          synopsis?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cover_emoji?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          position?: number
+          synopsis?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "script_projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_projects_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tags: {
         Row: {
@@ -773,71 +891,36 @@ export type Database = {
           },
         ]
       }
-      translation_projects: {
-        Row: {
-          id: string
-          workspace_id: string
-          name: string
-          source_lang: string
-          created_at: string
-          created_by: string | null
-        }
-        Insert: {
-          id?: string
-          workspace_id: string
-          name: string
-          source_lang?: string
-          created_at?: string
-          created_by?: string | null
-        }
-        Update: {
-          id?: string
-          workspace_id?: string
-          name?: string
-          source_lang?: string
-          created_at?: string
-          created_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "translation_projects_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       translation_files: {
         Row: {
+          filename: string
+          folder_path: string
           id: string
           project_id: string
-          filename: string
           raw_content: string
           target_language: string
           uploaded_at: string
           uploaded_by: string | null
-          folder_path: string
         }
         Insert: {
+          filename: string
+          folder_path?: string
           id?: string
           project_id: string
-          filename: string
           raw_content: string
           target_language: string
           uploaded_at?: string
           uploaded_by?: string | null
-          folder_path?: string
         }
         Update: {
+          filename?: string
+          folder_path?: string
           id?: string
           project_id?: string
-          filename?: string
           raw_content?: string
           target_language?: string
           uploaded_at?: string
           uploaded_by?: string | null
-          folder_path?: string
         }
         Relationships: [
           {
@@ -849,51 +932,86 @@ export type Database = {
           },
         ]
       }
-      translation_strings: {
+      translation_projects: {
         Row: {
+          created_at: string
+          created_by: string | null
           id: string
-          file_id: string
-          group_label: string | null
-          source_path: string
-          source_line: number
-          source_text: string
-          translated_text: string
-          status: string
-          updated_at: string
-          updated_by: string | null
-          translate_id: string | null
-          speaker: string | null
-          trailing: string | null
+          name: string
+          source_lang: string
+          workspace_id: string
         }
         Insert: {
+          created_at?: string
+          created_by?: string | null
           id?: string
-          file_id: string
-          group_label?: string | null
-          source_path: string
-          source_line: number
-          source_text: string
-          translated_text?: string
-          status?: string
-          updated_at?: string
-          updated_by?: string | null
-          translate_id?: string | null
-          speaker?: string | null
-          trailing?: string | null
+          name: string
+          source_lang?: string
+          workspace_id: string
         }
         Update: {
+          created_at?: string
+          created_by?: string | null
           id?: string
-          file_id?: string
+          name?: string
+          source_lang?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "translation_projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      translation_strings: {
+        Row: {
+          file_id: string
+          group_label: string | null
+          id: string
+          source_line: number
+          source_path: string
+          source_text: string
+          speaker: string | null
+          status: string
+          trailing: string | null
+          translate_id: string | null
+          translated_text: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          file_id: string
           group_label?: string | null
-          source_path?: string
-          source_line?: number
-          source_text?: string
-          translated_text?: string
+          id?: string
+          source_line: number
+          source_path: string
+          source_text: string
+          speaker?: string | null
           status?: string
+          trailing?: string | null
+          translate_id?: string | null
+          translated_text?: string
           updated_at?: string
           updated_by?: string | null
-          translate_id?: string | null
+        }
+        Update: {
+          file_id?: string
+          group_label?: string | null
+          id?: string
+          source_line?: number
+          source_path?: string
+          source_text?: string
           speaker?: string | null
+          status?: string
           trailing?: string | null
+          translate_id?: string | null
+          translated_text?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -936,7 +1054,29 @@ export type Database = {
           target_language?: string | null
           workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitations_invited_user_id_fkey"
+            columns: ["invited_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workspace_members: {
         Row: {
@@ -979,25 +1119,25 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          avatar_url: string | null
           created_at: string
           id: string
           name: string
           owner_id: string
-          avatar_url: string | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           name: string
           owner_id: string
-          avatar_url?: string | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           name?: string
           owner_id?: string
-          avatar_url?: string | null
         }
         Relationships: [
           {
@@ -1010,48 +1150,45 @@ export type Database = {
         ]
       }
     }
-    Views: { [_ in never]: never }
+    Views: {
+      [_ in never]: never
+    }
     Functions: {
-      translation_file_stats: {
-        Args: { _file_ids: string[] }
+      accept_invitation: {
+        Args: { _invitation_id: string }
         Returns: {
-          file_id: string
-          total: number
-          done: number
-        }[]
+          created_at: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          target_language: string | null
+          user_id: string
+          workspace_id: string
+        }
       }
       create_workspace: {
         Args: { _name: string }
         Returns: {
+          avatar_url: string | null
+          created_at: string
           id: string
           name: string
           owner_id: string
-          created_at: string
         }
       }
       invite_to_workspace: {
         Args: {
-          _workspace_id: string
           _email: string
           _role?: Database["public"]["Enums"]["workspace_role"]
+          _workspace_id: string
         }
         Returns: {
-          id: string
-          workspace_id: string
+          created_at: string
           email: string
+          id: string
+          invited_by: string | null
           invited_user_id: string | null
           role: Database["public"]["Enums"]["workspace_role"]
-          invited_by: string | null
-          created_at: string
-        }
-      }
-      accept_invitation: {
-        Args: { _invitation_id: string }
-        Returns: {
+          target_language: string | null
           workspace_id: string
-          user_id: string
-          role: Database["public"]["Enums"]["workspace_role"]
-          created_at: string
         }
       }
       reject_invitation: {
@@ -1062,23 +1199,151 @@ export type Database = {
         Args: { _invitation_id: string }
         Returns: undefined
       }
+      script_role_in: { Args: { _ws: string }; Returns: string }
+      translation_file_stats: {
+        Args: { _file_ids: string[] }
+        Returns: {
+          done: number
+          file_id: string
+          total: number
+        }[]
+      }
+      translation_role_in: { Args: { workspace_uuid: string }; Returns: string }
     }
     Enums: {
-      workspace_role: "owner" | "editor" | "viewer" | "translator"
       card_priority: "low" | "medium" | "high" | "urgent"
+      script_node_kind: "chapter" | "scene" | "block"
+      workspace_role: "owner" | "editor" | "viewer" | "translator"
     }
-    CompositeTypes: { [_ in never]: never }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
-export type Tables<T extends keyof DefaultSchema["Tables"]> =
-  DefaultSchema["Tables"][T]["Row"]
-export type TablesInsert<T extends keyof DefaultSchema["Tables"]> =
-  DefaultSchema["Tables"][T]["Insert"]
-export type TablesUpdate<T extends keyof DefaultSchema["Tables"]> =
-  DefaultSchema["Tables"][T]["Update"]
-export type Enums<T extends keyof DefaultSchema["Enums"]> =
-  DefaultSchema["Enums"][T]
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      card_priority: ["low", "medium", "high", "urgent"],
+      script_node_kind: ["chapter", "scene", "block"],
+      workspace_role: ["owner", "editor", "viewer", "translator"],
+    },
+  },
+} as const

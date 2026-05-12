@@ -3164,6 +3164,33 @@
   flex-direction: column;
   gap: 21px;
 }
+
+/* Skeleton stand-in for a SectionView before it intersects the viewport.
+   Stays the same height as the real section (parent reserves space via
+   contain-intrinsic-size) so the scrollbar doesn't jitter. Mount cost is
+   essentially zero — no Radix, no dnd-kit. Replaced by the real
+   SectionView the moment IntersectionObserver fires. */
+.rs-section-skeleton {
+  padding: 12px 16px;
+  border: 1px dashed rgba(200, 199, 202, 0.08);
+  border-radius: 10px;
+  background: rgba(200, 199, 202, 0.02);
+}
+.rs-section-skeleton-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rs-section-skeleton-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: rgba(200, 199, 202, 0.55);
+}
+.rs-section-skeleton-count {
+  font-size: 11px;
+  color: rgba(200, 199, 202, 0.3);
+}
 .rs-section-head {
   display: flex;
   align-items: center;
