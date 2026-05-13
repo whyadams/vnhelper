@@ -179,6 +179,33 @@ fn mcp_dir() -> Result<String, String> {
     Ok(dir.to_string_lossy().into_owned())
 }
 
+/// Resolves the path of the bundled MCP server binary at runtime.
+///
+/// The binary is shipped as a Tauri `bundle.resources` entry, which Tauri
+/// copies into the installer (and into the dev-server's resource dir during
+/// `tauri dev`). We return the absolute path so the frontend can stitch it
+/// into the Claude Desktop / Claude Code config snippet — no Node, no PATH
+/// lookups, no manual install required from the user.
+#[tauri::command]
+fn mcp_binary_path(app: AppHandle) -> Result<String, String> {
+    let binary_name = if cfg!(target_os = "windows") {
+        "binaries/vnhelper-mcp.exe"
+    } else {
+        "binaries/vnhelper-mcp"
+    };
+    let resolved = app
+        .path()
+        .resolve(binary_name, tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("resolve mcp binary: {e}"))?;
+    if !resolved.exists() {
+        return Err(format!(
+            "bundled MCP binary missing at {}",
+            resolved.display()
+        ));
+    }
+    Ok(resolved.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 fn update_tray_tasks(
     app: AppHandle,
@@ -217,6 +244,7 @@ pub fn run() {
             write_mcp_auth,
             write_mcp_env,
             mcp_dir,
+            mcp_binary_path,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

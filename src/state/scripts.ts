@@ -757,6 +757,194 @@ export function useScripts(workspaceId: string | null) {
     [user],
   );
 
+  /**
+   * Bulk-import a parsed Ren'Py document into the active project as a set
+   * of scenes. Two modes:
+   *
+   *   - "split": every top-level `label X:` in `blocks` becomes its own
+   *     scene under a fresh chapter named `categoryName`. The first
+   *     segment without a label (file-level `define`/`image` boilerplate)
+   *     is dropped — those aren't part of any scene's narrative flow.
+   *
+   *   - "single": a single scene under the active project root, carrying
+   *     the whole `blocks` array as `rpy_blocks`. Useful for short files
+   *     or when the author wants to organize manually.
+   *
+   * Reports progress through `onProgress` so the UI can keep the user
+   * informed: parsing → creating chapter → creating scenes (N of M) → done.
+   * Returns the created chapter id (split mode) or scene id (single mode).
+   */
+  const bulkImportRpy = useCallback(
+    async (opts: {
+      blocks: import("../lib/renpy/blocks").RpyBlocks;
+      mode: "split" | "single";
+      /** Used as chapter title in split mode, scene title in single mode. */
+      categoryName: string;
+      onProgress?: (step: string, current?: number, total?: number) => void;
+    }): Promise<string | null> => {
+      if (!workspaceId || !user || !activeProjectId) return null;
+      const { splitByLabels } = await import("../lib/renpy/splitByLabels");
+      const now = new Date().toISOString();
+
+      opts.onProgress?.("Preparing import…");
+
+      // ---- Single mode: one scene, easy path ---------------------------
+      if (opts.mode === "single") {
+        const id = newUuid();
+        const optimistic: ScriptNodeSummary = {
+          id,
+          project_id: activeProjectId,
+          parent_id: null,
+          kind: "scene",
+          title: opts.categoryName || "Imported Scene",
+          emoji: null,
+          pinned: false,
+          position: Date.now(),
+          status: "draft",
+          pov: null,
+          location_id: null,
+          tags: [],
+          rpy_label: null,
+          updated_at: now,
+        };
+        setNodes((cur) => [...cur, optimistic]);
+        opts.onProgress?.("Saving scene…", 1, 1);
+        const { error } = await supabase.from("script_nodes").insert({
+          id,
+          project_id: activeProjectId,
+          workspace_id: workspaceId,
+          parent_id: null,
+          kind: "scene",
+          title: optimistic.title,
+          body: "",
+          rpy_blocks: opts.blocks as never,
+          source_kind: "rpy_import",
+          created_by: user.id,
+          updated_by: user.id,
+          position: optimistic.position,
+        });
+        if (error) {
+          console.error("bulkImportRpy single", error);
+          setNodes((cur) => cur.filter((n) => n.id !== id));
+          return null;
+        }
+        setActiveNodeId(id);
+        return id;
+      }
+
+      // ---- Split mode: 1 chapter + N scenes -----------------------------
+      const segments = splitByLabels(opts.blocks);
+      const labelled = segments.filter((s) => s.name !== null) as Array<{
+        name: string;
+        blocks: import("../lib/renpy/blocks").RpyBlocks;
+      }>;
+      if (labelled.length === 0) return null;
+
+      // 1. Create the parent chapter.
+      const chapterId = newUuid();
+      const basePosition = Date.now();
+      const chapterOptimistic: ScriptNodeSummary = {
+        id: chapterId,
+        project_id: activeProjectId,
+        parent_id: null,
+        kind: "chapter",
+        title: opts.categoryName || "Imported Chapter",
+        emoji: null,
+        pinned: false,
+        position: basePosition,
+        status: "draft",
+        pov: null,
+        location_id: null,
+        tags: [],
+        rpy_label: null,
+        updated_at: now,
+      };
+      setNodes((cur) => [...cur, chapterOptimistic]);
+      opts.onProgress?.("Creating chapter…");
+      {
+        const { error } = await supabase.from("script_nodes").insert({
+          id: chapterId,
+          project_id: activeProjectId,
+          workspace_id: workspaceId,
+          parent_id: null,
+          kind: "chapter",
+          title: chapterOptimistic.title,
+          body: "",
+          created_by: user.id,
+          updated_by: user.id,
+          position: basePosition,
+        });
+        if (error) {
+          console.error("bulkImportRpy chapter", error);
+          setNodes((cur) => cur.filter((n) => n.id !== chapterId));
+          return null;
+        }
+      }
+
+      // 2. Batch-insert all scenes under the chapter. Position spaced by
+      //    1000 so the user can later insert new scenes between them
+      //    without bumping everyone.
+      opts.onProgress?.("Creating scenes…", 0, labelled.length);
+      const sceneInserts = labelled.map((s, i) => ({
+        id: newUuid(),
+        project_id: activeProjectId,
+        workspace_id: workspaceId,
+        parent_id: chapterId,
+        kind: "scene" as const,
+        title: s.name,
+        rpy_label: s.name,
+        rpy_blocks: s.blocks as never,
+        body: "",
+        position: basePosition + (i + 1) * 1000,
+        created_by: user.id,
+        updated_by: user.id,
+        source_kind: "rpy_import",
+      }));
+
+      // Optimistic local insert first so the sidebar updates immediately;
+      // realtime DELETE events would re-add anything we got wrong.
+      const sceneOptimistic: ScriptNodeSummary[] = sceneInserts.map((r) => ({
+        id: r.id,
+        project_id: r.project_id,
+        parent_id: r.parent_id,
+        kind: "scene",
+        title: r.title,
+        emoji: null,
+        pinned: false,
+        position: r.position,
+        status: "draft",
+        pov: null,
+        location_id: null,
+        tags: [],
+        rpy_label: r.rpy_label,
+        updated_at: now,
+      }));
+      setNodes((cur) => [...cur, ...sceneOptimistic]);
+
+      const { error: insErr } = await supabase
+        .from("script_nodes")
+        .insert(sceneInserts as never);
+      if (insErr) {
+        console.error("bulkImportRpy scenes", insErr);
+        // Rollback optimistic inserts on failure — chapter and scenes both.
+        setNodes((cur) =>
+          cur.filter(
+            (n) =>
+              n.id !== chapterId &&
+              !sceneInserts.some((s) => s.id === n.id),
+          ),
+        );
+        return null;
+      }
+      opts.onProgress?.("Done", labelled.length, labelled.length);
+
+      // Focus the first imported scene so the user sees what landed.
+      setActiveNodeId(sceneInserts[0].id);
+      return chapterId;
+    },
+    [workspaceId, user, activeProjectId, setActiveNodeId],
+  );
+
   const deleteNode = useCallback(
     async (id: string) => {
       // Optimistic local removal: walk local tree to collect the node + every
@@ -1110,6 +1298,7 @@ export function useScripts(workspaceId: string | null) {
     createNode,
     updateNode,
     deleteNode,
+    bulkImportRpy,
     togglePin,
 
     // characters

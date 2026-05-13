@@ -3,6 +3,30 @@
 MCP server exposing VnHelper (Supabase-backed) workspace operations to Claude.
 Lets Claude create kanban tasks, draft script scenes, manage characters, etc.
 
+## Installation for end users
+
+You don't have to install anything separately. The MCP server is **bundled
+inside the VnHelper installer as a single-file native binary** (compiled with
+`bun build --compile` — no Node, npm, or build tools required).
+
+To connect Claude:
+
+1. Install VnHelper.
+2. Open **Settings → Integrations → Connect Claude**.
+3. Pick **Claude Desktop** (config file) or **Claude Code** (CLI command),
+   copy the generated snippet, paste/run.
+4. Restart Claude.
+
+Token + workspace defaults are written to `~/.vnhelper/auth.json` and
+`~/.vnhelper/env.json` automatically. The generated snippet points directly
+at the bundled sidecar — typically
+`<install dir>/resources/binaries/vnhelper-mcp.exe` on Windows.
+
+The rest of this README covers the **developer** workflow (building from
+source, custom auth, HTTP transport, etc.).
+
+---
+
 ## Tools
 
 **Workspaces / projects**
@@ -27,14 +51,30 @@ Lets Claude create kanban tasks, draft script scenes, manage characters, etc.
 **Characters**
 - `list_characters`
 - `create_character`
+- `update_character` — patch fields (name/short_name/color/emoji/pronouns/age/role/voice_notes/rpy_var/aliases)
+- `delete_character`
 
-## Install
+**Calendar**
+- `list_calendar_events` — optional `from`/`to` (YYYY-MM-DD) date-range filter; attachments are resolved to entity names inline
+- `create_calendar_event` — title + date + optional time/color/description
+- `update_calendar_event`
+- `delete_calendar_event` — attachments cascade
+- `attach_to_calendar_event` — link card / script_node / character (idempotent)
+- `detach_from_calendar_event`
+
+## Build from source (dev)
 
 ```bash
 cd packages/vnhelper-mcp
 pnpm install
-pnpm run build
+pnpm run build           # tsc → dist/cli.js (run via `node`)
+pnpm run bundle:win      # bun --compile → dist/vnhelper-mcp.exe (single file)
+# also: bundle:mac / bundle:linux
 ```
+
+The bundled binary is what the Tauri installer ships. `bun --compile` embeds
+the Bun runtime into the exe (~115 MB) so the binary runs on a machine
+without Node/Bun installed.
 
 ## Configure
 

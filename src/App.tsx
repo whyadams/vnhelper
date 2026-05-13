@@ -19,6 +19,7 @@ import "./styles/translations.css";
 import "./styles/skeleton.css";
 import "./styles/widget.css";
 import "./styles/settings.css";
+import "./styles/subscription.css";
 import { AutoUpdater } from "./components/AutoUpdater";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { CalendarScreen } from "./components/calendar/CalendarScreen";
@@ -39,6 +40,9 @@ import { DialogProvider } from "./components/ui/Dialog";
 import { KanbanWidget } from "./components/widget/KanbanWidget";
 import { AuthProvider, useAuth } from "./state/AuthProvider";
 import { KanbanProvider, useKanban } from "./state/kanbanStore";
+import { SubscriptionProvider } from "./state/subscription";
+import { PaywallProvider } from "./components/subscription/Paywall";
+import { FrozenAutoSwitcher } from "./components/subscription/FrozenAutoSwitcher";
 import { useTrayTasks } from "./state/useTrayTasks";
 import { canSeeNav, type Role } from "./lib/roles";
 
@@ -126,12 +130,17 @@ function ActiveScreen() {
 
 function AuthedShell() {
   return (
-    <KanbanProvider>
-      <GlobalShortcuts />
-      <Rail />
-      <Sidebar />
-      <ActiveScreen />
-    </KanbanProvider>
+    <SubscriptionProvider>
+      <PaywallProvider>
+        <KanbanProvider>
+          <FrozenAutoSwitcher />
+          <GlobalShortcuts />
+          <Rail />
+          <Sidebar />
+          <ActiveScreen />
+        </KanbanProvider>
+      </PaywallProvider>
+    </SubscriptionProvider>
   );
 }
 

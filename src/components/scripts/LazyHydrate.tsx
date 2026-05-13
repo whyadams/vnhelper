@@ -174,6 +174,13 @@ const LazyHydrateInner = memo(function LazyHydrate({
         style={{
           contentVisibility: "auto",
           containIntrinsicSize: `auto ${estimatedHeight}px`,
+          // Stabilize layout: while showing the skeleton, force the wrapper
+          // to the virtualizer's estimated height. Without this, the
+          // skeleton renders at its natural (~40px) height, then jumps to
+          // the real height once children mount — which retriggers
+          // measureElement and shifts virtualizer offsets. After hydration
+          // we release the floor so measureElement records the real size.
+          minHeight: hydrated ? undefined : estimatedHeight,
         }}
       >
         {hydrated ? children : skeleton}

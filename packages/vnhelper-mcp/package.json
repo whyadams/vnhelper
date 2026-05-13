@@ -1,6 +1,6 @@
 {
   "name": "vnhelper-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server exposing VnHelper (Supabase) workspace operations to Claude.",
   "private": true,
   "type": "module",
@@ -10,7 +10,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/cli.js",
-    "login": "node dist/cli.js login"
+    "login": "node dist/cli.js login",
+    "bundle:win": "bun build src/cli.ts --compile --target=bun-windows-x64 --outfile dist/vnhelper-mcp.exe",
+    "bundle:mac": "bun build src/cli.ts --compile --target=bun-darwin-arm64 --outfile dist/vnhelper-mcp",
+    "bundle:linux": "bun build src/cli.ts --compile --target=bun-linux-x64 --outfile dist/vnhelper-mcp"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

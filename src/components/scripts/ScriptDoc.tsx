@@ -23,10 +23,14 @@ const ScriptEditor = lazy(() =>
 );
 import { useScriptStats } from "./scriptStats";
 import { RenpyTable } from "./RenpyTable";
+import { RpyImportModal } from "./RpyImportModal";
 import { ScriptImportModal } from "./ScriptImportModal";
 import type { RpyBlocks } from "../../lib/renpy/blocks";
 import { useDialog } from "../ui/Dialog";
 import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
+import { LinkedEventsSection } from "../calendar/LinkedEventsSection";
+import { useSubscription } from "../../state/subscription";
+import { usePaywall } from "../subscription/Paywall";
 import {
   Select,
   SelectContent,
@@ -101,6 +105,8 @@ interface DocProps {
 
 export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
   const dialog = useDialog();
+  const { limits } = useSubscription();
+  const paywall = usePaywall();
   const node = scripts.activeNode;
 
   const [titleDraft, setTitleDraft] = useState("");
@@ -116,6 +122,7 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     }
   };
   const [importOpen, setImportOpen] = useState(false);
+  const [rpyImportOpen, setRpyImportOpen] = useState(false);
   // Bumped on every external content replacement (e.g. Import) so the
   // TipTap editor and Table view get fresh `key` and remount with new state.
   const [externalRevision, setExternalRevision] = useState(0);
@@ -238,6 +245,10 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
 
   /** Build the project's .rpy and trigger a browser download. */
   const onClickExportRpy = async () => {
+    if (!limits.canExportRpy) {
+      paywall.show("rpy_export");
+      return;
+    }
     const result = await scripts.exportRpyProject();
     if (!result) {
       void dialog.alert({
@@ -505,8 +516,18 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
             <button
               className="hbtn fix-hbtn"
               type="button"
-              onClick={() => setImportOpen(true)}
-              title="Import plain-text script and auto-format"
+              onClick={() => {
+                // Two completely different import flows depending on the
+                // active tab — Doc parses plaintext into TipTap blocks,
+                // Renpy parses .rpy syntax into structured rpy_blocks.
+                if (viewMode === "renpy") setRpyImportOpen(true);
+                else setImportOpen(true);
+              }}
+              title={
+                viewMode === "renpy"
+                  ? "Import a .rpy file"
+                  : "Import plain-text script and auto-format"
+              }
             >
               Import
             </button>
@@ -728,6 +749,11 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
             </div>
           )}
 
+          <LinkedEventsSection
+            entity_type="script_node"
+            entity_id={scripts.activeNodeId}
+          />
+
           <div className="vn-cast-bar">
             <div className="vn-cast-bar-list">
               {scripts.characters.length === 0 ? (
@@ -805,6 +831,27 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
           }
           void scripts.updateNode(node.id, { content: nextContent });
           setExternalRevision((n) => n + 1);
+        }}
+      />
+
+      <RpyImportModal
+        open={rpyImportOpen}
+        hasActiveProject={!!scripts.activeProjectId}
+        defaultCategoryName={scripts.activeProject?.title}
+        onClose={() => setRpyImportOpen(false)}
+        onImport={async ({ text, mode, categoryName, onProgress }) => {
+          onProgress("Parsing…");
+          const { parseRpyScript } = await import(
+            "../../lib/renpy/scriptParser"
+          );
+          const parsed = parseRpyScript(text);
+          if (parsed.blocks.length === 0) return null;
+          return scripts.bulkImportRpy({
+            blocks: parsed.blocks,
+            mode,
+            categoryName,
+            onProgress,
+          });
         }}
       />
     </main>

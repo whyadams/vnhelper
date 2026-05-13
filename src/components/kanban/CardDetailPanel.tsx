@@ -29,6 +29,7 @@ import {
 } from "../ui/dropdown-menu";
 import { CommentComposer, renderCommentBody } from "./CommentComposer";
 import { useDialog } from "../ui/Dialog";
+import { LinkedEventsSection } from "../calendar/LinkedEventsSection";
 
 function BrandGlyph({
   brand,
@@ -660,6 +661,8 @@ export function CardDetailPanel() {
             )}
           </div>
         </section>
+
+        <LinkedEventsSection entity_type="card" entity_id={card.id} />
 
         <section className="cp-section">
           <h3 className="cp-section-title">

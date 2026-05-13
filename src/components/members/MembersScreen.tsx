@@ -4,6 +4,8 @@ import { useAuth } from "../../state/AuthProvider";
 import { useKanban } from "../../state/kanbanStore";
 import { UsersFilledIcon } from "../kanban/SidebarIcons";
 import { useDialog } from "../ui/Dialog";
+import { useSubscription } from "../../state/subscription";
+import { usePaywall } from "../subscription/Paywall";
 
 type Role = "owner" | "editor" | "viewer" | "translator";
 
@@ -39,6 +41,8 @@ export function MembersScreen() {
   const { user } = useAuth();
   const { state } = useKanban();
   const dialog = useDialog();
+  const { limits } = useSubscription();
+  const paywall = usePaywall();
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [filter, setFilter] = useState<RoleFilter>("all");
@@ -248,7 +252,13 @@ export function MembersScreen() {
           <button
             type="button"
             className="hbtn is-primary"
-            onClick={() => setShowInvite((v) => !v)}
+            onClick={() => {
+              if (!limits.canInviteCollaborators) {
+                paywall.show("invite_collaborator");
+                return;
+              }
+              setShowInvite((v) => !v);
+            }}
           >
             + Invite member
           </button>

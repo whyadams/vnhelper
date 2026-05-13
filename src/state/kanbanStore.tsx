@@ -36,6 +36,9 @@ export interface WorkspaceListItem {
   role: WorkspaceRole;
   avatar_url: string | null;
   target_language: string | null;
+  /** ISO string. Used by the subscription downgrade logic to pick the
+   *  "active" workspace (oldest) when a free-tier user has overflow. */
+  created_at: string;
 }
 
 export interface IncomingInvitation {
@@ -49,6 +52,23 @@ export interface IncomingInvitation {
   created_at: string;
 }
 
+/** Cross-screen navigation intent.
+ *
+ *  Some screens (Script, Cast) keep their selection state local to the
+ *  feature component, so we can't reach into them by dispatching here. Instead,
+ *  Calendar (or any other origin) writes a `pendingFocus` request, the target
+ *  screen subscribes via useEffect, consumes the request, and clears it. This
+ *  avoids lifting all of Script's state up here.
+ *
+ *  Producers: `dispatch({ type: "SET_PENDING_FOCUS", focus: {...} })`.
+ *  Consumers: read state.pendingFocus, act on it, then dispatch
+ *  `CLEAR_PENDING_FOCUS` to release. */
+export type PendingFocus =
+  | { kind: "card"; id: string }
+  | { kind: "script_node"; id: string }
+  | { kind: "character"; id: string }
+  | { kind: "calendar_event"; id: string; date: string };
+
 export interface KanbanState {
   // UI state
   columns: ColumnData[];
@@ -59,6 +79,7 @@ export interface KanbanState {
   listsCollapsed: boolean;
   filterTags: TagColor[];
   sort: SortMode;
+  pendingFocus: PendingFocus | null;
 
   // Backend identifiers
   workspaces: WorkspaceListItem[];
@@ -101,7 +122,9 @@ type LocalAction =
   | { type: "TOGGLE_FILTER_TAG"; tag: TagColor }
   | { type: "CLEAR_FILTERS" }
   | { type: "SET_SORT"; sort: SortMode }
-  | { type: "SET_ACTIVE_WORKSPACE"; id: string };
+  | { type: "SET_ACTIVE_WORKSPACE"; id: string }
+  | { type: "SET_PENDING_FOCUS"; focus: PendingFocus | null }
+  | { type: "CLEAR_PENDING_FOCUS" };
 
 // Internal/realtime — applied locally, not persisted
 type RemoteAction =
@@ -151,6 +174,7 @@ const initialState: KanbanState = {
   columnIdByKey: {},
   ready: false,
   incomingInvitations: [],
+  pendingFocus: null,
 };
 
 function findCard(
@@ -440,6 +464,10 @@ function reducer(state: KanbanState, action: Action): KanbanState {
       return { ...state, filterTags: [], search: "" };
     case "SET_SORT":
       return { ...state, sort: action.sort };
+    case "SET_PENDING_FOCUS":
+      return { ...state, pendingFocus: action.focus };
+    case "CLEAR_PENDING_FOCUS":
+      return { ...state, pendingFocus: null };
     default:
       return state;
   }
@@ -532,7 +560,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         await Promise.all([
           supabase
             .from("workspaces")
-            .select("id, name, avatar_url")
+            .select("id, name, avatar_url, created_at")
             .order("created_at", { ascending: true }),
           supabase
             .from("workspace_members")
@@ -554,6 +582,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         role: roleByWs.get(w.id) ?? "viewer",
         avatar_url: w.avatar_url ?? null,
         target_language: langByWs.get(w.id) ?? null,
+        created_at: w.created_at,
       }));
 
       if (list.length === 0) {
@@ -584,6 +613,7 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
             role: "owner",
             avatar_url: null,
             target_language: null,
+            created_at: new Date().toISOString(),
           });
         }
       }

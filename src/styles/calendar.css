@@ -502,3 +502,384 @@
   color: var(--status-danger);
   padding: 2px 0;
 }
+
+/* ---------- Attachment indicator on month-cell chips ---------- */
+.cal-chip-attach {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* ---------- Attachment section in EventModal ---------- */
+.ev-attach-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(200, 199, 202, 0.08);
+}
+.ev-attach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ev-attach-add {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(200, 199, 202, 0.12);
+  background: rgba(200, 199, 202, 0.03);
+  color: var(--text-1);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.ev-attach-add:hover {
+  background: rgba(200, 199, 202, 0.08);
+  border-color: rgba(200, 199, 202, 0.2);
+}
+.ev-attach-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ev-attach-empty {
+  font-size: 11.5px;
+  color: rgba(200, 199, 202, 0.4);
+  padding: 4px 2px;
+}
+
+.ev-attach-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ev-attach-chip {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border-radius: 8px;
+  background: rgba(200, 199, 202, 0.04);
+  border: 1px solid rgba(200, 199, 202, 0.06);
+  overflow: hidden;
+}
+.ev-attach-chip-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-1);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.ev-attach-chip-main:hover {
+  background: rgba(200, 199, 202, 0.04);
+}
+.ev-attach-chip-main:disabled { cursor: default; }
+.ev-attach-glyph {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-size: 12px;
+  background: rgba(200, 199, 202, 0.06);
+  color: var(--text-1);
+}
+.ev-attach-chip.t-card .ev-attach-glyph { background: rgba(140, 190, 255, 0.16); color: #b8dcff; }
+.ev-attach-chip.t-script_node .ev-attach-glyph { background: rgba(190, 160, 240, 0.16); color: #d6c2ff; }
+.ev-attach-chip.t-character .ev-attach-glyph { background: rgba(255, 180, 140, 0.16); color: #ffd1ad; }
+.ev-attach-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ev-attach-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ev-attach-name.is-deleted {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+.ev-attach-type {
+  font-size: 10.5px;
+  color: rgba(200, 199, 202, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ev-attach-remove {
+  flex-shrink: 0;
+  width: 30px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(200, 199, 202, 0.06);
+  color: rgba(200, 199, 202, 0.45);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.ev-attach-remove:hover {
+  background: rgba(255, 120, 120, 0.08);
+  color: #ff8b8b;
+}
+.ev-attach-remove:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Picker (Task/Scene/Character) */
+.ev-attach-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 9px;
+  background: rgba(200, 199, 202, 0.03);
+  border: 1px solid rgba(200, 199, 202, 0.08);
+}
+.ev-attach-tabs {
+  display: flex;
+  gap: 4px;
+}
+.ev-attach-tab {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(200, 199, 202, 0.55);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ev-attach-tab:hover { color: var(--text-1); }
+.ev-attach-tab.is-active {
+  background: rgba(200, 199, 202, 0.06);
+  border-color: rgba(200, 199, 202, 0.12);
+  color: var(--text-1);
+}
+.ev-attach-search {
+  font-size: 12px;
+}
+.ev-attach-results {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.ev-attach-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-1);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ev-attach-result:hover {
+  background: rgba(200, 199, 202, 0.06);
+}
+.ev-attach-result.is-attached {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ev-attach-result:disabled { cursor: not-allowed; }
+.ev-attach-result .ev-attach-glyph.t-card { background: rgba(140, 190, 255, 0.16); color: #b8dcff; }
+.ev-attach-result .ev-attach-glyph.t-script_node { background: rgba(190, 160, 240, 0.16); color: #d6c2ff; }
+.ev-attach-result .ev-attach-glyph.t-character { background: rgba(255, 180, 140, 0.16); color: #ffd1ad; }
+.ev-attach-attached {
+  margin-left: auto;
+  font-size: 10px;
+  color: rgba(200, 199, 202, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+/* ---------- Attachments in the day-sidebar event card ---------- */
+.cal-side-attach-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cal-side-attach {
+  display: flex;
+}
+.cal-side-attach-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(200, 199, 202, 0.06);
+  background: rgba(200, 199, 202, 0.03);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  min-width: 0;
+}
+.cal-side-attach-btn:hover {
+  background: rgba(200, 199, 202, 0.08);
+  border-color: rgba(200, 199, 202, 0.15);
+}
+.cal-side-attach-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.cal-side-attach-glyph {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.cal-side-attach.t-card .cal-side-attach-glyph { background: rgba(140, 190, 255, 0.16); color: #b8dcff; }
+.cal-side-attach.t-script_node .cal-side-attach-glyph { background: rgba(190, 160, 240, 0.16); color: #d6c2ff; }
+.cal-side-attach.t-character .cal-side-attach-glyph { background: rgba(255, 180, 140, 0.16); color: #ffd1ad; }
+.cal-side-attach-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-side-attach-type {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: rgba(200, 199, 202, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cal-side-attach.is-deleted .cal-side-attach-name {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* ---------- Linked events (reverse view) ----------
+   Rendered inside kanban card drawer, scene editor footer, and character
+   editor. The "section" variant matches `.cp-section` siblings on the kanban
+   side; "compact" trims padding for tighter hosts. */
+.linked-events {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid rgba(200, 199, 202, 0.06);
+}
+.linked-events-compact {
+  padding: 12px 0 0;
+  border-top: 1px solid rgba(200, 199, 202, 0.06);
+}
+.linked-events-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(200, 199, 202, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.linked-events-count {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(200, 199, 202, 0.08);
+  color: rgba(200, 199, 202, 0.6);
+  font-weight: 600;
+}
+.linked-events-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.linked-event {
+  display: flex;
+}
+.linked-event-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(200, 199, 202, 0.06);
+  background: rgba(200, 199, 202, 0.03);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  min-width: 0;
+}
+.linked-event-btn:hover {
+  background: rgba(200, 199, 202, 0.07);
+  border-color: rgba(200, 199, 202, 0.14);
+}
+.linked-event-bar {
+  flex-shrink: 0;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: currentColor;
+}
+/* Per-color tinting on the bar (mirrors the event chip palette). */
+.linked-event.t-pink .linked-event-bar { color: #ff8fbf; }
+.linked-event.t-green .linked-event-bar { color: #8ed4a5; }
+.linked-event.t-amber .linked-event-bar { color: #ffc97a; }
+.linked-event.t-violet .linked-event-bar { color: #c5a8ff; }
+.linked-event.t-sky .linked-event-bar { color: #8fc4ff; }
+.linked-event.t-rose .linked-event-bar { color: #ff8a8a; }
+.linked-event.t-teal .linked-event-bar { color: #7fd4cc; }
+.linked-event-date {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: rgba(200, 199, 202, 0.85);
+}
+.linked-event-time {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: rgba(200, 199, 202, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+.linked-event-title {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

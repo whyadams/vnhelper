@@ -3,16 +3,13 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
 } from "react";
-import {
-  hotkeysCoreFeature,
-  syncDataLoaderFeature,
-  type ItemInstance,
-} from "@headless-tree/core";
-import { useTree } from "@headless-tree/react";
 import type { ScriptNodeSummary } from "../../state/scripts";
-import { ChevRight } from "./SharedIcons";
+// Tree caret + folder/file glyphs are local to this file (see bottom). They
+// are copied verbatim from `TranslationsSidebar.tsx` so the two left sidebars
+// look and feel like the same component.
 import { useDialog } from "../ui/Dialog";
 import {
   DropdownMenu,
@@ -26,22 +23,42 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { SkeletonStack } from "../ui/Skeleton";
+import { useKanban } from "../../state/kanbanStore";
+import { useSubscription } from "../../state/subscription";
+import { usePaywall } from "../subscription/Paywall";
 
 type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
 type DropZone = "before" | "after" | "into";
 
-const VIRTUAL_ROOT = "__vn_root__";
-const TREE_INDENT = 18;
+// ---------- Tree shape ----------
+// Mirrors the Translations sidebar's `TreeNode` discriminated union. A
+// "folder" is any node that either is a chapter or has children; everything
+// else is a "file" leaf.
+type TreeNode =
+  | { kind: "folder"; node: ScriptNodeSummary; children: TreeNode[] }
+  | { kind: "file"; node: ScriptNodeSummary };
 
-interface TreeItemData {
-  id: string;
-  name: string;
-  kind: ScriptNodeSummary["kind"];
-  emoji: string | null;
-  pinned: boolean;
-  parent_id: string | null;
-  childIds: string[];
-  isVirtualRoot: boolean;
+function buildScriptTree(nodes: ScriptNodeSummary[]): TreeNode[] {
+  const byParent = new Map<string | null, ScriptNodeSummary[]>();
+  for (const n of nodes) {
+    const arr = byParent.get(n.parent_id) ?? [];
+    arr.push(n);
+    byParent.set(n.parent_id, arr);
+  }
+  for (const arr of byParent.values()) {
+    arr.sort((a, b) => a.position - b.position);
+  }
+  const build = (parentId: string | null): TreeNode[] => {
+    const kids = byParent.get(parentId) ?? [];
+    return kids.map((n) => {
+      const children = build(n.id);
+      const isFolder = n.kind === "chapter" || children.length > 0;
+      return isFolder
+        ? { kind: "folder" as const, node: n, children }
+        : { kind: "file" as const, node: n };
+    });
+  };
+  return build(null);
 }
 
 interface DragState {
@@ -66,6 +83,54 @@ export function ScriptPane({
   charactersActive,
 }: PaneProps) {
   const dialog = useDialog();
+  const { state: kanbanState } = useKanban();
+  const { limits } = useSubscription();
+  const paywall = usePaywall();
+
+  // Frozen project ids in the current workspace (only matters when the
+  // workspace is owned by the current user — invited workspaces are gated
+  // by the OWNER's tier and stay fully open from our side).
+  const frozenProjectIds = useMemo(() => {
+    const currentWs = kanbanState.workspaces.find(
+      (w) => w.id === kanbanState.workspaceId,
+    );
+    if (!currentWs || currentWs.role !== "owner") return new Set<string>();
+    if (!Number.isFinite(limits.maxScriptProjectsPerWorkspace))
+      return new Set<string>();
+    // Oldest project stays active; rest freeze.
+    const sorted = scripts.projects
+      .slice()
+      .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+    const frozen = new Set<string>();
+    for (let i = limits.maxScriptProjectsPerWorkspace; i < sorted.length; i++) {
+      frozen.add(sorted[i].id);
+    }
+    return frozen;
+  }, [
+    kanbanState.workspaces,
+    kanbanState.workspaceId,
+    scripts.projects,
+    limits.maxScriptProjectsPerWorkspace,
+  ]);
+
+  // If the active project just became frozen (trial expired while viewing
+  // an overflow project), jump back to the active (oldest) one.
+  useEffect(() => {
+    if (
+      scripts.activeProjectId &&
+      frozenProjectIds.has(scripts.activeProjectId)
+    ) {
+      const sorted = scripts.projects
+        .slice()
+        .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+      const fallback = sorted.find((p) => !frozenProjectIds.has(p.id));
+      if (fallback) scripts.setActiveProjectId(fallback.id);
+    }
+    // scripts.setActiveProjectId identity churns each render; we intentionally
+    // depend only on the ids being compared.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scripts.activeProjectId, frozenProjectIds, scripts.projects]);
+
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [drag, setDrag] = useState<DragState>({
     draggingId: null,
@@ -74,109 +139,107 @@ export function ScriptPane({
   });
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
-  // ---------- Build flat item map for headless-tree ----------
-  const itemsMap = useMemo<Record<string, TreeItemData>>(() => {
-    const byParent = new Map<string, ScriptNodeSummary[]>();
+  // ---------- Expansion state ----------
+  // Single Set<string> source of truth, persisted per-project to localStorage.
+  const EXPAND_KEY = useMemo(
+    () =>
+      scripts.activeProjectId
+        ? `vnhelper.script.tree.expanded:${scripts.activeProjectId}`
+        : null,
+    [scripts.activeProjectId],
+  );
+
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    if (!EXPAND_KEY) {
+      setExpanded(new Set());
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(EXPAND_KEY);
+      setExpanded(raw ? new Set(JSON.parse(raw) as string[]) : new Set());
+    } catch {
+      setExpanded(new Set());
+    }
+  }, [EXPAND_KEY]);
+
+  useEffect(() => {
+    if (!EXPAND_KEY) return;
+    try {
+      localStorage.setItem(EXPAND_KEY, JSON.stringify([...expanded]));
+    } catch {
+      // ignore quota errors
+    }
+  }, [EXPAND_KEY, expanded]);
+
+  // First-sight chapter auto-expand. After the user explicitly collapses a
+  // chapter, `seenRef` makes sure this effect never re-expands it.
+  const seenChaptersRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const toAdd: string[] = [];
     for (const n of scripts.nodes) {
-      const arr = byParent.get(n.parent_id ?? VIRTUAL_ROOT) ?? [];
-      arr.push(n);
-      byParent.set(n.parent_id ?? VIRTUAL_ROOT, arr);
+      if (n.kind !== "chapter") continue;
+      if (seenChaptersRef.current.has(n.id)) continue;
+      seenChaptersRef.current.add(n.id);
+      toAdd.push(n.id);
     }
-    for (const arr of byParent.values()) {
-      arr.sort((a, b) => a.position - b.position);
-    }
-    const map: Record<string, TreeItemData> = {
-      [VIRTUAL_ROOT]: {
-        id: VIRTUAL_ROOT,
-        name: "",
-        kind: "chapter",
-        emoji: null,
-        pinned: false,
-        parent_id: null,
-        childIds: (byParent.get(VIRTUAL_ROOT) ?? []).map((n) => n.id),
-        isVirtualRoot: true,
-      },
-    };
-    for (const n of scripts.nodes) {
-      map[n.id] = {
-        id: n.id,
-        name: n.title || "Untitled",
-        kind: n.kind,
-        emoji: n.emoji,
-        pinned: n.pinned,
-        parent_id: n.parent_id,
-        childIds: (byParent.get(n.id) ?? []).map((c) => c.id),
-        isVirtualRoot: false,
-      };
-    }
-    return map;
+    if (toAdd.length === 0) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      for (const id of toAdd) next.add(id);
+      return next;
+    });
   }, [scripts.nodes]);
 
-  // Track expanded items + chapters the user has explicitly collapsed.
-  // Default: chapters are expanded on first sight unless explicitly collapsed.
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
-  const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(
-    new Set(),
-  );
-
-  // Seed expandedItems with all chapter ids that haven't been explicitly collapsed.
+  // GC: drop ids of nodes that no longer exist.
   useEffect(() => {
-    const chapterIds = scripts.nodes
-      .filter((n) => n.kind === "chapter")
-      .map((n) => n.id);
-    setExpandedItems((prev) => {
-      const set = new Set(prev);
-      for (const id of chapterIds) {
-        if (!collapsedChapters.has(id)) set.add(id);
+    const valid = new Set(scripts.nodes.map((n) => n.id));
+    setExpanded((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of prev) {
+        if (!valid.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
       }
-      // drop ids that no longer exist
-      const valid = new Set(scripts.nodes.map((n) => n.id));
-      for (const id of [...set]) {
-        if (!valid.has(id)) set.delete(id);
-      }
-      return Array.from(set);
+      return changed ? next : prev;
     });
-  }, [scripts.nodes, collapsedChapters]);
+  }, [scripts.nodes]);
 
-  // Filter ids not present in the current itemsMap. Without this, a brief
-  // window between node deletion and the cleanup effect can pass a stale id
-  // to useTree, and the sync dataLoader throws on `undefined`.
-  const validExpandedItems = useMemo(
-    () => expandedItems.filter((id) => itemsMap[id] !== undefined),
-    [expandedItems, itemsMap],
-  );
-  const validSelectedItems = useMemo(
-    () =>
-      scripts.activeNodeId && itemsMap[scripts.activeNodeId]
-        ? [scripts.activeNodeId]
-        : [],
-    [scripts.activeNodeId, itemsMap],
-  );
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
-  const tree = useTree<TreeItemData>({
-    state: {
-      expandedItems: validExpandedItems,
-      selectedItems: validSelectedItems,
-    },
-    setExpandedItems,
-    indent: TREE_INDENT,
-    rootItemId: VIRTUAL_ROOT,
-    getItemName: (item) => item.getItemData()?.name ?? "",
-    isItemFolder: (item) => {
-      const d = item.getItemData();
-      if (!d) return false;
-      if (d.isVirtualRoot) return true;
-      return d.kind === "chapter" || d.childIds.length > 0;
-    },
-    dataLoader: {
-      getItem: (id: string) => itemsMap[id],
-      getChildren: (id: string) => itemsMap[id]?.childIds ?? [],
-    },
-    features: [syncDataLoaderFeature, hotkeysCoreFeature],
-  });
-
-  // Sync selection from external clicks (e.g. activeNodeId set by editor).
-  // headless-tree handles selection change visually via state above.
+  // Auto-expand chain to the active node so it's always reachable.
+  useEffect(() => {
+    if (!scripts.activeNodeId) return;
+    const byId = new Map(scripts.nodes.map((n) => [n.id, n]));
+    const toAdd: string[] = [];
+    let cur = byId.get(scripts.activeNodeId);
+    while (cur && cur.parent_id) {
+      toAdd.push(cur.parent_id);
+      cur = byId.get(cur.parent_id);
+    }
+    if (toAdd.length === 0) return;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      let added = false;
+      for (const id of toAdd) {
+        if (!next.has(id)) {
+          next.add(id);
+          added = true;
+        }
+      }
+      return added ? next : prev;
+    });
+  }, [scripts.activeNodeId, scripts.nodes]);
 
   // ---------- DnD helpers ----------
   const childrenByParent = useMemo(() => {
@@ -226,9 +289,12 @@ export function ScriptPane({
         parent_id: target.id,
         position: lastPos + 1024,
       });
-      setExpandedItems((prev) =>
-        prev.includes(target.id) ? prev : [...prev, target.id],
-      );
+      setExpanded((prev) => {
+        if (prev.has(target.id)) return prev;
+        const next = new Set(prev);
+        next.add(target.id);
+        return next;
+      });
       return;
     }
 
@@ -264,9 +330,7 @@ export function ScriptPane({
   const projectInitial =
     (scripts.activeProject?.title ?? "?").trim().charAt(0).toUpperCase() || "?";
 
-  const visibleItems = scripts.activeProjectId
-    ? tree.getItems().filter((it) => it.getId() !== VIRTUAL_ROOT)
-    : [];
+  const tree = useMemo(() => buildScriptTree(scripts.nodes), [scripts.nodes]);
 
   return (
     <aside className="notes-pane vn-pane">
@@ -309,13 +373,23 @@ export function ScriptPane({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-60">
             <DropdownMenuLabel>Projects</DropdownMenuLabel>
-            {scripts.projects.map((p) => (
+            {scripts.projects.map((p) => {
+              const isFrozen = frozenProjectIds.has(p.id);
+              return (
               <DropdownMenuItem
                 key={p.id}
                 data-active={
                   scripts.activeProjectId === p.id ? true : undefined
                 }
-                onSelect={() => scripts.setActiveProjectId(p.id)}
+                className={isFrozen ? "is-frozen" : undefined}
+                onSelect={(e) => {
+                  if (isFrozen) {
+                    e.preventDefault();
+                    paywall.show("frozen_project");
+                    return;
+                  }
+                  scripts.setActiveProjectId(p.id);
+                }}
               >
                 {p.cover_image_url ? (
                   <span className="vn-project-cover-thumb">
@@ -327,6 +401,24 @@ export function ScriptPane({
                   </span>
                 )}
                 <span className="vn-project-name">{p.title}</span>
+                {isFrozen && (
+                  <span className="vn-project-lock" aria-hidden>
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="4" y="11" width="16" height="10" rx="2" />
+                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                    </svg>
+                  </span>
+                )}
+                {!isFrozen && (
                 <button
                   type="button"
                   className="vn-project-edit-btn"
@@ -352,8 +444,10 @@ export function ScriptPane({
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </button>
+                )}
               </DropdownMenuItem>
-            ))}
+              );
+            })}
             {scripts.projects.length > 0 && <DropdownMenuSeparator />}
             {scripts.activeProject && (
               <DropdownMenuItem
@@ -369,11 +463,7 @@ export function ScriptPane({
         </DropdownMenu>
       </div>
 
-      <div
-        className="vn-tree vn-tree-headless"
-        style={{ ["--tree-indent" as never]: `${TREE_INDENT}px` }}
-        {...tree.getContainerProps()}
-      >
+      <div className="vn-tree">
         {!scripts.projectsReady ? (
           <SkeletonStack count={6} height={32} rounded={8} />
         ) : !scripts.activeProjectId ? (
@@ -385,27 +475,34 @@ export function ScriptPane({
           </div>
         ) : !scripts.contentReady ? (
           <SkeletonStack count={8} height={32} rounded={8} />
-        ) : visibleItems.length === 0 ? (
+        ) : tree.length === 0 ? (
           <div className="notes-empty fade-in">
             No scenes yet — click + to add a chapter or scene
           </div>
         ) : (
-          visibleItems.map((item) => (
-            <TreeRow
-              key={item.getId()}
-              item={item}
-              scripts={scripts}
-              drag={drag}
-              setDrag={setDrag}
-              isDescendant={isDescendant}
-              onDrop={(s, t, z) => void handleDrop(s, t, z)}
-              menuOpenId={menuOpenId}
-              setMenuOpenId={setMenuOpenId}
-              dialog={dialog}
-              setExpandedItems={setExpandedItems}
-              setCollapsedChapters={setCollapsedChapters}
-            />
-          ))
+          <div className="tr-tree">
+            {tree.map((node) => (
+              <TreeNodeView
+                key={
+                  node.kind === "folder"
+                    ? `f:${node.node.id}`
+                    : `r:${node.node.id}`
+                }
+                node={node}
+                depth={0}
+                scripts={scripts}
+                expanded={expanded}
+                onToggle={toggleExpanded}
+                drag={drag}
+                setDrag={setDrag}
+                isDescendant={isDescendant}
+                onDrop={(s, t, z) => void handleDrop(s, t, z)}
+                menuOpenId={menuOpenId}
+                setMenuOpenId={setMenuOpenId}
+                dialog={dialog}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -425,9 +522,14 @@ export function ScriptPane({
   );
 }
 
-interface RowProps {
-  item: ItemInstance<TreeItemData>;
+// ---------- Recursive tree row (mirrors Translations' `TreeNodeView`) ----
+
+interface TreeNodeViewProps {
+  node: TreeNode;
+  depth: number;
   scripts: ScriptsApi;
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
   drag: DragState;
   setDrag: (s: DragState) => void;
   isDescendant: (rootId: string, candidateId: string) => boolean;
@@ -435,13 +537,47 @@ interface RowProps {
   menuOpenId: string | null;
   setMenuOpenId: (id: string | null) => void;
   dialog: ReturnType<typeof useDialog>;
-  setExpandedItems: React.Dispatch<React.SetStateAction<string[]>>;
-  setCollapsedChapters: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
-function TreeRow({
-  item,
+function TreeNodeView(props: TreeNodeViewProps) {
+  const { node, depth, expanded } = props;
+  const id = node.node.id;
+  const isFolder = node.kind === "folder";
+  const isOpen = isFolder && expanded.has(id);
+
+  return (
+    <>
+      <div className="tr-tree-row" style={indentStyle(depth)}>
+        <ScriptRow {...props} />
+      </div>
+      {isFolder &&
+        isOpen &&
+        node.children.map((child) => (
+          <TreeNodeView
+            key={
+              child.kind === "folder"
+                ? `f:${child.node.id}`
+                : `r:${child.node.id}`
+            }
+            {...props}
+            node={child}
+            depth={depth + 1}
+          />
+        ))}
+    </>
+  );
+}
+
+function indentStyle(depth: number): CSSProperties {
+  return depth === 0 ? {} : { paddingLeft: `${depth * 14}px` };
+}
+
+// ---------- Individual row (folder or file) -----------------------------
+function ScriptRow({
+  node,
   scripts,
+  expanded,
+  onToggle,
   drag,
   setDrag,
   isDescendant,
@@ -449,27 +585,23 @@ function TreeRow({
   menuOpenId,
   setMenuOpenId,
   dialog,
-  setExpandedItems,
-  setCollapsedChapters,
-}: RowProps) {
-  const id = item.getId();
-  const data = item.getItemData();
-  const level = item.getItemMeta().level - 1; // virtual root is level 0
-  const isChapter = data?.kind === "chapter";
-  const hasChildren = (data?.childIds.length ?? 0) > 0;
-  const isFolder = isChapter || hasChildren;
-  const isExpanded = item.isExpanded();
+}: TreeNodeViewProps) {
+  const id = node.node.id;
+  const data = node.node;
+  const isFolder = node.kind === "folder";
+  const hasChildren = isFolder && node.children.length > 0;
+  const isOpen = isFolder && expanded.has(id);
   const isActive = scripts.activeNodeId === id;
   const menuOpen = menuOpenId === id;
 
-  const rowRef = useRef<HTMLDivElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const isDragSource = drag.draggingId === id;
   const isDropTarget = drag.overId === id;
   const dropZone = isDropTarget ? drag.zone : null;
 
   // ---------- HTML5 drag events ----------
   const computeZone = (e: DragEvent<HTMLDivElement>): DropZone => {
-    const rect = rowRef.current?.getBoundingClientRect();
+    const rect = wrapRef.current?.getBoundingClientRect();
     if (!rect) return "into";
     const y = e.clientY - rect.top;
     const h = rect.height;
@@ -496,14 +628,12 @@ function TreeRow({
       setDrag({ draggingId: drag.draggingId, overId: id, zone });
     }
   };
-
   const onDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    if (!rowRef.current?.contains(e.relatedTarget as Node)) {
+    if (!wrapRef.current?.contains(e.relatedTarget as Node)) {
       if (drag.overId === id)
         setDrag({ draggingId: drag.draggingId, overId: null, zone: null });
     }
   };
-
   const onDropEvt = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (!drag.draggingId || drag.draggingId === id) return;
@@ -513,192 +643,274 @@ function TreeRow({
     setDrag({ draggingId: null, overId: null, zone: null });
   };
 
-  const handleClick = () => {
+  // ---------- Click handlers ----------
+  const handleRowClick = () => {
     scripts.setActiveNodeId(id);
+    if (isFolder) onToggle(id);
   };
 
-  const toggleExpand = () => {
-    if (isExpanded) {
-      setExpandedItems((prev) => prev.filter((x) => x !== id));
-      if (isChapter) {
-        setCollapsedChapters((prev) => {
-          const next = new Set(prev);
-          next.add(id);
-          return next;
-        });
-      }
-    } else {
-      setExpandedItems((prev) =>
-        prev.includes(id) ? prev : [...prev, id],
-      );
-      if (isChapter) {
-        setCollapsedChapters((prev) => {
-          if (!prev.has(id)) return prev;
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }
-    }
-  };
+  const wrapClass =
+    "tr-row-wrap" +
+    (isActive ? " is-active" : "") +
+    (isDragSource ? " is-dragging" : "") +
+    (isDropTarget && dropZone === "into" ? " drop-into" : "");
+
+  const rowClass = isFolder
+    ? "tr-row tr-row-folder" + (isActive ? " is-active" : "")
+    : "tr-row tr-row-file has-icon" + (isActive ? " is-active" : "");
 
   return (
     <div
-      ref={rowRef}
-        className={
-          "vn-row" +
-          (isChapter ? " is-chapter" : " is-scene") +
-          (isActive ? " is-active" : "") +
-          (isDragSource ? " is-dragging" : "") +
-          (isDropTarget && dropZone === "into" ? " drop-into" : "")
-        }
-        style={{
-          paddingInlineStart: `${level * 18 + 8}px`,
-          position: "relative",
-        }}
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDropEvt}
-        onClick={handleClick}
-        data-folder={isFolder || undefined}
-        data-selected={isActive || undefined}
-        aria-expanded={isFolder ? isExpanded : undefined}
+      ref={wrapRef}
+      className={wrapClass}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDropEvt}
+    >
+      {isDropTarget && dropZone === "before" && (
+        <span className="tree-drop-line drop-line-top" />
+      )}
+      {isDropTarget && dropZone === "after" && (
+        <span className="tree-drop-line drop-line-bottom" />
+      )}
+      <button
+        type="button"
+        className={rowClass}
+        onClick={handleRowClick}
+        aria-expanded={isFolder ? isOpen : undefined}
       >
-        {isDropTarget && dropZone === "before" && (
-          <span className="tree-drop-line drop-line-top" />
-        )}
-        {isDropTarget && dropZone === "after" && (
-          <span className="tree-drop-line drop-line-bottom" />
-        )}
         {isFolder ? (
-          <button
-            className="vn-row-chev"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleExpand();
-            }}
-            aria-label={isExpanded ? "Collapse" : "Expand"}
+          <span
+            className={"tr-folder-caret" + (isOpen ? " is-open" : "")}
+            aria-hidden
           >
-            <ChevRight className={"chev" + (isExpanded ? " is-open" : "")} />
-          </button>
+            <ChevronIcon />
+          </span>
         ) : (
-          <span className="vn-row-chev vn-row-chev-spacer" />
+          <span className="tr-folder-caret" aria-hidden />
         )}
-        {data?.emoji && <span className="vn-row-emoji">{data.emoji}</span>}
-        <span className="vn-row-lbl">{data?.name || "Untitled"}</span>
-        {isActive && !isChapter && <span className="vn-row-dot" />}
+        {!data.emoji && (
+          <span className="tr-row-icon" aria-hidden>
+            {isFolder ? <FolderIcon open={isOpen} /> : <FileIcon />}
+          </span>
+        )}
+        {data.emoji && (
+          <span className="tr-row-icon" aria-hidden>
+            {data.emoji}
+          </span>
+        )}
+        <span className="tr-row-text" title={data.title || "Untitled"}>
+          {data.title || "Untitled"}
+        </span>
+      </button>
+
+      <div className="tr-row-actions">
         <DropdownMenu
           open={menuOpen}
           onOpenChange={(open) => setMenuOpenId(open ? id : null)}
         >
           <DropdownMenuTrigger asChild>
             <button
-              className="vn-row-more"
+              type="button"
+              className="tr-icon-btn"
+              draggable={false}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
               aria-label="Actions"
               title="Actions"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden
-              >
-                <circle cx="5" cy="12" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="19" cy="12" r="1.6" />
-              </svg>
+              <DotsIcon />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-56">
-            <DropdownMenuItem onSelect={() => void scripts.togglePin(id)}>
-              {data?.pinned ? "Unpin" : "Pin"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+        <DropdownMenuContent align="end" className="min-w-56">
+          <DropdownMenuItem onSelect={() => void scripts.togglePin(id)}>
+            {data.pinned ? "Unpin" : "Pin"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => {
+              void scripts.createNode({ parentId: id, kind: "scene" });
+            }}
+          >
+            + Add scene
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              void scripts.createNode({ parentId: id, kind: "block" });
+            }}
+          >
+            + Add block
+          </DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>Convert to…</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="min-w-40">
+              {data.kind !== "chapter" && (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void scripts.updateNode(id, { kind: "chapter" })
+                  }
+                >
+                  Chapter
+                </DropdownMenuItem>
+              )}
+              {data.kind !== "scene" && (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void scripts.updateNode(id, { kind: "scene" })
+                  }
+                >
+                  Scene
+                </DropdownMenuItem>
+              )}
+              {data.kind !== "block" && (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void scripts.updateNode(id, { kind: "block" })
+                  }
+                >
+                  Block
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuSeparator />
+          {data.parent_id && (
             <DropdownMenuItem
-              onSelect={() => {
-                void scripts.createNode({ parentId: id, kind: "scene" });
-                setExpandedItems((prev) =>
-                  prev.includes(id) ? prev : [...prev, id],
-                );
-              }}
+              onSelect={() => void scripts.updateNode(id, { parent_id: null })}
             >
-              + Add scene
+              Move to root
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                void scripts.createNode({ parentId: id, kind: "block" });
-                setExpandedItems((prev) =>
-                  prev.includes(id) ? prev : [...prev, id],
-                );
-              }}
-            >
-              + Add block
-            </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Convert to…</DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-40">
-                {data?.kind !== "chapter" && (
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      void scripts.updateNode(id, { kind: "chapter" })
-                    }
-                  >
-                    Chapter
-                  </DropdownMenuItem>
-                )}
-                {data?.kind !== "scene" && (
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      void scripts.updateNode(id, { kind: "scene" })
-                    }
-                  >
-                    Scene
-                  </DropdownMenuItem>
-                )}
-                {data?.kind !== "block" && (
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      void scripts.updateNode(id, { kind: "block" })
-                    }
-                  >
-                    Block
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuSeparator />
-            {data?.parent_id && (
-              <DropdownMenuItem
-                onSelect={() => void scripts.updateNode(id, { parent_id: null })}
-              >
-                Move to root
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => {
-                void (async () => {
-                  const ok = await dialog.confirm({
-                    title: "Delete",
-                    message: `Delete "${data?.name || "Untitled"}"${
-                      hasChildren ? " and all children" : ""
-                    }?`,
-                    variant: "danger",
-                    confirmLabel: "Delete",
-                  });
-                  if (ok) void scripts.deleteNode(id);
-                })();
-              }}
-            >
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+          )}
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => {
+              void (async () => {
+                const ok = await dialog.confirm({
+                  title: "Delete",
+                  message: `Delete "${data.title || "Untitled"}"${
+                    hasChildren ? " and all children" : ""
+                  }?`,
+                  variant: "danger",
+                  confirmLabel: "Delete",
+                });
+                if (ok) void scripts.deleteNode(id);
+              })();
+            }}
+          >
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
         </DropdownMenu>
       </div>
+    </div>
+  );
+}
+
+// ---------- Inline icons (copied from TranslationsSidebar) --------------
+
+function ChevronIcon() {
+  return (
+    <svg
+      width="6"
+      height="10"
+      viewBox="0 0 6 10"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M1 1L5 5L1 9"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function FolderIcon({ open = false }: { open?: boolean }) {
+  if (open) {
+    return (
+      <svg
+        width="14"
+        height="12"
+        viewBox="0 0 14 12"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M1.5 3.5C1.5 2.95 1.95 2.5 2.5 2.5H5.5L6.75 3.75H11.5C12.05 3.75 12.5 4.2 12.5 4.75V5.25H3.5L1.5 11V3.5Z"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M3.5 5.25H13.25L11.5 10.5C11.36 10.91 10.97 11.2 10.53 11.2H1.5"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      width="14"
+      height="12"
+      viewBox="0 0 14 12"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M1.5 3.5C1.5 2.95 1.95 2.5 2.5 2.5H5.5L6.75 3.75H11.5C12.05 3.75 12.5 4.2 12.5 4.75V9.5C12.5 10.05 12.05 10.5 11.5 10.5H2.5C1.95 10.5 1.5 10.05 1.5 9.5V3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg
+      width="11"
+      height="14"
+      viewBox="0 0 11 14"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M2 1.5H7L9.5 4V11.5C9.5 12.05 9.05 12.5 8.5 12.5H2C1.45 12.5 1 12.05 1 11.5V2.5C1 1.95 1.45 1.5 2 1.5Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 1.5V4H9.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DotsIcon() {
+  return (
+    <svg
+      width="14"
+      height="3"
+      viewBox="0 0 14 3"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="1.5" cy="1.5" r="1.2" />
+      <circle cx="7" cy="1.5" r="1.2" />
+      <circle cx="12.5" cy="1.5" r="1.2" />
+    </svg>
   );
 }

@@ -6,9 +6,32 @@ import path from "node:path";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+// React Compiler 1.0 (stable Oct 2025). Automatic memoization at the
+// compiler level — eliminates the manual React.memo/useMemo/useCallback
+// dance for most components, and gives measured INP wins in heavily
+// interactive UIs:
+//   • Wakelet: 30% INP speedup specifically on Radix Dropdowns
+//   • Sanity Studio: 20-30% editing frame-rate improvement in production
+// Our Renpy editor is exactly that workload (Radix Select/Dropdown +
+// dnd-kit per card), so this is the highest impact/effort knob available.
+//
+// `target: "19"` matches our React version (matters because the compiler
+// emits different runtime helpers per React major). Existing React.memo /
+// useCallback stay intact — Compiler works alongside them, not instead.
+const reactCompilerConfig = {
+  target: "19" as const,
+};
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      babel: {
+        plugins: [["babel-plugin-react-compiler", reactCompilerConfig]],
+      },
+    }),
+    tailwindcss(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

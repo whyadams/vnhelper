@@ -1,7 +1,7 @@
 {
   "name": "vnhelper",
   "private": true,
-  "version": "0.1.14",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -53,6 +53,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "babel-plugin-react-compiler": "^1.0.0",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.21.0",
     "typescript": "~5.8.3",

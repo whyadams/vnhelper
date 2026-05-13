@@ -343,6 +343,7 @@ export function RenpyTable({
       </div>
 
       <VirtualizedSections
+        nodeId={nodeId}
         sections={sections}
         charByVar={charByVar}
         characters={characters}
@@ -391,6 +392,7 @@ export function RenpyTable({
  * cross-window moves the user scrolls to the destination first.
  */
 function VirtualizedSections({
+  nodeId,
   sections,
   charByVar,
   characters,
@@ -400,6 +402,7 @@ function VirtualizedSections({
   onDuplicate,
   onInsertAfter,
 }: {
+  nodeId: string;
   sections: Section[];
   charByVar: Map<string, ScriptCharacter>;
   characters: ScriptCharacter[];
@@ -442,10 +445,36 @@ function VirtualizedSections({
     }
   }, []);
 
+  // Persistent measurements cache — the canonical fix for "fast scroll
+  // shows blank gaps". The first time a scene is opened the virtualizer
+  // measures each section on its way through the viewport; we persist
+  // those numbers to localStorage and feed them back as
+  // `initialMeasurementsCache` next session. Subsequent opens skip the
+  // measure-and-correct cycle entirely — the virtualizer KNOWS where
+  // every row sits, so dragging the scrollbar to the bottom lands
+  // exactly on the right section instead of falling through an
+  // unmeasured void. Same technique Linear / Notion use for long lists.
+  const cacheKey = `vnhelper.virt.measurements:${nodeId}`;
+  const initialCache = useMemo<
+    ReturnType<typeof loadMeasurementsCache>
+  >(() => loadMeasurementsCache(cacheKey), [cacheKey]);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const rowVirtualizer = useVirtualizer({
     count: sections.length,
     getScrollElement: () => scrollEl,
     scrollMargin,
+    initialMeasurementsCache: initialCache,
+    onChange: (instance) => {
+      // Debounced persistence — `onChange` fires on every scroll tick;
+      // writing localStorage on each is ~1ms but the JSON.stringify of
+      // hundreds of measurements adds up. 500ms is invisible to users
+      // and amortizes the cost across a scroll gesture.
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        saveMeasurementsCache(cacheKey, instance.measurementsCache);
+      }, 500);
+    },
     // Per-section estimate built by summing per-kind weights for every
     // block in the section's body, plus a header allowance. Far more
     // accurate than a flat `body.length * 80` average — sections heavy in
@@ -546,16 +575,72 @@ function VirtualizedSections({
 }
 
 /**
- * Per-kind row-height approximations used by TanStack's `estimateSize`. The
- * values come from eyeballing the rendered cards in `scripts.css` and aren't
- * meant to be exact — they only need to be within ~30 % so the virtualizer
- * sets a reasonable initial scroll height. `measureElement` corrects the
- * rest once items are on-screen. Distinguishing menu/raw/scene from plain
- * dialogue is what kills the "fast scroll leaves blank gaps" symptom that
- * a flat-average estimate produces.
+ * Persisted measurements cache, keyed by scene node id. The shape mirrors
+ * TanStack Virtual's `measurementsCache` (an array of items with `size`,
+ * `start`, `end`, `key`, `lane`, `index`). We don't actively re-create
+ * those objects ourselves — TanStack returns its real cache through the
+ * `onChange` callback and we JSON-stringify it as-is. On load we feed it
+ * straight back via `initialMeasurementsCache`.
+ *
+ * Stored under one key per scene so opening a new scene doesn't carry
+ * over the wrong cache. Bumping the storage prefix invalidates old
+ * caches if the shape ever changes — keep an eye on TanStack release
+ * notes for any breaking changes to the cache item shape.
  */
-function estimateBlockHeight(kind: RpyBlockKind): number {
-  switch (kind) {
+type MeasurementsCache = Parameters<
+  Exclude<
+    Parameters<typeof useVirtualizer>[0]["initialMeasurementsCache"],
+    undefined
+  > extends infer T
+    ? T extends ReadonlyArray<infer Item>
+      ? (item: Item) => void
+      : never
+    : never
+> extends [infer Item]
+  ? Item[]
+  : never;
+
+function loadMeasurementsCache(key: string): MeasurementsCache | undefined {
+  if (typeof localStorage === "undefined") return undefined;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as MeasurementsCache) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveMeasurementsCache(key: string, cache: unknown): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(cache));
+  } catch {
+    // QuotaExceededError or similar — silently drop. Worst case we just
+    // re-measure on next open, no correctness impact.
+  }
+}
+
+/**
+ * Per-content row-height approximations used by TanStack's `estimateSize`.
+ * Rather than a flat per-kind constant, dialogue/note/raw estimates scale
+ * with their actual text length — a single-line "yes." dialogue should not
+ * cost the same vertical budget as a 400-char paragraph. Accurate estimates
+ * are what stops "fast scroll leaves a blank gap" from happening: the
+ * virtualizer's idea of the offset for row N agrees with reality, so when
+ * the user drags the scrollbar to a deep position it lands on the right
+ * content instead of an unmeasured void.
+ *
+ * Approximations target a card ~480px wide, ~80 chars/line, ~22px line-height
+ * (matches the resolved layout from scripts.css; tweak if the design shifts).
+ */
+const CHARS_PER_LINE = 80;
+const LINE_HEIGHT = 22;
+const CARD_VPAD = 36; // top+bottom padding inside a typical card
+
+function estimateBlockHeight(b: RpyBlock): number {
+  switch (b.kind) {
     case "label":
       return 48;
     case "scene":
@@ -564,22 +649,38 @@ function estimateBlockHeight(kind: RpyBlockKind): number {
     case "hide":
       return 80;
     case "say":
-    case "narrator":
-      return 80;
+    case "narrator": {
+      // Dialogue card cost scales linearly with how many wrapped lines
+      // the text produces. Short barks ("..."): ~58px. Paragraphs: 100+.
+      const text = (b as { text?: string }).text ?? "";
+      const lines = Math.max(1, Math.ceil(text.length / CHARS_PER_LINE));
+      return CARD_VPAD + lines * LINE_HEIGHT;
+    }
     case "menu":
-      return 60;
-    case "choice":
-      return 100;
+      // Menu container alone — choices count below as separate blocks.
+      return 56;
+    case "choice": {
+      const text = (b as { text?: string }).text ?? "";
+      const lines = Math.max(1, Math.ceil(text.length / CHARS_PER_LINE));
+      return 48 + lines * LINE_HEIGHT;
+    }
     case "jump":
     case "call":
       return 64;
     case "with":
     case "pause":
       return 60;
-    case "note":
-      return 88;
-    case "raw":
-      return 180;
+    case "note": {
+      const text = (b as { text?: string }).text ?? "";
+      const lines = Math.max(1, Math.ceil(text.length / CHARS_PER_LINE));
+      return 32 + lines * LINE_HEIGHT;
+    }
+    case "raw": {
+      // Multi-line code blocks: each `lines[]` entry is one rendered row.
+      const raw = b as { lines?: string[] };
+      const count = raw.lines?.length ?? 1;
+      return 44 + count * 18;
+    }
     default:
       return 100;
   }
@@ -588,10 +689,12 @@ function estimateBlockHeight(kind: RpyBlockKind): number {
 function estimateSectionHeight(section: Section | undefined): number {
   if (!section) return 200;
   // Header strip (label name + scene chip + actions) is ~60px regardless
-  // of body contents.
+  // of body contents. Section gap inside `.rs-section { gap: 21px }` adds
+  // ~21px between every two child blocks.
   let total = 60;
-  for (const b of section.body) {
-    total += estimateBlockHeight(b.kind);
+  for (let i = 0; i < section.body.length; i++) {
+    total += estimateBlockHeight(section.body[i]);
+    if (i < section.body.length - 1) total += 21;
   }
   return total;
 }

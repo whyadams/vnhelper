@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useKanban } from "../../state/kanbanStore";
 import type {
   ScriptCharacter,
@@ -11,6 +11,7 @@ import {
 import { UsersFilledIcon } from "../kanban/SidebarIcons";
 import { useDialog } from "../ui/Dialog";
 import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
+import { LinkedEventsSection } from "../calendar/LinkedEventsSection";
 
 type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
 
@@ -29,6 +30,12 @@ interface PageProps {
   scripts: ScriptsApi;
   onBack: () => void;
   onAddCharacter: () => void;
+  /** If set, the page opens the editor for this character on mount and
+   *  whenever the prop changes. Cleared by the consumer once consumed. */
+  initialEditingId?: string | null;
+  /** Invoked once `initialEditingId` has been applied so the parent can
+   *  clear its pending-focus state and not re-trigger on the next render. */
+  onConsumeInitialEditingId?: () => void;
 }
 
 type Tab = "characters" | "locations";
@@ -37,11 +44,21 @@ export function ScriptCharactersPage({
   scripts,
   onBack,
   onAddCharacter,
+  initialEditingId,
+  onConsumeInitialEditingId,
 }: PageProps) {
   const [tab, setTab] = useState<Tab>("characters");
   const [filter, setFilter] = useState("");
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
   const [editingLocId, setEditingLocId] = useState<string | null>(null);
+
+  // External focus request — e.g. from a Calendar attachment click.
+  useEffect(() => {
+    if (!initialEditingId) return;
+    setTab("characters");
+    setEditingCharId(initialEditingId);
+    onConsumeInitialEditingId?.();
+  }, [initialEditingId, onConsumeInitialEditingId]);
   const dialog = useDialog();
 
   const q = filter.trim().toLowerCase();
@@ -639,6 +656,12 @@ function CharacterEditCardFull({
         value={voiceNotes}
         onChange={(e) => setVoiceNotes(e.target.value)}
         rows={3}
+      />
+
+      <LinkedEventsSection
+        entity_type="character"
+        entity_id={character.id}
+        variant="compact"
       />
 
       <div className="vn-char-actions">

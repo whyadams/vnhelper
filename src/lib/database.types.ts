@@ -43,6 +43,51 @@ export type Database = {
           },
         ]
       }
+      calendar_event_attachments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entity_id: string
+          entity_type: string
+          event_id: string
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entity_id: string
+          entity_type: string
+          event_id: string
+          id?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string
+          entity_type?: string
+          event_id?: string
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_attachments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_event_attachments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           color: string
@@ -859,6 +904,42 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          current_period_end: string | null
+          provider: string | null
+          provider_customer_id: string | null
+          provider_subscription_id: string | null
+          status: string
+          tier: string
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          current_period_end?: string | null
+          provider?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          status?: string
+          tier?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          current_period_end?: string | null
+          provider?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          status?: string
+          tier?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tags: {
         Row: {
           board_id: string
@@ -1151,7 +1232,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      my_subscription: {
+        Row: {
+          current_period_end: string | null
+          effective_tier: string | null
+          raw_tier: string | null
+          status: string | null
+          trial_ends_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          current_period_end?: string | null
+          effective_tier?: never
+          raw_tier?: string | null
+          status?: string | null
+          trial_ends_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          current_period_end?: string | null
+          effective_tier?: never
+          raw_tier?: string | null
+          status?: string | null
+          trial_ends_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation: {
@@ -1163,6 +1270,12 @@ export type Database = {
           user_id: string
           workspace_id: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_workspace: {
         Args: { _name: string }
@@ -1172,6 +1285,12 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspaces"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       invite_to_workspace: {
@@ -1190,6 +1309,12 @@ export type Database = {
           target_language: string | null
           workspace_id: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reject_invitation: {
         Args: { _invitation_id: string }
@@ -1200,6 +1325,7 @@ export type Database = {
         Returns: undefined
       }
       script_role_in: { Args: { _ws: string }; Returns: string }
+      seed_subscription_for_user: { Args: { _uid: string }; Returns: undefined }
       translation_file_stats: {
         Args: { _file_ids: string[] }
         Returns: {
@@ -1212,6 +1338,7 @@ export type Database = {
     }
     Enums: {
       card_priority: "low" | "medium" | "high" | "urgent"
+      graph_node_kind: "scene" | "choice" | "ending" | "chapter" | "note"
       script_node_kind: "chapter" | "scene" | "block"
       workspace_role: "owner" | "editor" | "viewer" | "translator"
     }
@@ -1342,6 +1469,7 @@ export const Constants = {
   public: {
     Enums: {
       card_priority: ["low", "medium", "high", "urgent"],
+      graph_node_kind: ["scene", "choice", "ending", "chapter", "note"],
       script_node_kind: ["chapter", "scene", "block"],
       workspace_role: ["owner", "editor", "viewer", "translator"],
     },

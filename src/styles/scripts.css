@@ -208,27 +208,54 @@
   transition: background 0.1s;
 }
 .vn-row.is-chapter:hover { background: rgba(200, 199, 202, 0.06); }
-.vn-row-chev {
+/* Caret — visually matches Translations sidebar's `.tr-folder-caret`, but
+   the button is wider (18×20) than the glyph so the click target is forgiving.
+   A narrow target inside a `draggable=true` row eats clicks on slight mouse
+   drift (browser starts a drag instead of firing click). Spacer keeps leaf
+   rows aligned with folder rows even though they don't carry a button. */
+.vn-folder-caret {
+  flex-shrink: 0;
   width: 18px;
-  height: 18px;
+  height: 20px;
   padding: 0;
   background: transparent;
   border: none;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: rgba(200, 199, 202, 0.6);
   cursor: pointer;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  border-radius: 4px;
+  transition: transform 0.15s, color 0.12s, background 0.12s;
 }
-.vn-row-chev .chev {
+.vn-folder-caret:hover {
+  color: rgba(200, 199, 202, 0.95);
+  background: rgba(200, 199, 202, 0.08);
+}
+.vn-folder-caret.is-open { transform: rotate(90deg); }
+.vn-folder-caret.is-open:hover { transform: rotate(90deg); }
+.vn-folder-caret-spacer { cursor: default; background: transparent; }
+.vn-folder-caret-spacer:hover { background: transparent; }
+
+/* Kind icon slot — folder open/closed for branches, file glyph for leaves.
+   Hidden when the row carries an emoji (the user's pick takes priority). */
+.vn-row-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 14px;
   height: 14px;
-  transition: transform 0.15s;
+  color: rgba(200, 199, 202, 0.55);
+  transition: color 0.12s;
 }
-.vn-row-chev .chev.is-open { transform: rotate(90deg); }
-.vn-row.is-chapter .vn-row-lbl {
-  flex: 1;
+.vn-row:hover .vn-row-icon { color: rgba(200, 199, 202, 0.75); }
+.vn-row.is-active .vn-row-icon { color: var(--text-1); }
+.vn-row.is-chapter .vn-row-icon { color: rgba(200, 199, 202, 0.85); }
+
+.vn-row.is-chapter .vn-row-text {
+  flex: 1 0 0;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-1);
@@ -258,8 +285,9 @@
 .vn-row.is-scene.is-active {
   background: rgba(200, 199, 202, 0.03);
 }
-.vn-row.is-scene .vn-row-lbl {
-  flex: 1;
+.vn-row.is-scene .vn-row-text {
+  flex: 1 0 0;
+  min-width: 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-1);
@@ -267,7 +295,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.vn-row.is-scene.is-active .vn-row-lbl { font-weight: 600; }
+.vn-row.is-scene.is-active .vn-row-text { font-weight: 600; }
 .vn-row-emoji {
   font-size: 13px;
   flex-shrink: 0;
@@ -2948,6 +2976,150 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ---- Ren'Py import dialog ---------------------------------------------
+   Lighter / narrower variant of the plain-text import dialog. Single
+   column (paste → mode picker → optional category → progress) instead
+   of the side-by-side preview that ScriptImportModal uses. */
+
+.vn-rpy-import-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 4px 22px 18px !important;
+}
+.vn-rpy-import-empty {
+  color: var(--text-3);
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+}
+.vn-rpy-import-textarea {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  min-height: 180px;
+  resize: vertical;
+  white-space: pre;
+}
+.vn-rpy-import-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.vn-rpy-import-stat-warn {
+  color: var(--status-warn);
+}
+
+.vn-rpy-import-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vn-rpy-import-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-input);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.vn-rpy-import-mode:hover {
+  border-color: var(--border-strong);
+}
+.vn-rpy-import-mode.is-active {
+  border-color: var(--accent-strong);
+  background: rgba(200, 199, 202, 0.05);
+}
+.vn-rpy-import-mode input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--accent-strong);
+}
+.vn-rpy-import-mode-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vn-rpy-import-mode-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.vn-rpy-import-mode-badge {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--accent-strong);
+  background: rgba(200, 199, 202, 0.08);
+  border-radius: 99px;
+  padding: 1px 8px;
+  font-weight: 500;
+}
+.vn-rpy-import-mode-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.vn-rpy-import-mode-sub code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--text-2);
+  background: rgba(200, 199, 202, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.vn-rpy-import-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: -4px;
+}
+
+/* Progress strip — appears while the import is committing to Supabase. */
+.vn-rpy-import-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(200, 199, 202, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.vn-rpy-import-progress-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.vn-rpy-import-progress-bar {
+  height: 4px;
+  background: rgba(200, 199, 202, 0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.vn-rpy-import-progress-fill {
+  height: 100%;
+  background: var(--accent-strong);
+  transition: width 0.2s ease-out;
+}
+
+.vn-rpy-import-error {
+  font-size: 12px;
+  color: var(--status-danger);
+  background: rgba(168, 112, 128, 0.08);
+  border: 1px solid rgba(168, 112, 128, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
 .vn-modal-import-body {
   flex: 1;
   min-height: 0;
@@ -4502,3 +4674,22 @@
   border-radius: 8px;
 }
 .rs-warnings ul { margin: 4px 0 0; padding-left: 20px; }
+
+/* ---------- Script tree extras (on top of translations.css) ----------
+   The Script sidebar reuses the Translations sidebar's `.tr-*` tree so the
+   two left panes share the same design system. These rules add the few
+   script-specific bits the file tree never needed: an active highlight for
+   folder (chapter) rows, drag-source dimming, and the drop-into glow. */
+.tr-row-wrap.is-active .tr-row-folder,
+.tr-row-folder.is-active {
+  background: rgba(200, 199, 202, 0.05);
+}
+.tr-row-folder.is-active:hover {
+  background: rgba(200, 199, 202, 0.08);
+}
+.tr-row-wrap.is-dragging { opacity: 0.4; }
+.tr-row-wrap.drop-into > .tr-row {
+  background: rgba(200, 199, 202, 0.1);
+  outline: 1px solid rgba(200, 199, 202, 0.3);
+  outline-offset: -1px;
+}

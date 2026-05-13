@@ -601,6 +601,405 @@ const createCharacter: ToolDef = {
   },
 };
 
+/* ---------- Character symmetry (update / delete) ---------- */
+
+const updateCharacter: ToolDef = {
+  name: "update_character",
+  description:
+    "Patch a character. Only the fields you pass are updated; others are left alone.",
+  inputSchema: z.object({
+    id: z.string().uuid(),
+    name: z.string().min(1).optional(),
+    short_name: z.string().nullable().optional(),
+    color: z.string().optional(),
+    emoji: z.string().nullable().optional(),
+    pronouns: z.string().nullable().optional(),
+    age: z.string().nullable().optional(),
+    role: z.string().nullable().optional(),
+    voice_notes: z.string().optional(),
+    rpy_var: z.string().nullable().optional(),
+    aliases: z.array(z.string()).optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        id: z.string().uuid(),
+        name: z.string().min(1).optional(),
+        short_name: z.string().nullable().optional(),
+        color: z.string().optional(),
+        emoji: z.string().nullable().optional(),
+        pronouns: z.string().nullable().optional(),
+        age: z.string().nullable().optional(),
+        role: z.string().nullable().optional(),
+        voice_notes: z.string().optional(),
+        rpy_var: z.string().nullable().optional(),
+        aliases: z.array(z.string()).optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const { id, ...patch } = args;
+    // Strip undefined so we don't overwrite columns with NULL by accident
+    // when the caller omits a field.
+    const cleanPatch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) {
+      if (v !== undefined) cleanPatch[k] = v;
+    }
+    const { data, error } = await c
+      .from("script_characters")
+      .update(cleanPatch)
+      .eq("id", id)
+      .select("id, name")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const deleteCharacter: ToolDef = {
+  name: "delete_character",
+  description:
+    "Permanently delete a character (cascades to nothing — only the row itself is removed; references in script bodies stay textual).",
+  inputSchema: z.object({ id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("script_characters")
+      .delete()
+      .eq("id", args.id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.id };
+  },
+};
+
+/* ---------- Calendar events ---------- */
+
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+const isoTime = z
+  .string()
+  .regex(/^\d{2}:\d{2}(:\d{2})?$/, "expected HH:MM or HH:MM:SS");
+const colorEnum = z.enum([
+  "pink",
+  "green",
+  "amber",
+  "violet",
+  "sky",
+  "rose",
+  "teal",
+]);
+
+const listCalendarEvents: ToolDef = {
+  name: "list_calendar_events",
+  description:
+    "List calendar events in a workspace, optionally bounded by a date range (inclusive). Returns events with their attachments resolved to names.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        from: isoDate.optional(),
+        to: isoDate.optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+
+    let q = c
+      .from("calendar_events")
+      .select(
+        "id, title, event_date, event_time, color, description, created_at",
+      )
+      .eq("workspace_id", ws)
+      .order("event_date", { ascending: true })
+      .order("event_time", { ascending: true, nullsFirst: true });
+    if (args.from) q = q.gte("event_date", args.from);
+    if (args.to) q = q.lte("event_date", args.to);
+    const { data: events, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const rows = events ?? [];
+    if (rows.length === 0) return [];
+
+    // Fetch attachments in a single round-trip and resolve entity names so
+    // the agent can reason about what each event links to without follow-up
+    // tool calls.
+    const eventIds = rows.map((e) => e.id);
+    const { data: atts, error: attErr } = await c
+      .from("calendar_event_attachments")
+      .select("id, event_id, entity_type, entity_id")
+      .in("event_id", eventIds);
+    if (attErr) throw new Error(attErr.message);
+
+    const cardIds: string[] = [];
+    const nodeIds: string[] = [];
+    const charIds: string[] = [];
+    for (const a of atts ?? []) {
+      if (a.entity_type === "card") cardIds.push(a.entity_id);
+      else if (a.entity_type === "script_node") nodeIds.push(a.entity_id);
+      else if (a.entity_type === "character") charIds.push(a.entity_id);
+    }
+    const nameOf = new Map<string, string>();
+    // Supabase query builder is PromiseLike, not Promise — Promise.all takes
+    // an iterable of PromiseLike so this typing covers both.
+    const fetches: PromiseLike<unknown>[] = [];
+    if (cardIds.length > 0) {
+      fetches.push(
+        c
+          .from("cards")
+          .select("id, title")
+          .in("id", cardIds)
+          .then(({ data }) => {
+            for (const r of data ?? []) nameOf.set(`card:${r.id}`, r.title);
+          }),
+      );
+    }
+    if (nodeIds.length > 0) {
+      fetches.push(
+        c
+          .from("script_nodes")
+          .select("id, title")
+          .in("id", nodeIds)
+          .then(({ data }) => {
+            for (const r of data ?? [])
+              nameOf.set(`script_node:${r.id}`, r.title);
+          }),
+      );
+    }
+    if (charIds.length > 0) {
+      fetches.push(
+        c
+          .from("script_characters")
+          .select("id, name")
+          .in("id", charIds)
+          .then(({ data }) => {
+            for (const r of data ?? [])
+              nameOf.set(`character:${r.id}`, r.name);
+          }),
+      );
+    }
+    await Promise.all(fetches);
+
+    const attByEvent = new Map<
+      string,
+      Array<{
+        attachment_id: string;
+        entity_type: string;
+        entity_id: string;
+        name: string | null;
+      }>
+    >();
+    for (const a of atts ?? []) {
+      const list = attByEvent.get(a.event_id) ?? [];
+      list.push({
+        attachment_id: a.id,
+        entity_type: a.entity_type,
+        entity_id: a.entity_id,
+        name: nameOf.get(`${a.entity_type}:${a.entity_id}`) ?? null,
+      });
+      attByEvent.set(a.event_id, list);
+    }
+
+    return rows.map((e) => ({
+      ...e,
+      attachments: attByEvent.get(e.id) ?? [],
+    }));
+  },
+};
+
+const createCalendarEvent: ToolDef = {
+  name: "create_calendar_event",
+  description:
+    "Create a calendar event. `event_date` is YYYY-MM-DD; `event_time` is optional HH:MM. Returns the new event id.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    title: z.string().min(1),
+    event_date: isoDate,
+    event_time: isoTime.optional(),
+    color: colorEnum.default("violet"),
+    description: z.string().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        title: z.string().min(1),
+        event_date: isoDate,
+        event_time: isoTime.optional(),
+        color: colorEnum.default("violet"),
+        description: z.string().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    // Server-side `created_by` is captured from the JWT — no need to pass it.
+    const { data, error } = await c
+      .from("calendar_events")
+      .insert({
+        workspace_id: ws,
+        title: args.title.trim(),
+        event_date: args.event_date,
+        // Normalise HH:MM → HH:MM:00 (postgres `time` column is happy either way).
+        event_time: args.event_time
+          ? args.event_time.length === 5
+            ? `${args.event_time}:00`
+            : args.event_time
+          : null,
+        color: args.color,
+        description: args.description ?? null,
+      })
+      .select("id, title, event_date, event_time, color")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const updateCalendarEvent: ToolDef = {
+  name: "update_calendar_event",
+  description:
+    "Patch a calendar event. Only fields you pass are updated.",
+  inputSchema: z.object({
+    id: z.string().uuid(),
+    title: z.string().min(1).optional(),
+    event_date: isoDate.optional(),
+    event_time: isoTime.nullable().optional(),
+    color: colorEnum.optional(),
+    description: z.string().nullable().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        id: z.string().uuid(),
+        title: z.string().min(1).optional(),
+        event_date: isoDate.optional(),
+        event_time: isoTime.nullable().optional(),
+        color: colorEnum.optional(),
+        description: z.string().nullable().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const { id, event_time, ...rest } = args;
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (v !== undefined) patch[k] = v;
+    }
+    if (event_time !== undefined) {
+      patch.event_time =
+        event_time === null
+          ? null
+          : event_time.length === 5
+            ? `${event_time}:00`
+            : event_time;
+    }
+    const { data, error } = await c
+      .from("calendar_events")
+      .update(patch)
+      .eq("id", id)
+      .select("id, title, event_date, event_time, color")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const deleteCalendarEvent: ToolDef = {
+  name: "delete_calendar_event",
+  description:
+    "Delete a calendar event. Attachments cascade-delete with it (DB ON DELETE CASCADE).",
+  inputSchema: z.object({ id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("calendar_events")
+      .delete()
+      .eq("id", args.id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.id };
+  },
+};
+
+/* ---------- Calendar attachments (polymorphic links to other entities) ---------- */
+
+const attachmentEntityType = z.enum(["card", "script_node", "character"]);
+
+const attachToCalendarEvent: ToolDef = {
+  name: "attach_to_calendar_event",
+  description:
+    "Link a kanban task / script node / character to a calendar event. Idempotent — if the link already exists the existing attachment id is returned.",
+  inputSchema: z.object({
+    event_id: z.string().uuid(),
+    entity_type: attachmentEntityType,
+    entity_id: z.string().uuid(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        event_id: z.string().uuid(),
+        entity_type: attachmentEntityType,
+        entity_id: z.string().uuid(),
+      })
+      .parse(raw);
+    const c = await getClient();
+
+    // The attachment row carries `workspace_id` for RLS scoping — look it
+    // up from the parent event so the caller doesn't have to know it.
+    const { data: ev, error: evErr } = await c
+      .from("calendar_events")
+      .select("workspace_id")
+      .eq("id", args.event_id)
+      .single();
+    if (evErr) throw new Error(`event not found: ${evErr.message}`);
+
+    // Idempotency: if this exact tuple is already attached, return it
+    // rather than failing on the unique constraint.
+    const { data: existing } = await c
+      .from("calendar_event_attachments")
+      .select("id")
+      .eq("event_id", args.event_id)
+      .eq("entity_type", args.entity_type)
+      .eq("entity_id", args.entity_id)
+      .maybeSingle();
+    if (existing) return { id: existing.id, already_attached: true };
+
+    const { data, error } = await c
+      .from("calendar_event_attachments")
+      .insert({
+        event_id: args.event_id,
+        workspace_id: ev.workspace_id,
+        entity_type: args.entity_type,
+        entity_id: args.entity_id,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { id: data.id, already_attached: false };
+  },
+};
+
+const detachFromCalendarEvent: ToolDef = {
+  name: "detach_from_calendar_event",
+  description:
+    "Remove an attachment from a calendar event by attachment id (the id returned from `attach_to_calendar_event` or surfaced via `list_calendar_events`).",
+  inputSchema: z.object({ attachment_id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ attachment_id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("calendar_event_attachments")
+      .delete()
+      .eq("id", args.attachment_id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.attachment_id };
+  },
+};
+
 /* ---------- Export ---------- */
 
 export const TOOLS: ToolDef[] = [
@@ -619,4 +1018,12 @@ export const TOOLS: ToolDef[] = [
   deleteScriptNode,
   listCharacters,
   createCharacter,
+  updateCharacter,
+  deleteCharacter,
+  listCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+  attachToCalendarEvent,
+  detachFromCalendarEvent,
 ];

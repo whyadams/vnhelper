@@ -23,6 +23,14 @@ dist-ssr
 # Rust build output
 src-tauri/target/
 
+# Bundled MCP sidecar — ~115MB compiled binary, regenerated locally via
+# `pnpm --filter vnhelper-mcp run bundle:win` (or bundle:mac / bundle:linux).
+# Required at Tauri build-time but never committed to git.
+src-tauri/binaries/vnhelper-mcp
+src-tauri/binaries/vnhelper-mcp.exe
+packages/vnhelper-mcp/dist/vnhelper-mcp
+packages/vnhelper-mcp/dist/vnhelper-mcp.exe
+
 # Local Claude Code agent caches
 .agents/
 .claude/

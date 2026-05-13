@@ -4,6 +4,8 @@ import { useAuth } from "../../state/AuthProvider";
 import { useKanban } from "../../state/kanbanStore";
 import { useNotifications } from "../../state/notifications";
 import { canSeeNav, type Role } from "../../lib/roles";
+import { useSubscription } from "../../state/subscription";
+import { usePaywall } from "../subscription/Paywall";
 import {
   BellFilledIcon,
   CalendarFilledIcon,
@@ -41,6 +43,28 @@ const MembersGlyph = UsersFilledIcon;
 const InvitesGlyph = MailFilledIcon;
 const BellGlyph = BellFilledIcon;
 
+function LockIcon(props: SVGProps<SVGSVGElement>) {
+  // Stroke-only padlock (12×12) tuned to match the sidebar's other inline
+  // icons (1.6 stroke, rounded joins). Sits in `.nav-item-lock` which paints
+  // it in muted text colour.
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+
 function SignOutGlyph(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -65,6 +89,8 @@ export function Sidebar() {
   const { state, dispatch } = useKanban();
   const { user, signOut } = useAuth();
   const notifications = useNotifications();
+  const { limits } = useSubscription();
+  const paywall = usePaywall();
 
   const userName =
     (user?.user_metadata?.name as string | undefined) ??
@@ -135,17 +161,35 @@ export function Sidebar() {
       {/* Essentials */}
       <div className="nav-section">
         <div className="nav-section-label">ESSENTIALS</div>
-        {visibleNav.map(({ key, label, Icon }) => (
-          <button
-            key={key}
-            className={"nav-item" + (isActive(key) ? " is-active" : "")}
-            type="button"
-            onClick={() => dispatch({ type: "SET_ACTIVE_NAV", key })}
-          >
-            <Icon className="ico" />
-            <span className="nav-item-label">{label}</span>
-          </button>
-        ))}
+        {visibleNav.map(({ key, label, Icon }) => {
+          const isLocked = key === "graph" && !limits.canUseGraph;
+          return (
+            <button
+              key={key}
+              className={
+                "nav-item" +
+                (isActive(key) ? " is-active" : "") +
+                (isLocked ? " is-locked" : "")
+              }
+              type="button"
+              onClick={() => {
+                if (isLocked) {
+                  paywall.show("graph");
+                  return;
+                }
+                dispatch({ type: "SET_ACTIVE_NAV", key });
+              }}
+            >
+              <Icon className="ico" />
+              <span className="nav-item-label">{label}</span>
+              {isLocked && (
+                <span className="nav-item-lock" aria-hidden>
+                  <LockIcon />
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {showWorkspaceSection && (

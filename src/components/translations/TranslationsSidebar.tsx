@@ -6,6 +6,9 @@ import { useDialog } from "../ui/Dialog";
 import type { TranslationFile, TranslationsApi } from "../../state/translations";
 import { SkeletonStack } from "../ui/Skeleton";
 import { TranslationSettingsScreen } from "./TranslationSettingsScreen";
+import { useKanban } from "../../state/kanbanStore";
+import { useSubscription } from "../../state/subscription";
+import { usePaywall } from "../subscription/Paywall";
 
 // One file in a multi-file import — keeps the relative folder path so the
 // sidebar tree can mirror the source project layout.
@@ -168,6 +171,69 @@ export function TranslationsSidebar({
   onImportFolder,
 }: Props) {
   const dialog = useDialog();
+  const { state: kanbanState } = useKanban();
+  const { limits } = useSubscription();
+  const paywall = usePaywall();
+
+  // Frozen translation projects in the current workspace. Same rule as
+  // script projects: oldest stay active, overflow freezes. Only enforced
+  // for OWNED workspaces — invited workspaces are gated by the inviter's
+  // tier on the server.
+  const frozenTranslationIds = useMemo(() => {
+    const currentWs = kanbanState.workspaces.find(
+      (w) => w.id === kanbanState.workspaceId,
+    );
+    if (!currentWs || currentWs.role !== "owner") return new Set<string>();
+    if (!Number.isFinite(limits.maxTranslationProjectsPerWorkspace))
+      return new Set<string>();
+    const sorted = api.projects
+      .slice()
+      .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""));
+    const frozen = new Set<string>();
+    for (
+      let i = limits.maxTranslationProjectsPerWorkspace;
+      i < sorted.length;
+      i++
+    ) {
+      frozen.add(sorted[i].id);
+    }
+    return frozen;
+  }, [
+    kanbanState.workspaces,
+    kanbanState.workspaceId,
+    api.projects,
+    limits.maxTranslationProjectsPerWorkspace,
+  ]);
+
+  const atTranslationLimit =
+    api.projects.length >= limits.maxTranslationProjectsPerWorkspace;
+
+  // If the active translation just became frozen (trial expired while inside
+  // an overflow language), jump back to the oldest unfrozen one so the
+  // editor isn't paywalled.
+  useEffect(() => {
+    if (
+      api.activeProjectId &&
+      frozenTranslationIds.has(api.activeProjectId)
+    ) {
+      const fallback = api.projects
+        .slice()
+        .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""))
+        .find((p) => !frozenTranslationIds.has(p.id));
+      if (fallback) api.setActiveProjectId(fallback.id);
+    }
+    // api.setActiveProjectId identity churns; depend only on the ids.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api.activeProjectId, frozenTranslationIds, api.projects]);
+
+  const handleNewProject = () => {
+    if (atTranslationLimit) {
+      paywall.show("translation_limit");
+      return;
+    }
+    onNewProject();
+  };
+
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [view, setView] = useState<View>(
     api.activeProjectId ? "files" : "projects",
@@ -479,7 +545,7 @@ export function TranslationsSidebar({
               <button
                 type="button"
                 className="tr-row tr-row-filled"
-                onClick={onNewProject}
+                onClick={handleNewProject}
               >
                 <span className="tr-row-text">Add Language</span>
                 <span className="tr-row-glyph" aria-hidden>
@@ -499,12 +565,15 @@ export function TranslationsSidebar({
                 {!canEdit && <p>Ask a workspace owner to add one.</p>}
               </div>
             ) : (
-              api.projects.map((p) => (
+              api.projects.map((p) => {
+                const isFrozen = frozenTranslationIds.has(p.id);
+                return (
                 <div
                   key={p.id}
                   className={
                     "tr-row-wrap" +
-                    (p.id === api.activeProjectId ? " is-active" : "")
+                    (p.id === api.activeProjectId ? " is-active" : "") +
+                    (isFrozen ? " is-frozen" : "")
                   }
                 >
                   <button
@@ -515,12 +584,37 @@ export function TranslationsSidebar({
                         ? "tr-row-filled"
                         : "tr-row-outlined")
                     }
-                    onClick={() => onSelectProject(p.id)}
+                    onClick={() => {
+                      if (isFrozen) {
+                        paywall.show("frozen_translation");
+                        return;
+                      }
+                      onSelectProject(p.id);
+                    }}
+                    title={isFrozen ? `${p.name} · frozen (free plan)` : p.name}
                   >
                     <span className="tr-row-text">{p.name}</span>
-                    <span className="tr-row-chev" aria-hidden>
-                      <ChevronIcon />
-                    </span>
+                    {isFrozen ? (
+                      <span className="tr-row-chev" aria-hidden>
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect x="4" y="11" width="16" height="10" rx="2" />
+                          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span className="tr-row-chev" aria-hidden>
+                        <ChevronIcon />
+                      </span>
+                    )}
                   </button>
                   {canEdit && (
                     <div className="tr-row-menu-wrap">
@@ -576,7 +670,8 @@ export function TranslationsSidebar({
                     </div>
                   )}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </>

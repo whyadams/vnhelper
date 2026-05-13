@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../state/AuthProvider";
@@ -9,7 +9,13 @@ const isTauri = (): boolean =>
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-const MCP_ENTRY = "E:/Desktop/VnHelper/packages/vnhelper-mcp/dist/cli.js";
+
+// Dev-time fallback when running outside of a packaged Tauri build (e.g.,
+// `pnpm dev` in a browser tab) — the bundled binary resolver returns an
+// error, so we fall back to the local checkout's compiled cli.js so devs
+// can still test the integration UI without rebuilding the installer.
+const DEV_FALLBACK_ENTRY =
+  "E:/Desktop/VnHelper/packages/vnhelper-mcp/dist/cli.js";
 
 type Target = "code" | "desktop";
 
@@ -52,36 +58,69 @@ export function IntegrationsSection() {
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [target, setTarget] = useState<Target>("desktop");
   const [copied, setCopied] = useState<"cmd" | "json" | null>(null);
+  /** Path to the bundled `vnhelper-mcp(.exe)` sidecar, resolved via Tauri at
+   *  mount. `null` while we wait for the IPC. If the resolver fails (e.g.,
+   *  the bundled binary is missing in a dev build), we fall back to the
+   *  local-checkout cli.js. */
+  const [mcpBinary, setMcpBinary] = useState<string | null>(null);
+  const [usingBundled, setUsingBundled] = useState(true);
+
+  useEffect(() => {
+    if (!isTauri()) {
+      setMcpBinary(DEV_FALLBACK_ENTRY);
+      setUsingBundled(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const p = await invoke<string>("mcp_binary_path");
+        if (!cancelled) {
+          setMcpBinary(p);
+          setUsingBundled(true);
+        }
+      } catch (e) {
+        console.warn("mcp_binary_path failed, using dev fallback", e);
+        if (!cancelled) {
+          setMcpBinary(DEV_FALLBACK_ENTRY);
+          setUsingBundled(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const buildCommand = (workspaceId: string | null) => {
+    if (!mcpBinary) return "";
     const wsFlag = workspaceId
       ? ` --env VNHELPER_DEFAULT_WORKSPACE_ID=${workspaceId}`
       : "";
-    return (
-      `claude mcp add vnhelper --scope user` +
+    const envFlags =
       ` --env VNHELPER_SUPABASE_URL=${SUPABASE_URL}` +
       ` --env VNHELPER_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}` +
-      wsFlag +
-      ` -- node "${MCP_ENTRY}"`
-    );
+      wsFlag;
+    // Bundled path: pass the sidecar exe directly — no Node required.
+    // Dev fallback path: launch via Node since the .js wasn't compiled.
+    const launcher = usingBundled
+      ? `"${mcpBinary}"`
+      : `node "${mcpBinary}"`;
+    return `claude mcp add vnhelper --scope user${envFlags} -- ${launcher}`;
   };
 
   const buildDesktopJson = (workspaceId: string | null) => {
+    if (!mcpBinary) return "";
     const env: Record<string, string> = {
       VNHELPER_SUPABASE_URL: SUPABASE_URL,
       VNHELPER_SUPABASE_ANON_KEY: SUPABASE_ANON_KEY,
     };
     if (workspaceId) env.VNHELPER_DEFAULT_WORKSPACE_ID = workspaceId;
+    const serverEntry = usingBundled
+      ? { command: mcpBinary, args: [] as string[], env }
+      : { command: "node", args: [mcpBinary], env };
     return JSON.stringify(
-      {
-        mcpServers: {
-          vnhelper: {
-            command: "node",
-            args: [MCP_ENTRY],
-            env,
-          },
-        },
-      },
+      { mcpServers: { vnhelper: serverEntry } },
       null,
       2,
     );
