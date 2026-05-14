@@ -20,6 +20,7 @@ import "./styles/skeleton.css";
 import "./styles/widget.css";
 import "./styles/settings.css";
 import "./styles/subscription.css";
+import "./styles/copy-button.css";
 import { AutoUpdater } from "./components/AutoUpdater";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { CalendarScreen } from "./components/calendar/CalendarScreen";
@@ -43,6 +44,7 @@ import { KanbanProvider, useKanban } from "./state/kanbanStore";
 import { SubscriptionProvider } from "./state/subscription";
 import { PaywallProvider } from "./components/subscription/Paywall";
 import { FrozenAutoSwitcher } from "./components/subscription/FrozenAutoSwitcher";
+import { CalendarNotifier } from "./components/calendar/CalendarNotifier";
 import { useTrayTasks } from "./state/useTrayTasks";
 import { canSeeNav, type Role } from "./lib/roles";
 
@@ -134,6 +136,7 @@ function AuthedShell() {
       <PaywallProvider>
         <KanbanProvider>
           <FrozenAutoSwitcher />
+          <CalendarNotifier />
           <GlobalShortcuts />
           <Rail />
           <Sidebar />

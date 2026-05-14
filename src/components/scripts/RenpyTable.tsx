@@ -1445,10 +1445,15 @@ function SceneBodyLineInner({
 }: {
   block: RpyBlock;
 } & Omit<CommonHandlers, "onInsertAfter">) {
+  // Hooks first — Rules of Hooks. The early-return guard for the wrong block
+  // kind has to live AFTER all hook calls, otherwise re-renders that switch
+  // between matching/non-matching blocks would change the hook call order
+  // and corrupt React's fiber state.
+  const s = useSortable(block.id);
+
   if (block.kind !== "say" && block.kind !== "narrator") return null;
 
   const isNarrator = block.kind === "narrator";
-  const s = useSortable(block.id);
 
   return (
     <div

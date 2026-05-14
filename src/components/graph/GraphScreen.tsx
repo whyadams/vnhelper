@@ -61,6 +61,9 @@ export function GraphScreen() {
           projectId={scripts.activeProjectId}
           workspaceId={state.workspaceId}
           onOpenScene={onOpenScene}
+          createNode={scripts.createNode}
+          updateNode={scripts.updateNode}
+          deleteNode={scripts.deleteNode}
         />
       ) : (
         <div className="graph-empty">

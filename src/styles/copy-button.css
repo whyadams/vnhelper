@@ -1,0 +1,77 @@
+/* Small clipboard button used across the app for grabbing entity ids to
+   hand to Claude via MCP. Two size variants:
+   - xs : 22×22 button with a 12px glyph, fits tree rows / dropdown items
+   - sm : 26×26 with a 14px glyph, fits card headers / detail panels */
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: rgba(200, 199, 202, 0.45);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s,
+    opacity 0.12s;
+  flex-shrink: 0;
+  line-height: 0;
+  /* Hidden until host row is hovered (parent must add `.copy-host` if it
+     wants this opt-in behaviour). Standalone usage stays always-visible. */
+}
+.copy-btn-xs {
+  width: 22px;
+  height: 22px;
+}
+.copy-btn-xs svg {
+  width: 12px;
+  height: 12px;
+}
+.copy-btn-sm {
+  width: 26px;
+  height: 26px;
+}
+.copy-btn-sm svg {
+  width: 14px;
+  height: 14px;
+}
+
+.copy-btn:hover {
+  background: rgba(200, 199, 202, 0.08);
+  border-color: rgba(200, 199, 202, 0.12);
+  color: rgba(200, 199, 202, 0.85);
+}
+.copy-btn:active {
+  background: rgba(200, 199, 202, 0.12);
+}
+
+/* Successful copy — green flash for ~1.5s. */
+.copy-btn.is-copied {
+  background: rgba(140, 220, 140, 0.12);
+  border-color: rgba(140, 220, 140, 0.25);
+  color: rgba(170, 230, 170, 0.95);
+}
+
+.copy-btn-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Opt-in hover reveal: put `.copy-host` on the row container, and the copy
+   button inside it stays at ~30% opacity until hover. Lets the icon stay
+   discoverable but not visually noisy. */
+.copy-host .copy-btn {
+  opacity: 0.3;
+}
+.copy-host:hover .copy-btn,
+.copy-host:focus-within .copy-btn,
+.copy-btn:hover,
+.copy-btn:focus-visible {
+  opacity: 1;
+}

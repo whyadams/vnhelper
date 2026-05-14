@@ -483,3 +483,47 @@
   .set-grid { grid-template-columns: 180px 1fr; }
   .set-content { padding: 24px 24px 80px; }
 }
+
+/* ---------- Switch toggle (autostart, notifications enable, …) ---------- */
+.set-toggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid rgba(200, 199, 202, 0.18);
+  border-radius: 99px;
+  background: rgba(200, 199, 202, 0.06);
+  cursor: pointer;
+  transition: background 0.16s, border-color 0.16s;
+}
+.set-toggle:hover {
+  background: rgba(200, 199, 202, 0.1);
+  border-color: rgba(200, 199, 202, 0.28);
+}
+.set-toggle-thumb {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(200, 199, 202, 0.7);
+  transition: left 0.16s, background 0.16s;
+}
+.set-toggle.is-on {
+  background: rgba(141, 153, 130, 0.4);
+  border-color: rgba(141, 153, 130, 0.55);
+}
+.set-toggle.is-on:hover {
+  background: rgba(141, 153, 130, 0.5);
+}
+.set-toggle.is-on .set-toggle-thumb {
+  left: calc(100% - 17px);
+  background: var(--text-1);
+}
+.set-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

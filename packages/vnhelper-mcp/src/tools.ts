@@ -338,7 +338,9 @@ const createScriptNode: ToolDef = {
     "Create a script node (chapter/scene/block). parent_id can be null for root. " +
     "`body` accepts markdown (#/##/### headings, **bold**, *italic*, ~~strike~~, " +
     "--- horizontal rule, > blockquote, - lists). Single newlines render as visible " +
-    "line breaks (hardBreak), blank lines start a new paragraph.",
+    "line breaks (hardBreak), blank lines start a new paragraph. " +
+    "Tip: call `get_writing_style` first to read the project's author voice " +
+    "preferences (language, tone, POV, …) before drafting content.",
   inputSchema: z.object({
     workspace_id: z.string().uuid().optional(),
     project_id: z.string().uuid().optional(),
@@ -461,7 +463,9 @@ const appendToScene: ToolDef = {
     "--- horizontal rule, > blockquote, - lists). The structured editor " +
     "content is regenerated from the merged markdown automatically. If the " +
     "scene was edited in the UI since the last write, the current editor " +
-    "state is preserved by serializing it back to markdown before appending.",
+    "state is preserved by serializing it back to markdown before appending. " +
+    "Tip: call `get_writing_style` first so the appended lines match the " +
+    "project's tone, POV, vocabulary, etc.",
   inputSchema: z.object({
     node_id: z.string().uuid(),
     text: z.string().min(1),
@@ -547,6 +551,224 @@ const listCharacters: ToolDef = {
       .order("position", { ascending: true });
     if (error) throw new Error(error.message);
     return data ?? [];
+  },
+};
+
+/* ---------- Subscription / tier ----------
+ * Lets Claude check the user's plan + remaining trial before attempting
+ * actions that the DB-side quota triggers might reject. Returns the same
+ * shape the frontend `useSubscription()` hook exposes, so prompts that
+ * reference "free plan limits" stay consistent across UI and agent.
+ *
+ * Keep `TIER_LIMITS` in sync with `src/state/subscription.tsx#LIMITS`.
+ */
+
+type Tier = "free" | "pro";
+
+/** Mirrors the LIMITS map in src/state/subscription.tsx. The frontend is the
+ *  source of truth for the *display* of limits, but Claude needs to see them
+ *  here without an extra round-trip. If you change one, change both. */
+const TIER_LIMITS: Record<Tier, Record<string, number | boolean>> = {
+  free: {
+    max_workspaces: 1,
+    max_script_projects_per_workspace: 1,
+    max_translation_projects_per_workspace: 2,
+    can_invite_collaborators: false,
+    can_use_graph: false,
+    can_export_rpy: false,
+  },
+  pro: {
+    max_workspaces: Number.POSITIVE_INFINITY,
+    max_script_projects_per_workspace: Number.POSITIVE_INFINITY,
+    max_translation_projects_per_workspace: Number.POSITIVE_INFINITY,
+    can_invite_collaborators: true,
+    can_use_graph: true,
+    can_export_rpy: true,
+  },
+};
+
+const getSubscription: ToolDef = {
+  name: "get_subscription",
+  description:
+    "Inspect the signed-in user's subscription state — tier (`free` | `pro`), raw status (`trialing` | `active` | `expired` | …), trial countdown, and the resolved limit map (max workspaces / script projects / translations, plus capability booleans). Call this BEFORE attempting actions that may be quota-blocked so you can warn the user up front and offer the right upgrade hint instead of surfacing a raw DB error.",
+  inputSchema: z.object({}),
+  handler: async () => {
+    const c = await getClient();
+    const { data, error } = await c
+      .from("my_subscription")
+      .select(
+        "effective_tier, status, trial_ends_at, current_period_end, raw_tier",
+      )
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    // No row → treat as free. The frontend uses the same fallback to avoid
+    // accidental unlock on a transient fetch failure.
+    if (!data) {
+      return {
+        tier: "free" as Tier,
+        raw_tier: null,
+        status: "expired",
+        trial_ends_at: null,
+        current_period_end: null,
+        is_trial: false,
+        trial_days_left: null,
+        limits: TIER_LIMITS.free,
+      };
+    }
+
+    const tier: Tier = data.effective_tier === "pro" ? "pro" : "free";
+    const trialEndsAt = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
+    const isTrial =
+      data.status === "trialing" &&
+      tier === "pro" &&
+      trialEndsAt !== null &&
+      trialEndsAt.getTime() > Date.now();
+    const trialDaysLeft =
+      isTrial && trialEndsAt
+        ? Math.max(
+            0,
+            Math.ceil(
+              (trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+            ),
+          )
+        : null;
+
+    return {
+      tier,
+      raw_tier: data.raw_tier ?? null,
+      status: data.status ?? "expired",
+      trial_ends_at: data.trial_ends_at ?? null,
+      current_period_end: data.current_period_end ?? null,
+      is_trial: isTrial,
+      trial_days_left: trialDaysLeft,
+      limits: TIER_LIMITS[tier],
+    };
+  },
+};
+
+const getWritingStyle: ToolDef = {
+  name: "get_writing_style",
+  description:
+    "Read the per-project writing style hints (language, tone, POV, tense, sentence length, vocabulary, do/don't examples, custom rules). Call this BEFORE drafting new scene content with create_script_node / append_to_scene so the output matches the author's voice. Returns an empty object when the author hasn't configured anything — in that case, default to a neutral style.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    project_id: z.string().uuid().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        project_id: z.string().uuid().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    const project = await resolveProjectId(c, ws, args.project_id);
+    const { data, error } = await c
+      .from("script_projects")
+      .select("id, title, writing_style")
+      .eq("id", project)
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      project_id: data.id,
+      project_title: data.title,
+      writing_style: data.writing_style ?? {},
+    };
+  },
+};
+
+/** Schema shared by `update_writing_style` — keep this in sync with the
+ *  TypeScript `WritingStyle` shape in the frontend. */
+const writingStylePatchSchema = z.object({
+  language: z.string().nullish(),
+  tone: z.array(z.string()).nullish(),
+  pov: z.enum(["first", "second", "third", "mixed"]).nullish(),
+  tense: z.enum(["past", "present", "mixed"]).nullish(),
+  sentence_length: z.enum(["short", "varied", "long"]).nullish(),
+  vocabulary: z.enum(["simple", "moderate", "rich"]).nullish(),
+  do_examples: z.array(z.string()).nullish(),
+  dont_examples: z.array(z.string()).nullish(),
+  custom_rules: z.string().nullish(),
+  notes: z.string().nullish(),
+});
+
+const updateWritingStyle: ToolDef = {
+  name: "update_writing_style",
+  description:
+    "Patch the per-project writing style. Use this to capture an author's request like 'make the style darker and more concise' — call `get_writing_style` first to see the current state, then apply your changes. Only the fields you pass are touched (merge semantics); pass `null` for a field to clear it. When `mode='replace'` the existing object is discarded and only your patch fields remain.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    project_id: z.string().uuid().optional(),
+    /** "merge" (default) — keys present in the patch overwrite, others are
+     *  kept. "replace" — the new object equals exactly the patch. */
+    mode: z.enum(["merge", "replace"]).default("merge"),
+    patch: writingStylePatchSchema,
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        project_id: z.string().uuid().optional(),
+        mode: z.enum(["merge", "replace"]).default("merge"),
+        patch: writingStylePatchSchema,
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    const project = await resolveProjectId(c, ws, args.project_id);
+
+    // Drop `null` entries from the incoming patch — they signal "clear this
+    // field". After merging we strip undefined/null/empty so the stored
+    // JSONB stays tight (matters because the agent later reads it back).
+    const cleanedPatch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(args.patch)) {
+      // `undefined` means "don't touch"; `null` means "clear" (handled below
+      // by simply omitting from the merge target).
+      if (v === undefined) continue;
+      if (v === null) {
+        cleanedPatch[k] = null;
+        continue;
+      }
+      cleanedPatch[k] = v;
+    }
+
+    let next: Record<string, unknown>;
+    if (args.mode === "replace") {
+      next = {};
+      for (const [k, v] of Object.entries(cleanedPatch)) {
+        if (v !== null) next[k] = v;
+      }
+    } else {
+      // Merge: fetch current, layer patch on top.
+      const { data, error } = await c
+        .from("script_projects")
+        .select("writing_style")
+        .eq("id", project)
+        .single();
+      if (error) throw new Error(error.message);
+      const current = (data?.writing_style ?? {}) as Record<string, unknown>;
+      next = { ...current };
+      for (const [k, v] of Object.entries(cleanedPatch)) {
+        if (v === null) {
+          delete next[k];
+        } else {
+          next[k] = v;
+        }
+      }
+    }
+
+    const { data: saved, error: saveErr } = await c
+      .from("script_projects")
+      .update({ writing_style: next as never })
+      .eq("id", project)
+      .select("id, writing_style")
+      .single();
+    if (saveErr) throw new Error(saveErr.message);
+    return {
+      project_id: saved.id,
+      writing_style: saved.writing_style ?? {},
+    };
   },
 };
 
@@ -665,6 +887,142 @@ const deleteCharacter: ToolDef = {
     const c = await getClient();
     const { error } = await c
       .from("script_characters")
+      .delete()
+      .eq("id", args.id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.id };
+  },
+};
+
+/* ---------- Script locations ----------------------------------------------
+ * Locations describe the physical (or imaginary) places a scene happens in —
+ * "Bar at midnight", "Eileen's flat", "Cosmodrome control room". Each scene
+ * can be linked to one location via `script_nodes.location_id`; the editor
+ * surfaces the mood and description as worldbuilding hints. CRUD mirrors the
+ * `script_characters` tools above.
+ */
+
+const listLocations: ToolDef = {
+  name: "list_locations",
+  description: "List locations in a project — places used as scene settings.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    project_id: z.string().uuid().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        project_id: z.string().uuid().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    const project = await resolveProjectId(c, ws, args.project_id);
+    const { data, error } = await c
+      .from("script_locations")
+      .select("id, name, description, mood, image_url, position")
+      .eq("project_id", project)
+      .order("position", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+};
+
+const createLocation: ToolDef = {
+  name: "create_location",
+  description:
+    "Create a location (place / setting) inside a script project. Use for worldbuilding entries the user can later attach to scenes via the UI or update_script_node.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    project_id: z.string().uuid().optional(),
+    name: z.string().min(1),
+    description: z.string().optional(),
+    mood: z.string().optional(),
+    image_url: z.string().url().nullable().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        project_id: z.string().uuid().optional(),
+        name: z.string().min(1),
+        description: z.string().optional(),
+        mood: z.string().optional(),
+        image_url: z.string().url().nullable().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    const project = await resolveProjectId(c, ws, args.project_id);
+    const { data, error } = await c
+      .from("script_locations")
+      .insert({
+        project_id: project,
+        workspace_id: ws,
+        name: args.name,
+        description: args.description ?? "",
+        mood: args.mood ?? null,
+        image_url: args.image_url ?? null,
+      })
+      .select("id, name")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const updateLocation: ToolDef = {
+  name: "update_location",
+  description:
+    "Patch a location. Only the fields you pass are updated; others are left alone. Useful for refining descriptions or mood notes as the story evolves.",
+  inputSchema: z.object({
+    id: z.string().uuid(),
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    mood: z.string().nullable().optional(),
+    image_url: z.string().url().nullable().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        id: z.string().uuid(),
+        name: z.string().min(1).optional(),
+        description: z.string().optional(),
+        mood: z.string().nullable().optional(),
+        image_url: z.string().url().nullable().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const { id, ...patch } = args;
+    // Strip undefined so we don't overwrite columns with NULL when caller
+    // omits a field. Explicit `null` is preserved (allowed clear-to-null
+    // for mood / image_url).
+    const cleanPatch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) {
+      if (v !== undefined) cleanPatch[k] = v;
+    }
+    const { data, error } = await c
+      .from("script_locations")
+      .update(cleanPatch)
+      .eq("id", id)
+      .select("id, name")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const deleteLocation: ToolDef = {
+  name: "delete_location",
+  description:
+    "Permanently delete a location. Scenes linked via location_id keep working — the FK is `ON DELETE SET NULL` so they just lose the location reference (text references to the location's name stay intact in scene bodies).",
+  inputSchema: z.object({ id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("script_locations")
       .delete()
       .eq("id", args.id);
     if (error) throw new Error(error.message);
@@ -1000,6 +1358,430 @@ const detachFromCalendarEvent: ToolDef = {
   },
 };
 
+/* ---------- Translations ----------------------------------------------------
+ *
+ * Designed for "give Claude one prompt and it does the work" rather than
+ * step-by-step navigation. The killer combo is:
+ *
+ *   1. `translation_overview`     — one call, get the whole language → file → progress map
+ *   2. `find_translation_strings` — flexible filter (status / glob / speaker / query)
+ *   3. `update_translation_strings` — bulk patch N rows at once
+ *
+ * With those three an agent can translate a chapter in two tool calls.
+ */
+
+/** "Pending" is a convenience grouping for users — it means anything not yet
+ *  marked `done`. The DB stores three statuses (empty / draft / done). */
+function statusFilter(
+  status: "pending" | "done" | "all" | undefined,
+): string[] | null {
+  if (!status || status === "all") return null;
+  if (status === "done") return ["done"];
+  return ["empty", "draft"];
+}
+
+/** Translate user-friendly glob into PostgREST `like` pattern.
+ *  `*` → `%`, `?` → `_`. We treat the underscore as a literal first so a
+ *  filename like `chapter_1` doesn't accidentally match `chapter-1`. */
+function globToLike(glob: string): string {
+  return glob
+    .replace(/_/g, "\\_") // escape SQL wildcard
+    .replace(/\*/g, "%")
+    .replace(/\?/g, "_");
+}
+
+const listTranslationProjects: ToolDef = {
+  name: "list_translation_projects",
+  description: "List translation projects (target languages) in a workspace.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({ workspace_id: z.string().uuid().optional() })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    const { data, error } = await c
+      .from("translation_projects")
+      .select("id, name, source_lang, created_at")
+      .eq("workspace_id", ws)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+};
+
+const translationOverview: ToolDef = {
+  name: "translation_overview",
+  description:
+    "Snapshot of all translation projects in a workspace WITH per-file progress (done/total). Use this as the first call when you need to find out which translation/file to work on — saves a chain of list_translation_projects + list_translation_files + per-file stat queries.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    include_files: z.boolean().default(true),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        include_files: z.boolean().default(true),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    const { data: projects, error } = await c
+      .from("translation_projects")
+      .select("id, name, source_lang, created_at")
+      .eq("workspace_id", ws)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const projRows = projects ?? [];
+    if (projRows.length === 0) return [];
+
+    if (!args.include_files) {
+      return projRows.map((p) => ({ ...p, files: [] }));
+    }
+
+    const projectIds = projRows.map((p) => p.id);
+    const { data: files, error: filesErr } = await c
+      .from("translation_files")
+      .select("id, project_id, filename, folder_path, uploaded_at")
+      .in("project_id", projectIds)
+      .order("folder_path", { ascending: true })
+      .order("filename", { ascending: true });
+    if (filesErr) throw new Error(filesErr.message);
+    const fileRows = files ?? [];
+
+    // Batch stat lookup — one RPC call returns done/total per file_id.
+    const fileIds = fileRows.map((f) => f.id);
+    const statsByFile = new Map<string, { done: number; total: number }>();
+    if (fileIds.length > 0) {
+      const { data: stats, error: statsErr } = await c.rpc(
+        "translation_file_stats",
+        { _file_ids: fileIds },
+      );
+      if (statsErr) throw new Error(statsErr.message);
+      for (const r of (stats ?? []) as Array<{
+        file_id: string;
+        done: number;
+        total: number;
+      }>) {
+        statsByFile.set(r.file_id, { done: r.done, total: r.total });
+      }
+    }
+
+    return projRows.map((p) => {
+      const myFiles = fileRows
+        .filter((f) => f.project_id === p.id)
+        .map((f) => {
+          const stats = statsByFile.get(f.id) ?? { done: 0, total: 0 };
+          return {
+            id: f.id,
+            filename: f.filename,
+            folder_path: f.folder_path,
+            full_path: f.folder_path
+              ? `${f.folder_path}/${f.filename}`
+              : f.filename,
+            stats,
+          };
+        });
+      const total = myFiles.reduce((acc, f) => acc + f.stats.total, 0);
+      const done = myFiles.reduce((acc, f) => acc + f.stats.done, 0);
+      return {
+        id: p.id,
+        name: p.name,
+        source_lang: p.source_lang,
+        stats: { total, done, pending: total - done },
+        files: myFiles,
+      };
+    });
+  },
+};
+
+const listTranslationFiles: ToolDef = {
+  name: "list_translation_files",
+  description:
+    "List .rpy files in a translation project, with per-file progress (done/total).",
+  inputSchema: z.object({ project_id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ project_id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { data, error } = await c
+      .from("translation_files")
+      .select("id, filename, folder_path, uploaded_at")
+      .eq("project_id", args.project_id)
+      .order("folder_path", { ascending: true })
+      .order("filename", { ascending: true });
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    if (rows.length === 0) return [];
+    const ids = rows.map((r) => r.id);
+    const { data: stats, error: statsErr } = await c.rpc(
+      "translation_file_stats",
+      { _file_ids: ids },
+    );
+    if (statsErr) throw new Error(statsErr.message);
+    const statsByFile = new Map(
+      ((stats ?? []) as Array<{ file_id: string; done: number; total: number }>).map(
+        (s) => [s.file_id, s],
+      ),
+    );
+    return rows.map((f) => ({
+      ...f,
+      full_path: f.folder_path ? `${f.folder_path}/${f.filename}` : f.filename,
+      stats: statsByFile.get(f.id) ?? { done: 0, total: 0 },
+    }));
+  },
+};
+
+const findTranslationStrings: ToolDef = {
+  name: "find_translation_strings",
+  description:
+    "Cross-file search for translation strings inside a project. Supports filtering by status ('pending' = empty+draft / 'done' / 'all'), speaker, full_path glob (e.g. 'chapter_1/*'), and a free-text query that scans source_text and translated_text. Default `status` is 'pending' and default `limit` is 100 (max 500). Use this instead of walking project → file → strings yourself.",
+  inputSchema: z.object({
+    project_id: z.string().uuid(),
+    status: z.enum(["pending", "done", "all"]).default("pending"),
+    query: z.string().optional(),
+    speaker: z.string().optional(),
+    file_path_glob: z.string().optional(),
+    limit: z.number().int().min(1).max(500).default(100),
+    offset: z.number().int().min(0).default(0),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        project_id: z.string().uuid(),
+        status: z.enum(["pending", "done", "all"]).default("pending"),
+        query: z.string().optional(),
+        speaker: z.string().optional(),
+        file_path_glob: z.string().optional(),
+        limit: z.number().int().min(1).max(500).default(100),
+        offset: z.number().int().min(0).default(0),
+      })
+      .parse(raw);
+    const c = await getClient();
+
+    // Resolve project's files; optionally narrow by glob. We need the full
+    // path map either way to enrich the response, so do this in one round.
+    const { data: files, error: filesErr } = await c
+      .from("translation_files")
+      .select("id, filename, folder_path")
+      .eq("project_id", args.project_id);
+    if (filesErr) throw new Error(filesErr.message);
+    const pathOf = new Map<string, string>();
+    let candidateFileIds: string[] = [];
+    for (const f of files ?? []) {
+      const full = f.folder_path ? `${f.folder_path}/${f.filename}` : f.filename;
+      pathOf.set(f.id, full);
+      if (args.file_path_glob) {
+        // Compile the glob to a regex once per row — small N, fine.
+        const pattern = new RegExp(
+          "^" + globToLike(args.file_path_glob).replace(/%/g, ".*").replace(/\\_/g, "_") + "$",
+          "i",
+        );
+        if (pattern.test(full)) candidateFileIds.push(f.id);
+      } else {
+        candidateFileIds.push(f.id);
+      }
+    }
+    if (candidateFileIds.length === 0) return [];
+
+    let q = c
+      .from("translation_strings")
+      .select(
+        "id, file_id, source_text, translated_text, speaker, status, source_line, source_path",
+      )
+      .in("file_id", candidateFileIds)
+      .order("source_line", { ascending: true })
+      .range(args.offset, args.offset + args.limit - 1);
+
+    const allowedStatuses = statusFilter(args.status);
+    if (allowedStatuses) q = q.in("status", allowedStatuses);
+    if (args.speaker) q = q.eq("speaker", args.speaker);
+    if (args.query) {
+      // Match either side of the string — useful for finding a placeholder
+      // in the source or spotting earlier translations to mimic.
+      const safe = args.query.replace(/[%_]/g, (m) => "\\" + m);
+      q = q.or(
+        `source_text.ilike.%${safe}%,translated_text.ilike.%${safe}%`,
+      );
+    }
+
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((s) => ({
+      id: s.id,
+      file_id: s.file_id,
+      full_path: pathOf.get(s.file_id) ?? null,
+      source_line: s.source_line,
+      speaker: s.speaker,
+      status: s.status,
+      source_text: s.source_text,
+      translated_text: s.translated_text,
+    }));
+  },
+};
+
+const readTranslationStrings: ToolDef = {
+  name: "read_translation_strings",
+  description:
+    "Sequential dump of a translation file's strings with pagination. Use when you need adjacent strings for context (the previous lines of dialogue) rather than a sparse filtered set.",
+  inputSchema: z.object({
+    file_id: z.string().uuid(),
+    status: z.enum(["pending", "done", "all"]).default("all"),
+    limit: z.number().int().min(1).max(500).default(200),
+    offset: z.number().int().min(0).default(0),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        file_id: z.string().uuid(),
+        status: z.enum(["pending", "done", "all"]).default("all"),
+        limit: z.number().int().min(1).max(500).default(200),
+        offset: z.number().int().min(0).default(0),
+      })
+      .parse(raw);
+    const c = await getClient();
+    let q = c
+      .from("translation_strings")
+      .select(
+        "id, source_text, translated_text, speaker, status, source_line, source_path, group_label",
+      )
+      .eq("file_id", args.file_id)
+      .order("source_line", { ascending: true })
+      .range(args.offset, args.offset + args.limit - 1);
+    const allowedStatuses = statusFilter(args.status);
+    if (allowedStatuses) q = q.in("status", allowedStatuses);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+};
+
+const updateTranslationStrings: ToolDef = {
+  name: "update_translation_strings",
+  description:
+    "Bulk-patch translation strings — pass an array of {id, translated_text, status?} and they're all updated in one round trip. The most efficient way for an agent to ship a chunk of translations. `status` defaults to 'done' when not provided. Returns a per-row result so partial failures don't lose the rest.",
+  inputSchema: z.object({
+    updates: z
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          translated_text: z.string(),
+          status: z.enum(["empty", "draft", "done"]).optional(),
+        }),
+      )
+      .min(1)
+      .max(500),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        updates: z
+          .array(
+            z.object({
+              id: z.string().uuid(),
+              translated_text: z.string(),
+              status: z.enum(["empty", "draft", "done"]).optional(),
+            }),
+          )
+          .min(1)
+          .max(500),
+      })
+      .parse(raw);
+    const c = await getClient();
+    // Supabase doesn't have a clean multi-row UPDATE-WHERE-id-IN-VALUES API,
+    // so we issue one UPDATE per row but in parallel. Sub-second for ~100
+    // rows; safer than a CTE workaround that needs an RPC.
+    const results = await Promise.all(
+      args.updates.map(async (u) => {
+        const { error } = await c
+          .from("translation_strings")
+          .update({
+            translated_text: u.translated_text,
+            status: u.status ?? "done",
+          })
+          .eq("id", u.id);
+        return { id: u.id, ok: !error, error: error?.message };
+      }),
+    );
+    const failed = results.filter((r) => !r.ok);
+    return {
+      updated: results.length - failed.length,
+      failed: failed.length,
+      errors: failed,
+    };
+  },
+};
+
+const listTranslationSpeakers: ToolDef = {
+  name: "list_translation_speakers",
+  description:
+    "Distinct speakers in a translation project (e.g. 'dg', 'alice', null for narrator). Useful for 'translate everything Alice says'-style queries — feed the speaker into find_translation_strings.",
+  inputSchema: z.object({ project_id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ project_id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    // Resolve file ids first; Supabase has no DISTINCT clause via PostgREST,
+    // so we dedupe client-side over a bounded set.
+    const { data: files, error: filesErr } = await c
+      .from("translation_files")
+      .select("id")
+      .eq("project_id", args.project_id);
+    if (filesErr) throw new Error(filesErr.message);
+    const ids = (files ?? []).map((f) => f.id);
+    if (ids.length === 0) return [];
+    const { data, error } = await c
+      .from("translation_strings")
+      .select("speaker")
+      .in("file_id", ids)
+      .limit(10000);
+    if (error) throw new Error(error.message);
+    const counts = new Map<string | null, number>();
+    for (const r of data ?? []) {
+      const k = r.speaker;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([speaker, count]) => ({ speaker, count }))
+      .sort((a, b) => b.count - a.count);
+  },
+};
+
+const deleteTranslationFile: ToolDef = {
+  name: "delete_translation_file",
+  description:
+    "Delete a translation file (all its strings cascade-delete with it).",
+  inputSchema: z.object({ id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("translation_files")
+      .delete()
+      .eq("id", args.id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.id };
+  },
+};
+
+const deleteTranslationProject: ToolDef = {
+  name: "delete_translation_project",
+  description:
+    "Delete an entire translation project (all files + strings cascade-delete).",
+  inputSchema: z.object({ id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("translation_projects")
+      .delete()
+      .eq("id", args.id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.id };
+  },
+};
+
 /* ---------- Export ---------- */
 
 export const TOOLS: ToolDef[] = [
@@ -1020,10 +1802,26 @@ export const TOOLS: ToolDef[] = [
   createCharacter,
   updateCharacter,
   deleteCharacter,
+  listLocations,
+  createLocation,
+  updateLocation,
+  deleteLocation,
+  getSubscription,
+  getWritingStyle,
+  updateWritingStyle,
   listCalendarEvents,
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
   attachToCalendarEvent,
   detachFromCalendarEvent,
+  listTranslationProjects,
+  translationOverview,
+  listTranslationFiles,
+  findTranslationStrings,
+  readTranslationStrings,
+  updateTranslationStrings,
+  listTranslationSpeakers,
+  deleteTranslationFile,
+  deleteTranslationProject,
 ];

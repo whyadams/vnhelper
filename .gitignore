@@ -37,6 +37,10 @@ packages/vnhelper-mcp/dist/vnhelper-mcp.exe
 skills-lock.json
 memory/
 
+# Stray Ren'Py debug dumps from local testing — never part of the build.
+_dbgfile.rpy
+*.dbg.rpy
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

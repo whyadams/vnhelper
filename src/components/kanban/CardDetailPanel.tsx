@@ -30,6 +30,7 @@ import {
 import { CommentComposer, renderCommentBody } from "./CommentComposer";
 import { useDialog } from "../ui/Dialog";
 import { LinkedEventsSection } from "../calendar/LinkedEventsSection";
+import { CopyButton } from "../ui/CopyButton";
 
 function BrandGlyph({
   brand,
@@ -248,6 +249,11 @@ export function CardDetailPanel() {
         </DropdownMenu>
 
         <div className="cp-head-actions">
+          <CopyButton
+            value={card.id}
+            title="Copy card id (use as entity_id in MCP task tools)"
+            size="sm"
+          />
           <button
             className="cp-icon-btn cp-danger"
             type="button"

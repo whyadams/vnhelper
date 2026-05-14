@@ -215,8 +215,8 @@
   border: none;
   color: var(--text-2);
   cursor: pointer;
-  padding: 4px;
-  display: grid;
+  padding: 10px;
+  display: flex;
   place-items: center;
 }
 .user-chip button:hover { color: var(--text-1); }

@@ -1,11 +1,11 @@
 import { type ComponentType, type SVGProps } from "react";
 import { Languages as LucideLanguages } from "lucide-react";
-import { useAuth } from "../../state/AuthProvider";
 import { useKanban } from "../../state/kanbanStore";
 import { useNotifications } from "../../state/notifications";
 import { canSeeNav, type Role } from "../../lib/roles";
 import { useSubscription } from "../../state/subscription";
 import { usePaywall } from "../subscription/Paywall";
+import { UserMenu } from "./UserMenu";
 import {
   BellFilledIcon,
   CalendarFilledIcon,
@@ -65,37 +65,12 @@ function LockIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-function SignOutGlyph(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16,17 21,12 16,7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
-
 export function Sidebar() {
   const { state, dispatch } = useKanban();
-  const { user, signOut } = useAuth();
   const notifications = useNotifications();
   const { limits } = useSubscription();
   const paywall = usePaywall();
 
-  const userName =
-    (user?.user_metadata?.name as string | undefined) ??
-    user?.email?.split("@")[0] ??
-    "Me";
   const pendingInvites = state.incomingInvitations.length;
   const unreadNotifs = notifications.unreadCount;
 
@@ -245,24 +220,9 @@ export function Sidebar() {
       <div className="sidebar-divider" />
       <div className="sidebar-spacer-12" />
 
-      {/* User card */}
-      <div className="user-chip">
-        <div className="user-chip-info">
-          <div className="user-chip-name" title={user?.email ?? ""}>
-            {userName}
-          </div>
-          <div className="user-chip-email">{user?.email ?? ""}</div>
-        </div>
-        <button
-          type="button"
-          className="user-chip-action"
-          onClick={() => void signOut()}
-          title="Sign out"
-          aria-label="Sign out"
-        >
-          <SignOutGlyph />
-        </button>
-      </div>
+      {/* Compact identity widget. Avatar carries a colored status ring for
+          trial state at-a-glance; dropdown holds email + trial CTA + sign-out. */}
+      <UserMenu />
     </aside>
   );
 }

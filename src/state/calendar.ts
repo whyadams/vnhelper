@@ -258,11 +258,20 @@ export function useCalendar(workspaceId: string | null) {
 
   // Realtime — inline INSERT/UPDATE/DELETE on events. We also listen to the
   // attachments table so a remote attach/detach reflects without refetch.
+  //
+  // Channel name is suffixed with a fresh UUID *per effect run* so we don't
+  // collide with (a) React Strict Mode's dev double-invoke, where cleanup's
+  // async `removeChannel` hasn't completed by the time the re-mount runs,
+  // and (b) other consumers of `useCalendar` mounted in the same workspace
+  // (e.g. the CalendarNotifier poller). Supabase's RealtimeChannel rejects
+  // adding `.on()` listeners to an already-`subscribe()`d channel; isolated
+  // channel names sidestep that entirely.
   useEffect(() => {
     if (!workspaceId) return;
     const myWs = workspaceId;
+    const channelId = newUuid();
     const ch = supabase
-      .channel(`calendar:${myWs}`)
+      .channel(`calendar:${myWs}:${channelId}`)
       .on(
         "postgres_changes",
         {

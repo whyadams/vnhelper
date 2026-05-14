@@ -39,7 +39,12 @@ export interface LabelNodeDatum extends Record<string, unknown> {
   choiceTexts: string[];
   isImplicit: boolean;
   isEntry: boolean;
+  isOrphan: boolean;
   isUnreachable: boolean;
+  isEnding: boolean;
+  wordCount: number;
+  povColor: string | null;
+  povName: string | null;
 }
 
 export interface EdgeDatum extends Record<string, unknown> {
@@ -127,7 +132,12 @@ function toNodeDatum(n: GraphNodeData): LabelNodeDatum {
     choiceTexts: n.choiceTexts,
     isImplicit: n.isImplicit,
     isEntry: n.isEntry,
+    isOrphan: n.isOrphan,
     isUnreachable: n.isUnreachable,
+    isEnding: n.isEnding,
+    wordCount: n.wordCount,
+    povColor: n.povColor,
+    povName: n.povName,
   };
 }
 

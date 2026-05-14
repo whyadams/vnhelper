@@ -38,6 +38,19 @@ export interface GraphSourceRow {
   position: number;
   rpy_label: string | null;
   rpy_blocks: RpyBlocks | null;
+  /** Character reference for POV: usually script_characters.id, but legacy
+   *  imports may store the character name. Resolved in `buildGraph` via the
+   *  provided `characters` map. */
+  pov: string | null;
+}
+
+/** Character lookup table — passed into `buildGraph` so the build can resolve
+ *  scene.pov into a colour for the node ring. Kept tiny on purpose: id, name
+ *  for fallback matching, and the hex colour. */
+export interface GraphCharacter {
+  id: string;
+  name: string;
+  color: string;
 }
 
 export interface GraphNodeData {
@@ -72,9 +85,31 @@ export interface GraphNodeData {
    *  Surfaced in the UI as a "START" marker so you can find where the
    *  story actually begins at a glance. */
   isEntry: boolean;
-  /** True when no other label in the project jumps/calls/branches into
-   *  this one. The entry point is excluded from this flag. */
+  /** True when no other label in the project jumps/calls/branches/falls
+   *  through into this one. The entry point is excluded. Strict subset
+   *  of `isUnreachable` — a node with zero inbound can't be reached. */
+  isOrphan: boolean;
+  /** True when BFS from the entry point can't reach this label via any
+   *  non-broken edge. Covers orphans AND disconnected islands (labels
+   *  that have inbound, but only from other unreachable labels). */
   isUnreachable: boolean;
+  /** True when this label has no outbound edges. Could be an intentional
+   *  story ending (label finishes with `return`) or a forgotten flow
+   *  transition — the UI just surfaces it; intent is up to the author. */
+  isEnding: boolean;
+  /** Approximate word count of visible content in this segment: sums
+   *  whitespace-split words across say/narrator/choice/note text. Used as
+   *  a "scene-length" hint on the node ("250w", "1.2k") to flag scenes
+   *  that have ballooned or stayed empty. */
+  wordCount: number;
+  /** Hex colour from the scene's POV character, when one is set. Null when
+   *  the scene has no POV or POV doesn't resolve to a known character.
+   *  Painted as a left/top accent so the author can spot "this is Alice's
+   *  scene" at a glance across the canvas. */
+  povColor: string | null;
+  /** Display name of the resolved POV character — surfaced in tooltips so
+   *  the colour above has a textual anchor. Null when no POV is set. */
+  povName: string | null;
 }
 
 export type EdgeOrigin =
@@ -109,9 +144,26 @@ export interface GraphBuildResult {
     labelCount: number;
     edgeCount: number;
     brokenEdgeCount: number;
-    /** Labels with no inbound edge from any other label. The very first
-     *  label in tree-order is treated as reachable (project entry point). */
+    /** Labels with no inbound from any other label (excluding entry). */
+    orphanCount: number;
+    /** Labels that BFS from entry can't reach via non-broken edges
+     *  (orphans + disconnected islands). Always ≥ orphanCount. */
     unreachableCount: number;
+    /** Labels with no outbound edges. Intent (story ending vs forgotten
+     *  transition) is the author's call — we just count them. */
+    endingCount: number;
+    /** Labels reachable from entry by BFS (includes entry). Used for
+     *  the path-coverage panel: reachableCount / labelCount = coverage. */
+    reachableCount: number;
+    /** Endings that are actually reachable from entry. The difference
+     *  (endingCount − reachableEndingCount) is the count of endings
+     *  that exist but the player can never see — usually a bug. */
+    reachableEndingCount: number;
+    /** Shortest / longest / average BFS depth from entry to any reachable
+     *  ending, in edges. Null when no reachable ending exists. */
+    minPathToEnding: number | null;
+    avgPathToEnding: number | null;
+    maxPathToEnding: number | null;
     conditionalEdgeCount: number;
   };
 }
@@ -132,9 +184,30 @@ interface LabelSegment {
   isImplicit: boolean;
 }
 
-export function buildGraph(rows: GraphSourceRow[]): GraphBuildResult {
+export function buildGraph(
+  rows: GraphSourceRow[],
+  characters: GraphCharacter[] = [],
+): GraphBuildResult {
   const byId = new Map<string, GraphSourceRow>();
   for (const r of rows) byId.set(r.id, r);
+
+  // Character lookup tables for resolving scene.pov. Mirrors the editor's
+  // resolution order (ScriptDoc.tsx): exact id match first, then case-
+  // insensitive name match. Built once so per-segment resolve is O(1).
+  const charById = new Map<string, GraphCharacter>();
+  const charByName = new Map<string, GraphCharacter>();
+  for (const c of characters) {
+    charById.set(c.id, c);
+    charByName.set(c.name.toLowerCase(), c);
+  }
+  const resolvePov = (
+    pov: string | null,
+  ): { color: string | null; name: string | null } => {
+    if (!pov) return { color: null, name: null };
+    const c = charById.get(pov) ?? charByName.get(pov.toLowerCase());
+    if (!c) return { color: null, name: null };
+    return { color: c.color, name: c.name };
+  };
 
   const chapterOf = (id: string): string | null => {
     let cur: GraphSourceRow | undefined = byId.get(id);
@@ -235,8 +308,49 @@ export function buildGraph(rows: GraphSourceRow[]): GraphBuildResult {
   }
 
   const entrySegmentName = segments[0]?.name;
+
+  // -- 3a. BFS reachability from entry over non-broken edges. ------------
+  //         A node is "unreachable" when the entry can't reach it via any
+  //         path — this is the accurate measure (orphans + islands), not
+  //         just "no inbound". We walk an adjacency built from the same
+  //         edge list that survived broken-target filtering.
+  const adjacency = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.broken) continue;
+    let arr = adjacency.get(e.source);
+    if (!arr) {
+      arr = [];
+      adjacency.set(e.source, arr);
+    }
+    arr.push(e.target);
+  }
+  // True BFS (not DFS) — we need depths for path-length coverage stats.
+  // Depth is in edges (not segments): entry depth 0, neighbours 1, …
+  const reachable = new Set<string>();
+  const depthFromEntry = new Map<string, number>();
+  if (entrySegmentName) {
+    const queue: string[] = [entrySegmentName];
+    reachable.add(entrySegmentName);
+    depthFromEntry.set(entrySegmentName, 0);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      const d = depthFromEntry.get(cur)!;
+      const next = adjacency.get(cur);
+      if (!next) continue;
+      for (const n of next) {
+        if (reachable.has(n)) continue;
+        reachable.add(n);
+        depthFromEntry.set(n, d + 1);
+        queue.push(n);
+      }
+    }
+  }
+
   const nodes: GraphNodeData[] = segments.map((s) => {
     const sceneRow = byId.get(s.sceneId);
+    const out = outboundCount.get(s.name) ?? 0;
+    const isEntry = s.name === entrySegmentName;
+    const pov = resolvePov(sceneRow?.pov ?? null);
     return {
       id: s.name,
       label: s.name,
@@ -246,16 +360,41 @@ export function buildGraph(rows: GraphSourceRow[]): GraphBuildResult {
       status: s.status,
       chapter:
         sceneRow && sceneRow.parent_id ? chapterOf(sceneRow.parent_id) : null,
-      outboundCount: outboundCount.get(s.name) ?? 0,
+      outboundCount: out,
       brokenOutboundCount: brokenOutBySource.get(s.name) ?? 0,
       choiceTexts: collectChoiceTexts(s.blocks),
       isImplicit: s.isImplicit,
-      isEntry: s.name === entrySegmentName,
-      isUnreachable: s.name !== entrySegmentName && !inbound.has(s.name),
+      isEntry,
+      isOrphan: !isEntry && !inbound.has(s.name),
+      isUnreachable: !isEntry && !reachable.has(s.name),
+      isEnding: out === 0,
+      wordCount: countWords(s.blocks),
+      povColor: pov.color,
+      povName: pov.name,
     };
   });
 
   // -- 4. Stats ------------------------------------------------------------
+
+  // Path-length coverage: depths of reachable endings give us min/avg/max
+  // path from entry to any "outcome". Unreachable endings are excluded —
+  // they're a separate kind of integrity warning (counted via the
+  // endingCount / reachableEndingCount delta).
+  const endingDepths: number[] = [];
+  for (const n of nodes) {
+    if (!n.isEnding) continue;
+    const d = depthFromEntry.get(n.id);
+    if (d !== undefined) endingDepths.push(d);
+  }
+  const reachableEndingCount = endingDepths.length;
+  const minPathToEnding =
+    reachableEndingCount > 0 ? Math.min(...endingDepths) : null;
+  const maxPathToEnding =
+    reachableEndingCount > 0 ? Math.max(...endingDepths) : null;
+  const avgPathToEnding =
+    reachableEndingCount > 0
+      ? endingDepths.reduce((s, x) => s + x, 0) / reachableEndingCount
+      : null;
 
   return {
     nodes,
@@ -264,7 +403,14 @@ export function buildGraph(rows: GraphSourceRow[]): GraphBuildResult {
       labelCount: nodes.length,
       edgeCount: edges.length,
       brokenEdgeCount: edges.filter((e) => e.broken).length,
+      orphanCount: nodes.filter((n) => n.isOrphan).length,
       unreachableCount: nodes.filter((n) => n.isUnreachable).length,
+      endingCount: nodes.filter((n) => n.isEnding).length,
+      reachableCount: reachable.size,
+      reachableEndingCount,
+      minPathToEnding,
+      avgPathToEnding,
+      maxPathToEnding,
       conditionalEdgeCount: edges.filter((e) => e.origin === "conditional")
         .length,
     },
@@ -370,6 +516,40 @@ function collectChoiceTexts(blocks: RpyBlocks): string[] {
     if (b.kind === "choice") out.push(b.text);
   }
   return out;
+}
+
+/**
+ * Approximate word count of the visible content inside a segment. We count
+ * across say / narrator / choice / note text, since those are the strings
+ * that actually become words on screen. Raw / control-flow blocks are
+ * skipped (they're code, not prose) — including them would inflate the
+ * count for label-heavy scenes that contain mostly $-effects.
+ *
+ * Whitespace-split words are a coarse approximation but enough for the
+ * "is this scene 200w or 5k" signal we need on a node.
+ */
+function countWords(blocks: RpyBlocks): number {
+  let total = 0;
+  const add = (s: string | undefined) => {
+    if (!s) return;
+    const m = s.trim().match(/\S+/g);
+    if (m) total += m.length;
+  };
+  for (const b of blocks) {
+    switch (b.kind) {
+      case "say":
+      case "narrator":
+      case "note":
+        add(b.text);
+        break;
+      case "choice":
+        add(b.text);
+        break;
+      default:
+        break;
+    }
+  }
+  return total;
 }
 
 /**

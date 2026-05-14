@@ -133,3 +133,72 @@
 .tr-row-wrap.is-frozen .tr-row-chev {
   color: rgba(200, 199, 202, 0.6);
 }
+
+
+/* ---------- Trial pill ----------
+   Figma ADAMS / 1511:306 — sage-green pill sitting just above the user-chip
+   at the bottom of the sidebar. Same 40px height + 8px corner as the search
+   input at the top of the sidebar, giving the column visual rhyme.
+   The left "Триал" label is muted; the right value (days remaining or
+   "Апгрейд") carries the saturated colour. */
+.trial-pill {
+  /* Sits as the first row inside `.user-chip` (above the identity row).
+     Parent's `gap: 10px` handles spacing — no margin here. */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 0 15px;
+  border-radius: 8px;
+  background: rgba(141, 153, 130, 0.05);
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.trial-pill:hover {
+  background: rgba(141, 153, 130, 0.1);
+}
+.trial-pill-label {
+  flex: 1;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(141, 153, 130, 0.4);
+}
+.trial-pill-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8d9982;
+  white-space: nowrap;
+}
+
+/* Last day — amber accent on the value, slightly warmer pill bg. */
+.trial-pill.is-urgent {
+  background: rgba(220, 180, 110, 0.05);
+}
+.trial-pill.is-urgent:hover {
+  background: rgba(220, 180, 110, 0.1);
+}
+.trial-pill.is-urgent .trial-pill-label {
+  color: rgba(220, 180, 110, 0.4);
+}
+.trial-pill.is-urgent .trial-pill-value {
+  color: #d6b46e;
+}
+
+/* Trial expired — red accent. Slightly louder so the user notices, but the
+   pill stays low-contrast against the sidebar. */
+.trial-pill.is-expired {
+  background: rgba(220, 140, 140, 0.06);
+}
+.trial-pill.is-expired:hover {
+  background: rgba(220, 140, 140, 0.12);
+}
+.trial-pill.is-expired .trial-pill-label {
+  color: rgba(220, 140, 140, 0.5);
+}
+.trial-pill.is-expired .trial-pill-value {
+  color: #d68c8c;
+}

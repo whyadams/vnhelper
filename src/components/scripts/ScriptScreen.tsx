@@ -8,11 +8,11 @@ import { usePaywall } from "../subscription/Paywall";
 import { CreateProjectModal } from "./CreateProjectModal";
 import { EditProjectModal } from "./EditProjectModal";
 import { QuickAddCharacterModal } from "./QuickAddCharacterModal";
-import { ScriptCharactersPage } from "./ScriptCharactersPage";
+import { ScriptSettingsPage } from "./ScriptCharactersPage";
 import { ScriptDoc } from "./ScriptDoc";
 import { ScriptPane } from "./ScriptPane";
 
-type View = "scene" | "characters";
+type View = "scene" | "settings";
 
 export function ScriptScreen() {
   const { state, dispatch } = useKanban();
@@ -35,7 +35,12 @@ export function ScriptScreen() {
   const [quickCharOpen, setQuickCharOpen] = useState(false);
   const [editProject, setEditProject] = useState<ScriptProject | null>(null);
   const [view, setView] = useState<View>("scene");
-  /** Character id queued for editing — handed to ScriptCharactersPage so it
+  /** Tab to land on when the Settings page mounts (e.g. open straight to
+   *  Cast when arriving via a Calendar attachment click on a character). */
+  const [initialSettingsTab, setInitialSettingsTab] = useState<
+    "style" | "characters" | "locations" | "project" | undefined
+  >(undefined);
+  /** Character id queued for editing — handed to ScriptSettingsPage so it
    *  can open the editor when navigated from elsewhere (e.g. Calendar). */
   const [pendingEditCharId, setPendingEditCharId] = useState<string | null>(
     null,
@@ -78,7 +83,9 @@ export function ScriptScreen() {
             return;
           }
           scripts.setActiveProjectId(data.project_id);
-          setView("characters");
+          // Open Settings on the Cast tab with this character pre-selected.
+          setInitialSettingsTab("characters");
+          setView("settings");
           setPendingEditCharId(data.id);
         }
       } finally {
@@ -101,8 +108,13 @@ export function ScriptScreen() {
         scripts={scripts}
         onCreateProject={tryOpenCreate}
         onEditProject={(p) => setEditProject(p)}
-        onShowCharacters={() => setView("characters")}
-        charactersActive={view === "characters"}
+        onShowSettings={() => {
+          // Always open on the Writing Style tab by default — the user
+          // clicked the settings cog, not a character row.
+          setInitialSettingsTab(undefined);
+          setView("settings");
+        }}
+        settingsActive={view === "settings"}
       />
       {view === "scene" ? (
         <ScriptDoc
@@ -110,12 +122,13 @@ export function ScriptScreen() {
           onAddCharacter={() => setQuickCharOpen(true)}
         />
       ) : (
-        <ScriptCharactersPage
+        <ScriptSettingsPage
           scripts={scripts}
           onBack={() => setView("scene")}
           onAddCharacter={() => setQuickCharOpen(true)}
           initialEditingId={pendingEditCharId}
           onConsumeInitialEditingId={() => setPendingEditCharId(null)}
+          initialTab={initialSettingsTab}
         />
       )}
       <CreateProjectModal

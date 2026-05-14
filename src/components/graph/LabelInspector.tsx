@@ -87,6 +87,35 @@ export function LabelInspector({
             {selected.chapter && <span>{selected.chapter} · </span>}
             <span>{selected.sceneTitle}</span>
           </div>
+          {(selected.povName || selected.wordCount > 0) && (
+            <div className="graph-inspector-meta">
+              {selected.povName && (
+                <span
+                  className="graph-inspector-pov"
+                  style={
+                    selected.povColor
+                      ? { color: selected.povColor }
+                      : undefined
+                  }
+                >
+                  <span
+                    className="graph-inspector-pov-dot"
+                    style={
+                      selected.povColor
+                        ? { background: selected.povColor }
+                        : undefined
+                    }
+                  />
+                  POV: {selected.povName}
+                </span>
+              )}
+              {selected.wordCount > 0 && (
+                <span className="graph-inspector-words">
+                  {selected.wordCount} words
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <button
           type="button"
@@ -101,17 +130,27 @@ export function LabelInspector({
 
       {/* ---- Flags ------------------------------------------------------ */}
       {(selected.isEntry ||
+        selected.isOrphan ||
         selected.isUnreachable ||
+        selected.isEnding ||
         selected.brokenOutboundCount > 0 ||
         selected.isImplicit) && (
         <div className="graph-inspector-flags">
           {selected.isEntry && (
             <span className="graph-flag graph-flag-entry">START</span>
           )}
-          {selected.isUnreachable && !selected.isEntry && (
-            <span className="graph-flag graph-flag-unreachable">
-              UNREACHABLE
-            </span>
+          {!selected.isEntry && selected.isOrphan && (
+            <span className="graph-flag graph-flag-orphan">ORPHAN</span>
+          )}
+          {!selected.isEntry &&
+            selected.isUnreachable &&
+            !selected.isOrphan && (
+              <span className="graph-flag graph-flag-unreachable">
+                UNREACHABLE
+              </span>
+            )}
+          {!selected.isEntry && selected.isEnding && (
+            <span className="graph-flag graph-flag-ending">ENDING</span>
           )}
           {selected.brokenOutboundCount > 0 && (
             <span className="graph-flag graph-flag-broken">

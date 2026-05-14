@@ -235,7 +235,10 @@
   content: "";
 }
 
-/* Status accent stripe on the left edge — mirrors kanban card status pill */
+/* Status accent stripe on the left edge — mirrors kanban card status pill.
+   Note: integrity flags (is-entry / is-orphan / is-unreachable) and the POV
+   accent (.has-pov) override this — they win via !important / specificity.
+   The small status dot in the label-name row is the always-visible signal. */
 .graph-node[data-status="todo"] {
   border-left: 2px solid var(--text-3);
 }
@@ -249,6 +252,69 @@
   border-left: 2px solid var(--status-ok);
 }
 
+/* POV character colour — left border tinted by the POV character. Painted
+   only when no integrity flag is competing (entry / orphan / unreachable
+   override via !important earlier in the file). Reads as "this whole
+   left-rail of the node belongs to character X". */
+.graph-node.has-pov {
+  border-left: 3px solid var(--node-pov);
+}
+.graph-node.has-pov.is-orphan,
+.graph-node.has-pov.is-unreachable {
+  /* Integrity wins on the left edge; surface POV via top accent instead. */
+  box-shadow: inset 0 2px 0 0 var(--node-pov);
+}
+.graph-node.has-pov.is-entry {
+  /* Stack: keep entry's outer ring + add the POV top accent. */
+  box-shadow:
+    inset 0 2px 0 0 var(--node-pov),
+    0 0 0 1px rgba(141, 153, 130, 0.25);
+}
+
+/* Status dot — small filled circle in the label-name row. Always visible
+   regardless of border-stripe state, so status reads at a glance even
+   when integrity / POV claim the left edge. */
+.graph-node-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-3);
+  box-shadow: 0 0 0 1.5px var(--bg-elevated);
+}
+.graph-node-status-dot[data-status="todo"] {
+  background: var(--text-3);
+}
+.graph-node-status-dot[data-status="progress"] {
+  background: var(--status-info);
+}
+.graph-node-status-dot[data-status="review"] {
+  background: var(--status-warn);
+}
+.graph-node-status-dot[data-status="done"] {
+  background: var(--status-ok);
+}
+
+/* Fork glyph next to the label name — marks choice-bearing nodes. Quiet
+   accent colour (matches the existing menu-edge teal) so it reads as flow-
+   control hint without overpowering the label name. */
+.graph-node-fork {
+  color: var(--accent-strong);
+  opacity: 0.85;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+/* Word-count chip — leftmost in the counter row. Same monospace as the
+   other counters; muted by default, tints with the others on hover. */
+.graph-node-words {
+  color: var(--text-3);
+  font-family: "JetBrains Mono", monospace;
+}
+.graph-node:hover .graph-node-words {
+  color: var(--text-2);
+}
+
 /* ---- Graph-level signals ---- */
 
 /* Entry point — the first label by tree order. Override the status stripe
@@ -258,14 +324,37 @@
   box-shadow: 0 0 0 1px rgba(141, 153, 130, 0.25);
 }
 
-/* Unreachable label — no other label jumps/calls/branches into this one.
-   Dim it a touch and stripe in warn-color on the left. */
-.graph-node.is-unreachable {
-  border-left: 2px solid var(--status-warn) !important;
+/* Orphan label — no other label points at this one at all. The louder
+   case (likely a forgotten test scene or a typo elsewhere) gets a solid
+   warn stripe + clear dimming. */
+.graph-node.is-orphan {
+  border-left: 3px solid var(--status-warn) !important;
   opacity: 0.78;
+}
+.graph-node.is-orphan:hover {
+  opacity: 1;
+}
+
+/* Unreachable but not orphan — has inbound, just from another unreachable
+   node (a disconnected island). Same warn family, slightly softer stripe
+   so the user can tell the two apart at a glance. */
+.graph-node.is-unreachable {
+  border-left: 2px dashed var(--status-warn) !important;
+  opacity: 0.82;
 }
 .graph-node.is-unreachable:hover {
   opacity: 1;
+}
+
+/* Ending — no outbound. Often intentional (`return` in Ren'Py terminates
+   the script), so we use a quiet right-edge stripe rather than a loud
+   dim. Pairs with the small "◼ end" chip in the counter row. */
+.graph-node.is-ending {
+  border-right: 2px solid var(--status-info);
+}
+/* Broken-out stripe wins on the right edge — broken is louder. */
+.graph-node.is-ending.has-broken-out {
+  border-right: 3px solid var(--status-danger);
 }
 
 /* Has broken outbound — at least one jump/call points at a label that
@@ -299,15 +388,28 @@
   background: var(--status-ok);
   color: #131416;
 }
-.graph-node-badge-unreachable {
+.graph-node-badge-orphan {
   left: 10px;
   background: var(--status-warn);
+  color: #131416;
+}
+.graph-node-badge-unreachable {
+  left: 10px;
+  background: rgba(168, 152, 130, 0.85);
   color: #131416;
 }
 .graph-node-badge-broken {
   right: 10px;
   background: var(--status-danger);
   color: #fff;
+}
+
+/* "◼ end" chip lives in the counter row so it doesn't fight with the top
+   badges. Muted info colour because endings are usually intentional. */
+.graph-node-ending {
+  color: var(--status-info);
+  opacity: 0.85;
+  font-family: "JetBrains Mono", monospace;
 }
 
 .graph-node-handle {
@@ -346,6 +448,15 @@
 .graph-stat-warn {
   color: var(--status-warn);
 }
+.graph-stat-info {
+  color: var(--status-info);
+}
+.graph-stats span[title] {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-decoration-color: rgba(200, 199, 202, 0.25);
+  text-underline-offset: 3px;
+}
 .graph-stat-reset {
   margin-left: 4px;
   padding: 3px 8px;
@@ -361,6 +472,97 @@
 .graph-stat-reset:hover {
   border-color: var(--border-strong);
   color: var(--text-1);
+}
+
+.graph-stat-coverage-btn {
+  margin-left: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: Montserrat, sans-serif;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.graph-stat-coverage-btn:hover {
+  background: var(--bg-input);
+  color: var(--text-1);
+  border-color: var(--border);
+}
+.graph-stat-coverage-btn.is-open {
+  background: var(--bg-input);
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+
+/* ---- Coverage fly-out ----
+   Anchored under the stats overlay (top-left). Three rows: reachable %,
+   reachable endings, path-length triplet. Compact + monospace where
+   numbers live so they line up across rows. */
+.graph-coverage-panel {
+  position: absolute;
+  top: 56px;
+  left: 12px;
+  min-width: 260px;
+  padding: 12px 14px;
+  background: rgba(28, 29, 31, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: Montserrat, sans-serif;
+  font-size: 12px;
+  color: var(--text-1);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 4;
+  animation: graph-coverage-in 0.14s ease-out;
+}
+@keyframes graph-coverage-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.graph-coverage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.graph-coverage-label {
+  color: var(--text-3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.graph-coverage-value {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--text-1);
+}
+.graph-coverage-pct {
+  color: var(--status-ok);
+}
+.graph-coverage-warn {
+  color: var(--status-warn);
+}
+.graph-coverage-unit {
+  color: var(--text-3);
+  font-family: Montserrat, sans-serif;
+  font-size: 10px;
+}
+.graph-coverage-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
 }
 
 /* ============================================================
@@ -432,6 +634,33 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* POV + word-count meta row under the scene title. POV chip carries the
+   character's hex colour, word-count is a quiet monospace counter. */
+.graph-inspector-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 11px;
+}
+.graph-inspector-pov {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+.graph-inspector-pov-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+.graph-inspector-words {
+  font-family: "JetBrains Mono", monospace;
+  color: var(--text-3);
+}
 .graph-inspector-close {
   flex-shrink: 0;
   width: 24px;
@@ -472,8 +701,16 @@
   background: var(--status-ok);
   color: #131416;
 }
-.graph-flag-unreachable {
+.graph-flag-orphan {
   background: var(--status-warn);
+  color: #131416;
+}
+.graph-flag-unreachable {
+  background: rgba(168, 152, 130, 0.85);
+  color: #131416;
+}
+.graph-flag-ending {
+  background: var(--status-info);
   color: #131416;
 }
 .graph-flag-broken {
@@ -737,6 +974,385 @@
   background: var(--bg-card-hover);
 }
 
+/* ============================================================
+   Filter toolbar — bottom-center chip row. Quick-narrow the
+   visible graph to orphans / unreachable / endings / choices /
+   broken without removing layout state.
+   ============================================================ */
+
+.graph-filter-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: rgba(28, 29, 31, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: Montserrat, sans-serif;
+  backdrop-filter: blur(8px);
+  z-index: 4;
+  /* Sits above xyflow's Controls/MiniMap by default, but stops short of
+     the right edge so it doesn't collide with the search palette button. */
+  max-width: calc(100% - 360px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.graph-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.graph-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.graph-filter-chip:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-1);
+}
+.graph-filter-chip.is-active {
+  background: var(--bg-input);
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.graph-filter-chip.is-disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Tone classes pick up an accent stripe under the chip when active —
+   carries the same colour family as the corresponding stat/badge. */
+.graph-filter-chip.is-active.is-warn {
+  box-shadow: inset 0 -2px 0 0 var(--status-warn);
+}
+.graph-filter-chip.is-active.is-info {
+  box-shadow: inset 0 -2px 0 0 var(--status-info);
+}
+.graph-filter-chip.is-active.is-danger {
+  box-shadow: inset 0 -2px 0 0 var(--status-danger);
+}
+.graph-filter-chip.is-active.is-accent {
+  box-shadow: inset 0 -2px 0 0 var(--accent-strong);
+}
+
+.graph-filter-chip-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  padding: 1px 6px;
+  background: var(--bg-input);
+  border-radius: 99px;
+  letter-spacing: 0;
+}
+.graph-filter-chip.is-active .graph-filter-chip-count {
+  color: var(--text-1);
+}
+
+.graph-filter-bar-kbd {
+  margin-left: 6px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* Dimmed / highlighted node states driven by FilterToolbar. We dim by
+   opacity + filter so the spatial layout stays put and the user can
+   still drag/click through dimmed nodes if they need to. */
+.react-flow__node.is-dimmed {
+  opacity: 0.18;
+  filter: saturate(0.6);
+  transition: opacity 0.16s, filter 0.16s;
+}
+.react-flow__node.is-dimmed:hover {
+  opacity: 0.55;
+}
+.react-flow__node.is-highlighted {
+  transition: opacity 0.16s, filter 0.16s;
+}
+
+/* ---- Compare-paths highlight ----
+   Activated when the user picks two labels and runs "Compare paths".
+   Three colour roles: blue (path → target A), amber (path → target B),
+   neutral grey (common prefix / shared sub-paths), everything else
+   fades hard. The LCA node gets a brighter ring as the divergence anchor. */
+.react-flow__node.is-cmp-outside {
+  opacity: 0.08;
+  filter: saturate(0.4);
+  transition: opacity 0.16s, filter 0.16s;
+}
+.react-flow__node.is-cmp-common .graph-node {
+  border-color: var(--text-2);
+  box-shadow: 0 0 0 1px var(--text-2);
+  opacity: 0.85;
+}
+.react-flow__node.is-cmp-branch-a .graph-node,
+.react-flow__node.is-cmp-target-a .graph-node {
+  border-color: var(--status-info);
+  box-shadow: 0 0 0 1.5px var(--status-info);
+}
+.react-flow__node.is-cmp-branch-b .graph-node,
+.react-flow__node.is-cmp-target-b .graph-node {
+  border-color: var(--status-warn);
+  box-shadow: 0 0 0 1.5px var(--status-warn);
+}
+.react-flow__node.is-cmp-shared .graph-node {
+  /* Node sits on both branches — paint with a 2-colour split via a
+     conic gradient on box-shadow stand-in. Browsers don't paint shadow
+     gradients, so we layer two flat shadows mimicking a half/half. */
+  box-shadow:
+    -2px 0 0 0 var(--status-info),
+    2px 0 0 0 var(--status-warn);
+}
+.react-flow__node.is-cmp-lca .graph-node {
+  border-color: var(--accent-strong);
+  box-shadow:
+    0 0 0 2px var(--accent-strong),
+    0 0 18px rgba(141, 153, 130, 0.45);
+}
+.react-flow__node.is-cmp-target-a .graph-node {
+  /* Target nodes get a slightly thicker ring so the two endpoints
+     anchor the picture visually. */
+  box-shadow: 0 0 0 2.5px var(--status-info);
+}
+.react-flow__node.is-cmp-target-b .graph-node {
+  box-shadow: 0 0 0 2.5px var(--status-warn);
+}
+
+/* Floating chip that appears when exactly two nodes are selected. Sits
+   above the filter toolbar so the user notices it without having to
+   hunt for it. Click triggers Compare mode and replaces the chip with
+   the side panel. */
+.graph-compare-chip {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(20, 22, 26, 0.96);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-family: Montserrat, sans-serif;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+  z-index: 5;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.12s, transform 0.12s;
+  animation: graph-compare-chip-in 0.16s ease-out;
+}
+@keyframes graph-compare-chip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+.graph-compare-chip:hover {
+  border-color: var(--accent-strong);
+}
+.graph-compare-chip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.graph-compare-chip-dot.is-a { background: var(--status-info); }
+.graph-compare-chip-dot.is-b { background: var(--status-warn); }
+.graph-compare-chip-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+.graph-compare-chip-sep {
+  color: var(--text-3);
+  font-size: 11px;
+}
+.graph-compare-chip-cta {
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  color: var(--accent-strong);
+  font-weight: 500;
+}
+
+/* Side panel surfacing compare metrics. Top-right corner — doesn't
+   collide with the stats overlay (top-left) or the inspector (right
+   when open; we lift to top-right with sufficient inset). */
+.graph-compare-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 280px;
+  background: rgba(20, 22, 26, 0.96);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-family: Montserrat, sans-serif;
+  color: var(--text-1);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  animation: graph-compare-panel-in 0.16s ease-out;
+}
+@keyframes graph-compare-panel-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.graph-compare-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-compare-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.graph-compare-panel-exit {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.graph-compare-panel-exit:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+}
+.graph-compare-panel-row {
+  padding: 10px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.graph-compare-panel-row:last-of-type {
+  border-bottom: none;
+}
+.graph-compare-panel-row.is-divergence {
+  background: rgba(141, 153, 130, 0.06);
+}
+.graph-compare-panel-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  flex-shrink: 0;
+  width: 70px;
+  padding-top: 2px;
+}
+.graph-compare-panel-bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.graph-compare-panel-row.is-branch-a .graph-compare-panel-bullet {
+  background: var(--status-info);
+}
+.graph-compare-panel-row.is-branch-b .graph-compare-panel-bullet {
+  background: var(--status-warn);
+}
+.graph-compare-panel-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.graph-compare-panel-target {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.graph-compare-panel-target:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+.graph-compare-panel-metric {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: "JetBrains Mono", monospace;
+}
+.graph-compare-panel-foot {
+  padding: 10px 14px;
+  font-size: 10px;
+  color: var(--text-3);
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+/* ---- Reachability highlight ----
+   When a single node is selected we paint its incoming sub-graph
+   (ancestors) in info-blue and outgoing sub-graph (descendants) in
+   ok-green. Everything else fades hard so the player-flow context
+   pops without removing layout state. */
+.react-flow__node.is-reach-outside {
+  opacity: 0.12;
+  filter: saturate(0.5);
+  transition: opacity 0.16s, filter 0.16s;
+}
+.react-flow__node.is-reach-outside:hover {
+  opacity: 0.4;
+}
+.react-flow__node.is-reach-ancestor .graph-node {
+  border-color: var(--status-info);
+  box-shadow: 0 0 0 1px var(--status-info);
+}
+.react-flow__node.is-reach-descendant .graph-node {
+  border-color: var(--status-ok);
+  box-shadow: 0 0 0 1px var(--status-ok);
+}
+.react-flow__node.is-reach-focus .graph-node {
+  /* Existing .is-selected styling already paints the focus ring; we
+     just slightly amplify it so the focus node anchors the picture. */
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 2px var(--accent-strong);
+}
+
 /* Floating trigger button for the search palette — discoverable
    hint for the Ctrl/Cmd+K shortcut. Sits top-right inside the
    canvas wrap, mirrors the stats plate position on the left. */
@@ -950,8 +1566,16 @@
   background: var(--status-ok);
   color: #131416;
 }
-.graph-search-tag-unreach {
+.graph-search-tag-orphan {
   background: var(--status-warn);
+  color: #131416;
+}
+.graph-search-tag-unreach {
+  background: rgba(168, 152, 130, 0.85);
+  color: #131416;
+}
+.graph-search-tag-ending {
+  background: var(--status-info);
   color: #131416;
 }
 .graph-search-tag-broken {
@@ -967,4 +1591,1125 @@
   font-size: 10px;
   color: var(--text-3);
   font-family: "JetBrains Mono", monospace;
+}
+
+/* Simulate button — sibling of Coverage, slightly louder (accent border on
+   hover) since it opens a modal experience rather than a fly-out. */
+.graph-stat-sim-btn {
+  margin-left: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: Montserrat, sans-serif;
+  font-weight: 500;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.graph-stat-sim-btn:hover {
+  border-color: var(--accent-strong);
+  background: var(--bg-card-hover);
+  color: var(--text-1);
+}
+
+/* ============================================================
+   Group rectangles — translucent coloured frames behind clusters
+   of labels. Click the tag to edit name / colour / delete.
+   ============================================================ */
+
+.graph-group {
+  width: 100%;
+  height: 100%;
+  border: 2px solid var(--group-border, rgba(120, 160, 220, 0.5));
+  background: var(--group-bg, rgba(60, 110, 200, 0.05));
+  border-radius: 12px;
+  position: relative;
+  pointer-events: none;
+}
+.graph-group.is-selected {
+  border-color: var(--group-border-active, rgba(120, 160, 220, 0.9));
+  background: var(--group-bg-active, rgba(60, 110, 200, 0.09));
+}
+.graph-group-tag {
+  position: absolute;
+  top: -1px;
+  left: 12px;
+  transform: translateY(-100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--group-tag-bg, rgba(38, 56, 92, 0.95));
+  color: var(--group-tag-text, #d8e4f8);
+  border: 1px solid var(--group-border, rgba(120, 160, 220, 0.5));
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-family: Montserrat, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.12s;
+}
+.graph-group-tag:hover {
+  background: var(--group-tag-bg-hover, rgba(58, 80, 124, 0.96));
+}
+.graph-group-tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--group-border, rgba(120, 160, 220, 0.9));
+  flex-shrink: 0;
+}
+.graph-group-tag-count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--group-tag-count, rgba(216, 228, 248, 0.7));
+  padding: 1px 5px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 99px;
+}
+
+/* Colour variants via CSS vars on the wrapping node so .graph-group rules
+   stay generic. Keep palette intentionally muted — groups are background
+   chrome, they shouldn't out-shout actual nodes. */
+.graph-group.is-color-blue {
+  --group-border: rgba(120, 160, 220, 0.55);
+  --group-bg: rgba(60, 110, 200, 0.06);
+  --group-tag-bg: rgba(38, 56, 92, 0.95);
+  --group-tag-text: #d8e4f8;
+}
+.graph-group.is-color-green {
+  --group-border: rgba(130, 200, 140, 0.55);
+  --group-bg: rgba(60, 160, 80, 0.06);
+  --group-tag-bg: rgba(40, 70, 50, 0.95);
+  --group-tag-text: #d8f4dc;
+}
+.graph-group.is-color-purple {
+  --group-border: rgba(190, 150, 220, 0.55);
+  --group-bg: rgba(140, 90, 200, 0.06);
+  --group-tag-bg: rgba(68, 50, 92, 0.95);
+  --group-tag-text: #e8d8f8;
+}
+.graph-group.is-color-amber {
+  --group-border: rgba(220, 180, 110, 0.55);
+  --group-bg: rgba(200, 150, 60, 0.06);
+  --group-tag-bg: rgba(80, 60, 32, 0.95);
+  --group-tag-text: #f4e8d0;
+}
+.graph-group.is-color-red {
+  --group-border: rgba(220, 130, 130, 0.55);
+  --group-bg: rgba(200, 80, 80, 0.06);
+  --group-tag-bg: rgba(92, 42, 42, 0.95);
+  --group-tag-text: #f8dcdc;
+}
+
+/* "Group these N labels" floating chip — appears when 2+ labels are
+   selected. Sits next to (or instead of) the Compare chip. */
+.graph-group-chip {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(calc(-50% + 280px));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(20, 22, 26, 0.96);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-family: Montserrat, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-1);
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.graph-group-chip:hover {
+  border-color: rgba(190, 150, 220, 0.7);
+}
+
+/* Edit popover for an existing group. Bottom-right (so it doesn't fight
+   the compare panel top-right). */
+.graph-group-editor {
+  position: absolute;
+  bottom: 110px;
+  right: 12px;
+  width: 260px;
+  background: rgba(20, 22, 26, 0.97);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: Montserrat, sans-serif;
+  color: var(--text-1);
+  animation: graph-compare-panel-in 0.16s ease-out;
+}
+.graph-group-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.graph-group-editor-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.graph-group-editor-close {
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: inherit;
+}
+.graph-group-editor-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+}
+.graph-group-editor-name {
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+}
+.graph-group-editor-name:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+}
+.graph-group-editor-swatches {
+  display: flex;
+  gap: 6px;
+}
+.graph-group-editor-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s;
+}
+.graph-group-editor-swatch:hover {
+  transform: scale(1.12);
+}
+.graph-group-editor-swatch.is-active {
+  outline: 2px solid var(--text-1);
+  outline-offset: 1px;
+}
+.graph-group-editor-swatch.is-color-blue { background: rgb(82, 130, 220); }
+.graph-group-editor-swatch.is-color-green { background: rgb(100, 180, 120); }
+.graph-group-editor-swatch.is-color-purple { background: rgb(170, 110, 210); }
+.graph-group-editor-swatch.is-color-amber { background: rgb(220, 180, 110); }
+.graph-group-editor-swatch.is-color-red { background: rgb(210, 110, 110); }
+.graph-group-editor-meta {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.graph-group-editor-delete {
+  height: 30px;
+  background: transparent;
+  border: 1px solid rgba(220, 110, 110, 0.4);
+  border-radius: 6px;
+  color: rgba(220, 130, 130, 0.9);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.graph-group-editor-delete:hover {
+  background: rgba(220, 110, 110, 0.12);
+  color: rgb(240, 150, 150);
+  border-color: rgba(220, 110, 110, 0.7);
+}
+
+/* ============================================================
+   Tool palette — Figma-style vertical toolbar pinned to the left
+   edge of the canvas. Each tool drives cursor + ReactFlow's
+   pan / select behaviour through a class on the canvas wrap.
+   ============================================================ */
+
+.graph-tools {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(20, 22, 26, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+.graph-tools-item {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.graph-tools-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+}
+.graph-tools-item.is-active {
+  background: rgba(200, 199, 202, 0.12);
+  border-color: rgba(200, 199, 202, 0.18);
+  color: var(--text-1);
+}
+.graph-tools-item[data-divider="before"] {
+  margin-top: 4px;
+  position: relative;
+}
+.graph-tools-item[data-divider="before"]::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 4px;
+  right: 4px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Cursor + visual hint per active tool — applied to the canvas wrap,
+   then xyflow's pane / nodes inherit it where appropriate. */
+.graph-canvas-wrap.is-tool-pan .react-flow__pane {
+  cursor: grab;
+}
+.graph-canvas-wrap.is-tool-pan .react-flow__pane:active {
+  cursor: grabbing;
+}
+.graph-canvas-wrap.is-tool-add-scene .react-flow__pane,
+.graph-canvas-wrap.is-tool-add-note .react-flow__pane {
+  cursor: crosshair;
+}
+/* Creation tools also temporarily soften the nodes so the user knows
+   clicks land on the canvas, not on existing nodes. */
+.graph-canvas-wrap.is-tool-add-scene .react-flow__node-label,
+.graph-canvas-wrap.is-tool-add-note .react-flow__node-label {
+  opacity: 0.55;
+  filter: saturate(0.7);
+  pointer-events: none;
+}
+.graph-canvas-wrap.is-tool-add-scene .react-flow__node-note,
+.graph-canvas-wrap.is-tool-add-note .react-flow__node-note {
+  pointer-events: none;
+}
+
+/* Connection-handle visibility — with nodesConnectable enabled in Phase 3
+   we want handles discoverable on hover (without overwhelming the canvas
+   in idle state). xyflow's default handles are tiny dots. */
+.react-flow__node-label .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: var(--text-3);
+  border: 2px solid var(--bg-elevated);
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s;
+}
+.react-flow__node-label:hover .react-flow__handle,
+.react-flow__node-label.selected .react-flow__handle {
+  opacity: 1;
+}
+.react-flow__node-label .react-flow__handle:hover {
+  background: var(--accent-strong);
+  width: 14px;
+  height: 14px;
+}
+
+/* Group rectangles aren't subject to integrity / filter / compare
+   className mutations — they're orthogonal authorial chrome. */
+.react-flow__node-group.is-dimmed,
+.react-flow__node-group.is-reach-outside,
+.react-flow__node-group.is-cmp-outside {
+  opacity: 1;
+  filter: none;
+}
+.react-flow__node-group .selected,
+.react-flow__node-group.selected {
+  outline: none !important;
+}
+
+.graph-stat-note-btn {
+  margin-left: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: Montserrat, sans-serif;
+  font-weight: 500;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.graph-stat-note-btn:hover {
+  border-color: rgba(220, 180, 110, 0.5);
+  background: var(--bg-card-hover);
+  color: var(--text-1);
+}
+
+/* ============================================================
+   Sticky-note annotations on the canvas. Free-form paper-like
+   notes that hold "TODO" / authorial reminders. Drag, edit
+   inline (double-click), recolour via the toolbar swatches.
+   ============================================================ */
+
+.graph-note {
+  width: 220px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--note-border, rgba(0, 0, 0, 0.15));
+  background: var(--note-bg, #fff3a8);
+  color: var(--note-text, #2a2613);
+  font-family: Montserrat, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  /* Paper-style shadow — kept light enough to repaint cheaply during
+     drag. Heavier blurs + transform transitions caused frame-rate drops
+     because :hover fired on every drag frame as the mouse trailed the
+     note. We keep a single static shadow and skip rotate/transition. */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+  position: relative;
+}
+.graph-note.is-selected {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+.graph-note.is-editing {
+  cursor: text;
+}
+/* Promote the note wrapper to its own compositor layer so xyflow's
+   translate doesn't force layout-paint on the surrounding canvas. */
+.react-flow__node-note {
+  will-change: transform;
+}
+
+.graph-note-text {
+  flex: 1;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  min-height: 40px;
+  cursor: text;
+}
+.graph-note-placeholder {
+  color: rgba(0, 0, 0, 0.35);
+  font-style: italic;
+}
+
+.graph-note-textarea {
+  flex: 1;
+  min-height: 60px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.graph-note-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.graph-note:hover .graph-note-toolbar,
+.graph-note.is-editing .graph-note-toolbar,
+.graph-note.is-selected .graph-note-toolbar {
+  opacity: 1;
+}
+
+.graph-note-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s;
+}
+.graph-note-swatch:hover {
+  transform: scale(1.15);
+}
+.graph-note-swatch.is-active {
+  outline: 2px solid rgba(0, 0, 0, 0.35);
+  outline-offset: 1px;
+}
+.graph-note-swatch.is-color-yellow { background: #fff3a8; }
+.graph-note-swatch.is-color-blue { background: #b8d8ff; }
+.graph-note-swatch.is-color-red { background: #ffc4c0; }
+.graph-note-swatch.is-color-green { background: #c4e8c0; }
+.graph-note-swatch.is-color-purple { background: #d8c4e8; }
+
+.graph-note-delete {
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.graph-note-delete:hover {
+  background: rgba(180, 50, 50, 0.12);
+  color: rgba(140, 30, 30, 0.85);
+}
+
+/* Colour variants — set the bg / border / text triple via CSS vars so
+   the rules above stay generic and we tweak palette in one place. */
+.graph-note.is-color-yellow {
+  --note-bg: #fff3a8;
+  --note-border: rgba(180, 150, 30, 0.25);
+  --note-text: #2a2613;
+}
+.graph-note.is-color-blue {
+  --note-bg: #c8dffa;
+  --note-border: rgba(60, 90, 150, 0.3);
+  --note-text: #1a2238;
+}
+.graph-note.is-color-red {
+  --note-bg: #fec5c0;
+  --note-border: rgba(170, 60, 50, 0.35);
+  --note-text: #3a1a18;
+}
+.graph-note.is-color-green {
+  --note-bg: #c8e8c0;
+  --note-border: rgba(70, 130, 70, 0.3);
+  --note-text: #1a2a18;
+}
+.graph-note.is-color-purple {
+  --note-bg: #dec8e8;
+  --note-border: rgba(120, 80, 150, 0.3);
+  --note-text: #2a1a35;
+}
+
+/* xyflow's default node selection ring is OK for label nodes but ugly
+   for sticky notes — they have their own selection style. Suppress
+   the default outline when type=note. */
+.react-flow__node-note.selected,
+.react-flow__node-note .react-flow__node {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Sticky notes shouldn't dim with the integrity / filter / compare
+   modes — they're orthogonal authorial overlay. Override the various
+   className mutations that other modes add. */
+.react-flow__node-note.is-dimmed,
+.react-flow__node-note.is-reach-outside,
+.react-flow__node-note.is-cmp-outside {
+  opacity: 1;
+  filter: none;
+}
+
+/* ============================================================
+   Path simulator — Ren'Py-style playthrough overlay.
+   Top bar (scene/label + chrome) · stage (cast chips + dialogue
+   pinned to the bottom) · optional history drawer on the right.
+   Click anywhere on the stage / Space / Enter / → to advance one
+   event; choice overlay appears centered when the step's events
+   exhaust.
+   ============================================================ */
+
+.path-sim-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: rgba(8, 9, 11, 0.78);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  animation: path-sim-fade 0.14s ease-out;
+}
+@keyframes path-sim-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.path-sim {
+  width: min(1100px, 100%);
+  height: min(780px, 100%);
+  background: linear-gradient(180deg, #1a1c20 0%, #0f1013 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow:
+    0 36px 72px rgba(0, 0, 0, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  font-family: Montserrat, sans-serif;
+  color: var(--text-1);
+  overflow: hidden;
+  animation: path-sim-rise 0.16s ease-out;
+  position: relative;
+}
+.path-sim:has(.path-sim-history) {
+  grid-template-columns: 1fr 260px;
+  grid-template-rows: auto 1fr;
+}
+.path-sim:has(.path-sim-history) .path-sim-topbar {
+  grid-column: 1 / span 2;
+}
+@keyframes path-sim-rise {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ---- Top bar ---- */
+.path-sim-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+  flex-wrap: wrap;
+}
+.path-sim-topbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.path-sim-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 360px;
+}
+.path-sim-label-name {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.path-sim-topbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.path-sim-bg-tag {
+  padding: 3px 8px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.path-sim-action {
+  height: 28px;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.path-sim-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--text-1);
+}
+.path-sim-action:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.path-sim-action.is-active {
+  background: rgba(200, 199, 202, 0.12);
+  color: var(--text-1);
+  border-color: rgba(200, 199, 202, 0.2);
+}
+.path-sim-close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.path-sim-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+}
+
+/* ---- Stage ---- */
+.path-sim-stage {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background-image:
+    radial-gradient(
+      circle at 50% 35%,
+      rgba(160, 180, 220, 0.04),
+      transparent 70%
+    );
+  cursor: pointer;
+}
+.path-sim-stage.is-choosing {
+  cursor: default;
+}
+
+/* Visible-character chips — top-half of the stage so dialogue at the
+   bottom can breathe. Positions ape Ren'Py's left/center/right. */
+.path-sim-cast {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  justify-items: center;
+  padding: 24px 32px;
+  min-height: 240px;
+  pointer-events: none;
+}
+.path-sim-cast-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--char-color, rgba(200, 199, 202, 0.4));
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 12px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  animation: path-sim-cast-in 0.22s ease-out;
+}
+@keyframes path-sim-cast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.path-sim-cast-chip.is-pos-left { grid-column: 1; justify-self: end; }
+.path-sim-cast-chip.is-pos-right { grid-column: 3; justify-self: start; }
+.path-sim-cast-chip.is-pos-center,
+.path-sim-cast-chip:not(.is-pos-left):not(.is-pos-right) {
+  grid-column: 2;
+}
+.path-sim-cast-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--char-color, rgba(200, 199, 202, 0.25));
+  color: #131416;
+  font-family: Montserrat, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+}
+.path-sim-cast-name {
+  font-weight: 600;
+  color: var(--text-1);
+  font-size: 13px;
+}
+.path-sim-cast-expr {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* Bottom dialogue bar — Ren'Py-shaped. Speaker plate floats above
+   the body so the name is the visual anchor. */
+.path-sim-dialogue {
+  margin: 0 auto 22px;
+  width: min(820px, 92%);
+  position: relative;
+  animation: path-sim-dialogue-in 0.18s ease-out;
+}
+@keyframes path-sim-dialogue-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.path-sim-speaker {
+  position: absolute;
+  top: -12px;
+  left: 24px;
+  padding: 4px 14px;
+  background: var(--char-color, var(--accent-strong));
+  color: #131416;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 1;
+}
+.path-sim-dialogue-body {
+  padding: 22px 24px 18px;
+  background: rgba(8, 10, 14, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+.path-sim-dialogue-body.is-narrator {
+  background: rgba(20, 22, 26, 0.85);
+  font-style: italic;
+}
+.path-sim-dialogue-body.is-note {
+  background: rgba(168, 152, 130, 0.05);
+  border-color: rgba(168, 152, 130, 0.2);
+  font-family: "JetBrains Mono", monospace;
+}
+.path-sim-dialogue-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-1);
+}
+.path-sim-dialogue-body.is-note .path-sim-dialogue-text {
+  color: var(--text-3);
+  font-size: 13px;
+}
+.path-sim-advance-hint {
+  position: absolute;
+  bottom: 6px;
+  right: 12px;
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  font-family: "JetBrains Mono", monospace;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: path-sim-advance-pulse 1.6s ease-in-out infinite;
+}
+.path-sim-advance-hint kbd {
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+@keyframes path-sim-advance-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.85; }
+}
+
+/* Choice overlay — centred in the stage when events exhaust. */
+.path-sim-choices {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 32px;
+  background: rgba(8, 9, 11, 0.55);
+  backdrop-filter: blur(2px);
+  animation: path-sim-fade 0.16s ease-out;
+}
+.path-sim-choice {
+  width: min(540px, 92%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 22px;
+  background: rgba(20, 22, 26, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.05s;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+.path-sim-choice:hover:not(:disabled) {
+  background: rgba(34, 38, 44, 0.96);
+  border-color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+.path-sim-choice:active:not(:disabled) {
+  transform: translateY(0);
+}
+.path-sim-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.path-sim-choice.is-choice {
+  border-left: 3px solid var(--accent-strong);
+}
+.path-sim-choice.is-continue {
+  border-left: 3px solid var(--status-info);
+}
+.path-sim-choice.is-conditional {
+  border-left: 3px solid var(--status-warn);
+}
+.path-sim-choice.is-fallthrough {
+  border-left: 3px solid var(--text-3);
+}
+.path-sim-choice.is-broken {
+  border-color: rgba(168, 112, 128, 0.4);
+  color: var(--status-danger);
+  text-decoration: line-through;
+  text-decoration-color: rgba(168, 112, 128, 0.5);
+}
+.path-sim-choice-label {
+  font-size: 15px;
+}
+.path-sim-choice-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.path-sim-end {
+  text-align: center;
+  padding: 32px;
+  max-width: 480px;
+  background: rgba(20, 22, 26, 0.96);
+  border: 1px solid rgba(141, 153, 130, 0.4);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+.path-sim-end-tag {
+  display: inline-block;
+  padding: 5px 14px;
+  font-family: Montserrat, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: var(--status-ok);
+  color: #131416;
+  border-radius: 4px;
+  margin-bottom: 14px;
+}
+.path-sim-end p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+.path-sim-end kbd {
+  font-family: "JetBrains Mono", monospace;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+}
+
+.path-sim-stage-empty {
+  margin: auto;
+  padding: 40px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ---- History drawer ---- */
+.path-sim-history {
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.path-sim-history-head {
+  padding: 12px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.path-sim-history-close {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 12px;
+}
+.path-sim-history-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+}
+.path-sim-history-list {
+  flex: 1;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.path-sim-history-list::-webkit-scrollbar { width: 6px; }
+.path-sim-history-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+}
+.path-sim-history-row {
+  padding: 8px 14px;
+  border-left: 2px solid transparent;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.path-sim-history-row.is-current {
+  border-left-color: var(--accent-strong);
+  background: rgba(200, 199, 202, 0.04);
+}
+.path-sim-history-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.path-sim-history-name {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.path-sim-history-jump {
+  font-family: inherit;
+  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.path-sim-history-jump:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+}
+.path-sim-history-scene {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.path-sim-history-chosen {
+  font-size: 11px;
+  color: var(--text-2);
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.path-sim-history-chosen.is-choice { border-left: 2px solid var(--accent-strong); }
+.path-sim-history-chosen.is-conditional { border-left: 2px solid var(--status-warn); }
+.path-sim-history-chosen.is-continue { border-left: 2px solid var(--status-info); }
+.path-sim-history-chosen.is-fallthrough { border-left: 2px solid var(--text-3); }
+
+.path-sim-empty {
+  padding: 40px 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
 }

@@ -192,215 +192,11 @@
 }
 .vn-tree::-webkit-scrollbar-thumb:hover { background: var(--text-4); }
 
-/* Chapter row */
-.vn-row.is-chapter {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 36px;
-  flex-shrink: 0;
-  padding: 0 12px;
-  border-radius: 9px;
-  background: rgba(200, 199, 202, 0.03);
-  color: var(--text-1);
-  cursor: pointer;
-  position: relative;
-  transition: background 0.1s;
-}
-.vn-row.is-chapter:hover { background: rgba(200, 199, 202, 0.06); }
-/* Caret — visually matches Translations sidebar's `.tr-folder-caret`, but
-   the button is wider (18×20) than the glyph so the click target is forgiving.
-   A narrow target inside a `draggable=true` row eats clicks on slight mouse
-   drift (browser starts a drag instead of firing click). Spacer keeps leaf
-   rows aligned with folder rows even though they don't carry a button. */
-.vn-folder-caret {
-  flex-shrink: 0;
-  width: 18px;
-  height: 20px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(200, 199, 202, 0.6);
-  cursor: pointer;
-  transition: transform 0.15s, color 0.12s, background 0.12s;
-}
-.vn-folder-caret:hover {
-  color: rgba(200, 199, 202, 0.95);
-  background: rgba(200, 199, 202, 0.08);
-}
-.vn-folder-caret.is-open { transform: rotate(90deg); }
-.vn-folder-caret.is-open:hover { transform: rotate(90deg); }
-.vn-folder-caret-spacer { cursor: default; background: transparent; }
-.vn-folder-caret-spacer:hover { background: transparent; }
-
-/* Kind icon slot — folder open/closed for branches, file glyph for leaves.
-   Hidden when the row carries an emoji (the user's pick takes priority). */
-.vn-row-icon {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  color: rgba(200, 199, 202, 0.55);
-  transition: color 0.12s;
-}
-.vn-row:hover .vn-row-icon { color: rgba(200, 199, 202, 0.75); }
-.vn-row.is-active .vn-row-icon { color: var(--text-1); }
-.vn-row.is-chapter .vn-row-icon { color: rgba(200, 199, 202, 0.85); }
-
-.vn-row.is-chapter .vn-row-text {
-  flex: 1 0 0;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-1);
-  letter-spacing: -0.005em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Scene/block row */
-.vn-row.is-scene {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 36px;
-  flex-shrink: 0;
-  padding: 0 12px;
-  border-radius: 9px;
-  color: var(--text-1);
-  cursor: pointer;
-  position: relative;
-  transition: background 0.1s, color 0.1s;
-}
-.vn-row.is-scene:hover {
-  background: rgba(200, 199, 202, 0.06);
-}
-.vn-row.is-scene.is-active {
-  background: rgba(200, 199, 202, 0.03);
-}
-.vn-row.is-scene .vn-row-text {
-  flex: 1 0 0;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.vn-row.is-scene.is-active .vn-row-text { font-weight: 600; }
-.vn-row-emoji {
-  font-size: 13px;
-  flex-shrink: 0;
-}
-.vn-row-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 99px;
-  background: var(--text-1);
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-
-/* "+ New scene" pseudo-row */
-.vn-row.is-newscene {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 7px;
-  background: transparent;
-  border: none;
-  color: rgba(200, 199, 202, 0.4);
-  cursor: pointer;
-  font-family: inherit;
-  text-align: left;
-  width: 100%;
-  transition: background 0.1s, color 0.1s;
-}
-.vn-row.is-newscene:hover {
-  background: rgba(200, 199, 202, 0.03);
-  color: rgba(200, 199, 202, 0.7);
-}
-.vn-row.is-newscene .vn-row-plus {
-  font-size: 13px;
-  width: 14px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.vn-row.is-newscene .vn-row-lbl {
-  font-size: 12.5px;
-  font-weight: 500;
-}
-
-/* More button (hover-only, both kinds) */
-.vn-row-more {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: rgba(200, 199, 202, 0.4);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  border-radius: 3px;
-  opacity: 0;
-  transition: opacity 0.12s, background 0.12s, color 0.12s;
-  flex-shrink: 0;
-}
-.vn-row:hover .vn-row-more,
-.vn-row.is-active .vn-row-more {
-  opacity: 1;
-}
-.vn-row-more:hover {
-  background: rgba(200, 199, 202, 0.08);
-  color: var(--text-1);
-}
-
-/* Chapter children body — guide line on left */
-.vn-ch-body {
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-}
-.vn-ch-guide {
-  width: 18px;
-  flex-shrink: 0;
-  position: relative;
-}
-.vn-ch-guide::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(200, 199, 202, 0.07);
-}
-.vn-ch-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 2px 0;
-  flex: 1;
-  min-width: 0;
-}
-
-.vn-row.is-dragging { opacity: 0.4; }
-.vn-row.drop-into {
-  background: rgba(200, 199, 202, 0.1);
-  outline: 1px solid rgba(200, 199, 202, 0.3);
-  outline-offset: -1px;
-}
+/* NOTE: The legacy `.vn-row*` tree styles (chapter/scene/newscene rows,
+ * `.vn-folder-caret`, `.vn-ch-body` guide line, etc.) were removed after the
+ * ScriptPane tree was rewritten on top of the Translations sidebar's `.tr-*`
+ * primitives — see [src/styles/translations.css] and the `.tr-row-wrap`
+ * overrides further down in this file. */
 
 /* ---------- Doc / props row ---------- */
 
@@ -4674,6 +4470,166 @@
   border-radius: 8px;
 }
 .rs-warnings ul { margin: 4px 0 0; padding-left: 20px; }
+
+/* ---------- Writing Style + Project tabs (inside ScriptSettingsPage) ---------- */
+
+.vn-style-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 760px;
+  padding: 18px 22px 32px;
+}
+.vn-style-hint {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(200, 199, 202, 0.55);
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(200, 199, 202, 0.03);
+  border: 1px solid rgba(200, 199, 202, 0.05);
+}
+.vn-style-hint code {
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(200, 199, 202, 0.08);
+}
+.vn-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.vn-style-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.vn-style-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(200, 199, 202, 0.6);
+}
+.vn-style-hint-inline {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(200, 199, 202, 0.4);
+}
+.vn-style-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.vn-style-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(200, 199, 202, 0.03);
+  border: 1px solid rgba(200, 199, 202, 0.06);
+  font-size: 12px;
+  color: rgba(200, 199, 202, 0.7);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  text-transform: capitalize;
+}
+.vn-style-radio:hover {
+  color: var(--text-1);
+  background: rgba(200, 199, 202, 0.06);
+}
+.vn-style-radio input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.vn-style-radio:has(input:checked) {
+  background: rgba(200, 199, 202, 0.1);
+  border-color: rgba(200, 199, 202, 0.2);
+  color: var(--text-1);
+}
+.vn-style-preview {
+  border-top: 1px solid rgba(200, 199, 202, 0.06);
+  padding-top: 12px;
+}
+.vn-style-preview summary {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(200, 199, 202, 0.5);
+  cursor: pointer;
+  list-style: none;
+}
+.vn-style-preview summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.12s;
+}
+.vn-style-preview[open] summary::before {
+  transform: rotate(90deg);
+}
+.vn-style-preview pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: rgba(200, 199, 202, 0.7);
+  overflow-x: auto;
+}
+
+/* Project tab specifics */
+.vn-project-cover-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.vn-project-cover-preview {
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(200, 199, 202, 0.08);
+}
+.vn-project-cover-emoji {
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  background: rgba(200, 199, 202, 0.04);
+  border: 1px solid rgba(200, 199, 202, 0.06);
+}
+.vn-project-cover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.vn-project-emoji-input {
+  max-width: 180px;
+}
+.vn-id-pill {
+  display: inline-block;
+  font-size: 11.5px;
+  font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", monospace;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: rgba(200, 199, 202, 0.06);
+  color: rgba(200, 199, 202, 0.85);
+  user-select: all;
+}
 
 /* ---------- Script tree extras (on top of translations.css) ----------
    The Script sidebar reuses the Translations sidebar's `.tr-*` tree so the

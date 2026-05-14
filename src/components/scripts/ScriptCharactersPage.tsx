@@ -3,6 +3,8 @@ import { useKanban } from "../../state/kanbanStore";
 import type {
   ScriptCharacter,
   ScriptLocation,
+  ScriptProject,
+  WritingStyle,
 } from "../../state/scripts";
 import {
   deleteCharacterAvatar,
@@ -12,6 +14,7 @@ import { UsersFilledIcon } from "../kanban/SidebarIcons";
 import { useDialog } from "../ui/Dialog";
 import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
 import { LinkedEventsSection } from "../calendar/LinkedEventsSection";
+import { CopyButton } from "../ui/CopyButton";
 
 type ScriptsApi = ReturnType<typeof import("../../state/scripts").useScripts>;
 
@@ -38,16 +41,20 @@ interface PageProps {
   onConsumeInitialEditingId?: () => void;
 }
 
-type Tab = "characters" | "locations";
+type Tab = "style" | "characters" | "locations" | "project";
 
-export function ScriptCharactersPage({
+export function ScriptSettingsPage({
   scripts,
   onBack,
   onAddCharacter,
   initialEditingId,
   onConsumeInitialEditingId,
-}: PageProps) {
-  const [tab, setTab] = useState<Tab>("characters");
+  initialTab,
+}: PageProps & { initialTab?: Tab }) {
+  // Default to "style" — it's the new flagship of this page and gives the
+  // user a reason to open it on their own (Cast tab was a curiosity surface,
+  // style is the one they'll come back to).
+  const [tab, setTab] = useState<Tab>(initialTab ?? "style");
   const [filter, setFilter] = useState("");
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
   const [editingLocId, setEditingLocId] = useState<string | null>(null);
@@ -109,7 +116,7 @@ export function ScriptCharactersPage({
             ←
           </button>
           <UsersFilledIcon size={20} className="tmt-ico" />
-          <span className="tmt-title">Cast</span>
+          <span className="tmt-title">Settings</span>
         </div>
         <div className="notes-empty-doc">
           <SkeletonBox style={{ width: 320, maxWidth: "60%" }}>
@@ -135,7 +142,7 @@ export function ScriptCharactersPage({
             ←
           </button>
           <UsersFilledIcon size={20} className="tmt-ico" />
-          <span className="tmt-title">Cast</span>
+          <span className="tmt-title">Settings</span>
         </div>
         <div className="notes-empty-doc fade-in">
           <p>Pick or create a script project first.</p>
@@ -157,13 +164,13 @@ export function ScriptCharactersPage({
           ←
         </button>
         <UsersFilledIcon size={20} className="tmt-ico" />
-        <span className="tmt-title">Cast</span>
+        <span className="tmt-title">Settings</span>
         <span className="tmt-sep">·</span>
         <span className="vn-cast-project">
           {scripts.activeProject?.title}
         </span>
         <span className="tmt-spacer" />
-        {tab === "characters" ? (
+        {tab === "characters" && (
           <button
             type="button"
             className="tmt-add"
@@ -171,7 +178,8 @@ export function ScriptCharactersPage({
           >
             + New character
           </button>
-        ) : (
+        )}
+        {tab === "locations" && (
           <button
             type="button"
             className="tmt-add"
@@ -187,11 +195,20 @@ export function ScriptCharactersPage({
           <button
             type="button"
             className={
+              "vn-cast-tab" + (tab === "style" ? " is-active" : "")
+            }
+            onClick={() => setTab("style")}
+          >
+            Writing style
+          </button>
+          <button
+            type="button"
+            className={
               "vn-cast-tab" + (tab === "characters" ? " is-active" : "")
             }
             onClick={() => setTab("characters")}
           >
-            Characters
+            Cast
             <span className="vn-cast-tab-ct">
               {scripts.characters.length}
             </span>
@@ -208,21 +225,60 @@ export function ScriptCharactersPage({
               {scripts.locations.length}
             </span>
           </button>
+          <button
+            type="button"
+            className={
+              "vn-cast-tab" + (tab === "project" ? " is-active" : "")
+            }
+            onClick={() => setTab("project")}
+          >
+            Project
+          </button>
         </div>
         <span className="tmt-spacer" />
-        <input
-          className="vn-cast-search-input"
-          placeholder={
-            tab === "characters" ? "Filter cast…" : "Filter locations…"
-          }
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        {(tab === "characters" || tab === "locations") && (
+          <input
+            className="vn-cast-search-input"
+            placeholder={
+              tab === "characters" ? "Filter cast…" : "Filter locations…"
+            }
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        )}
       </div>
 
       <div className="doc-scroll vn-cast-scroll">
         <div className="vn-cast-page">
-          {tab === "characters" ? (
+          {tab === "style" && scripts.activeProject && (
+            <WritingStyleTab
+              project={scripts.activeProject}
+              onSave={(patch) =>
+                void scripts.updateWritingStyle(
+                  scripts.activeProject!.id,
+                  patch,
+                )
+              }
+            />
+          )}
+          {tab === "project" && scripts.activeProject && (
+            <ProjectMetaTab
+              project={scripts.activeProject}
+              onSave={(patch) =>
+                void scripts.updateProject(
+                  scripts.activeProject!.id,
+                  patch,
+                )
+              }
+              onUploadCover={(file) =>
+                scripts.uploadProjectCover(scripts.activeProject!.id, file)
+              }
+              onRemoveCover={() =>
+                scripts.removeProjectCover(scripts.activeProject!.id)
+              }
+            />
+          )}
+          {(tab === "characters" || tab === "locations") && (tab === "characters" ? (
             filteredCharacters.length === 0 ? (
               <div className="vn-cast-empty">
                 {q
@@ -312,7 +368,7 @@ export function ScriptCharactersPage({
                 ),
               )}
             </div>
-          )}
+          ))}
         </div>
       </div>
     </main>
@@ -525,12 +581,22 @@ function CharacterEditCardFull({
           onChange={(e) => void onAvatarFile(e.target.files?.[0] ?? null)}
         />
         <div className="vn-cast-edit-name-col">
-          <input
-            className="vn-input vn-input-large"
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 8 }}
+          >
+            <input
+              className="vn-input vn-input-large"
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <CopyButton
+              value={character.id}
+              title="Copy character id (use as entity_id in MCP character tools)"
+              size="sm"
+            />
+          </div>
           {avatarUrl && (
             <button
               type="button"
@@ -740,6 +806,356 @@ function LocationEditCardFull({
         <button type="button" className="hbtn is-primary" onClick={save}>
           Save
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Writing Style tab ----------
+
+/**
+ * Per-project authoring style form. Every field auto-saves on blur (text)
+ * or on change (radios) — there's no submit button because the data is
+ * loose hints, not validated state. Empty fields mean "no preference" and
+ * are stripped before write so MCP's `get_writing_style` returns the
+ * smallest possible object.
+ */
+function WritingStyleTab({
+  project,
+  onSave,
+}: {
+  project: ScriptProject;
+  onSave: (patch: Partial<WritingStyle>) => void;
+}) {
+  const style = project.writing_style ?? {};
+  const update = (patch: Partial<WritingStyle>) => onSave(patch);
+
+  // Tone is a comma-separated input — easier than tag-chips for v1 and
+  // matches how writers think about tone ("dark, intimate, comedic").
+  const [toneDraft, setToneDraft] = useState((style.tone ?? []).join(", "));
+  useEffect(() => {
+    setToneDraft((style.tone ?? []).join(", "));
+    // Re-sync only when the active project changes; ignore mid-typing churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id]);
+
+  const commitTone = () => {
+    const tags = toneDraft
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    update({ tone: tags.length > 0 ? tags : undefined });
+  };
+
+  return (
+    <div className="vn-style-form">
+      <div className="vn-style-hint">
+        These hints are surfaced to Claude through MCP (call{" "}
+        <code>get_writing_style</code>) so AI helpers keep tone, POV and
+        vocabulary consistent across new scenes. Leave a field blank if you
+        have no preference.
+      </div>
+
+      <div className="vn-style-grid">
+        <label className="vn-style-field">
+          <span className="vn-style-label">Language</span>
+          <input
+            className="vn-input"
+            placeholder="e.g. ru, en-US, ja"
+            defaultValue={style.language ?? ""}
+            onBlur={(e) =>
+              update({ language: e.target.value.trim() || undefined })
+            }
+          />
+        </label>
+
+        <label className="vn-style-field">
+          <span className="vn-style-label">Tone tags</span>
+          <input
+            className="vn-input"
+            placeholder="dark, intimate, comedic, melancholic, …"
+            value={toneDraft}
+            onChange={(e) => setToneDraft(e.target.value)}
+            onBlur={commitTone}
+          />
+        </label>
+
+        <fieldset className="vn-style-field">
+          <legend className="vn-style-label">POV</legend>
+          <div className="vn-style-radios">
+            {(["first", "second", "third", "mixed"] as const).map((v) => (
+              <label key={v} className="vn-style-radio">
+                <input
+                  type="radio"
+                  name="pov"
+                  checked={style.pov === v}
+                  onChange={() => update({ pov: v })}
+                />
+                <span>{v}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="vn-style-field">
+          <legend className="vn-style-label">Tense</legend>
+          <div className="vn-style-radios">
+            {(["past", "present", "mixed"] as const).map((v) => (
+              <label key={v} className="vn-style-radio">
+                <input
+                  type="radio"
+                  name="tense"
+                  checked={style.tense === v}
+                  onChange={() => update({ tense: v })}
+                />
+                <span>{v}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="vn-style-field">
+          <legend className="vn-style-label">Sentence length</legend>
+          <div className="vn-style-radios">
+            {(["short", "varied", "long"] as const).map((v) => (
+              <label key={v} className="vn-style-radio">
+                <input
+                  type="radio"
+                  name="sentence_length"
+                  checked={style.sentence_length === v}
+                  onChange={() => update({ sentence_length: v })}
+                />
+                <span>{v}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="vn-style-field">
+          <legend className="vn-style-label">Vocabulary</legend>
+          <div className="vn-style-radios">
+            {(["simple", "moderate", "rich"] as const).map((v) => (
+              <label key={v} className="vn-style-radio">
+                <input
+                  type="radio"
+                  name="vocabulary"
+                  checked={style.vocabulary === v}
+                  onChange={() => update({ vocabulary: v })}
+                />
+                <span>{v}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </div>
+
+      <label className="vn-style-field">
+        <span className="vn-style-label">
+          DO — example lines to imitate
+          <span className="vn-style-hint-inline"> (one per line)</span>
+        </span>
+        <textarea
+          className="vn-textarea"
+          rows={4}
+          placeholder={
+            "Лес шёл за ней третий час. Она перестала считать.\n" +
+            "He smiled, but it didn't reach his eyes."
+          }
+          defaultValue={(style.do_examples ?? []).join("\n")}
+          onBlur={(e) => {
+            const lines = e.target.value
+              .split("\n")
+              .map((l) => l.trim())
+              .filter(Boolean);
+            update({ do_examples: lines.length > 0 ? lines : undefined });
+          }}
+        />
+      </label>
+
+      <label className="vn-style-field">
+        <span className="vn-style-label">
+          DON'T — patterns to avoid
+          <span className="vn-style-hint-inline"> (one per line)</span>
+        </span>
+        <textarea
+          className="vn-textarea"
+          rows={4}
+          placeholder={
+            "purple prose\n" +
+            'adverbs in dialogue tags ("she said loudly")\n' +
+            "modern slang in a historical setting"
+          }
+          defaultValue={(style.dont_examples ?? []).join("\n")}
+          onBlur={(e) => {
+            const lines = e.target.value
+              .split("\n")
+              .map((l) => l.trim())
+              .filter(Boolean);
+            update({ dont_examples: lines.length > 0 ? lines : undefined });
+          }}
+        />
+      </label>
+
+      <label className="vn-style-field">
+        <span className="vn-style-label">Custom rules</span>
+        <textarea
+          className="vn-textarea"
+          rows={3}
+          placeholder="Free-form rules: 'never break the fourth wall', 'always include a sensory detail', …"
+          defaultValue={style.custom_rules ?? ""}
+          onBlur={(e) =>
+            update({ custom_rules: e.target.value.trim() || undefined })
+          }
+        />
+      </label>
+
+      <label className="vn-style-field">
+        <span className="vn-style-label">Notes (private — not sent to AI)</span>
+        <textarea
+          className="vn-textarea"
+          rows={2}
+          defaultValue={style.notes ?? ""}
+          onBlur={(e) => update({ notes: e.target.value.trim() || undefined })}
+        />
+      </label>
+
+      <details className="vn-style-preview">
+        <summary>How Claude will see this</summary>
+        <pre>{JSON.stringify(style, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
+// ---------- Project meta tab ----------
+
+function ProjectMetaTab({
+  project,
+  onSave,
+  onUploadCover,
+  onRemoveCover,
+}: {
+  project: ScriptProject;
+  onSave: (
+    patch: Partial<Pick<ScriptProject, "title" | "synopsis" | "cover_emoji">>,
+  ) => void;
+  onUploadCover: (file: File) => Promise<string | null>;
+  onRemoveCover: () => Promise<void>;
+}) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const onPickFile = async (file: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      await onUploadCover(file);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="vn-style-form">
+      <div className="vn-style-hint">
+        Basic project metadata — title, short synopsis, and a cover image or
+        emoji. Shown in the project switcher and exported with Ren'Py builds.
+      </div>
+
+      <label className="vn-style-field">
+        <span className="vn-style-label">Title</span>
+        <input
+          className="vn-input vn-input-large"
+          defaultValue={project.title}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (v && v !== project.title) onSave({ title: v });
+          }}
+        />
+      </label>
+
+      <label className="vn-style-field">
+        <span className="vn-style-label">Synopsis</span>
+        <textarea
+          className="vn-textarea"
+          rows={4}
+          placeholder="One-paragraph pitch of the story…"
+          defaultValue={project.synopsis}
+          onBlur={(e) => {
+            const v = e.target.value;
+            if (v !== project.synopsis) onSave({ synopsis: v });
+          }}
+        />
+      </label>
+
+      <div className="vn-style-field">
+        <span className="vn-style-label">Cover</span>
+        <div className="vn-project-cover-row">
+          {project.cover_image_url ? (
+            <img
+              className="vn-project-cover-preview"
+              src={project.cover_image_url}
+              alt=""
+            />
+          ) : (
+            <span className="vn-project-cover-emoji">
+              {project.cover_emoji ?? "📖"}
+            </span>
+          )}
+          <div className="vn-project-cover-actions">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              style={{ display: "none" }}
+              onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              className="hbtn"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading
+                ? "Uploading…"
+                : project.cover_image_url
+                  ? "Replace image"
+                  : "Upload image"}
+            </button>
+            {project.cover_image_url && (
+              <button
+                type="button"
+                className="hbtn"
+                onClick={() => void onRemoveCover()}
+              >
+                Remove image
+              </button>
+            )}
+            <input
+              className="vn-input vn-project-emoji-input"
+              placeholder="or emoji 📖"
+              defaultValue={project.cover_emoji ?? ""}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v !== (project.cover_emoji ?? "")) {
+                  onSave({ cover_emoji: v || null });
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="vn-style-field">
+        <span className="vn-style-label">Project id</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <code className="vn-id-pill">{project.id}</code>
+          <CopyButton
+            value={project.id}
+            title="Copy project id (use as project_id in MCP script tools)"
+            size="sm"
+          />
+        </div>
       </div>
     </div>
   );

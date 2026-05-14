@@ -10,6 +10,29 @@ export type ScriptContent = Json;
 /** Origin of a scene's Renpy-blocks: authored in VnHelper, or imported from .rpy. */
 export type ScriptSourceKind = "vnhelper" | "rpy_import";
 
+/** Per-project authoring style hints surfaced to AI / MCP. Every field is
+ *  optional — empty values mean "no preference, use defaults". Stored as
+ *  JSONB so we can grow the schema without further migrations. */
+export interface WritingStyle {
+  /** Free-form locale string — "ru", "en-US", "Custom", … — passed to AI
+   *  so it writes in the right language. */
+  language?: string;
+  /** Tag-list of tonal qualities (dark, intimate, comedic, …). */
+  tone?: string[];
+  pov?: "first" | "second" | "third" | "mixed";
+  tense?: "past" | "present" | "mixed";
+  sentence_length?: "short" | "varied" | "long";
+  vocabulary?: "simple" | "moderate" | "rich";
+  /** Exemplar lines the user wants imitated. */
+  do_examples?: string[];
+  /** Lines / patterns to avoid. */
+  dont_examples?: string[];
+  /** Free-form rules ("no second-person", "always include sensory detail"). */
+  custom_rules?: string;
+  /** Misc notes shown only to the human author. */
+  notes?: string;
+}
+
 export interface ScriptProject {
   id: string;
   workspace_id: string;
@@ -20,6 +43,7 @@ export interface ScriptProject {
   position: number;
   created_at: string;
   updated_at: string;
+  writing_style: WritingStyle;
 }
 
 export interface ScriptNodeSummary {
@@ -198,7 +222,7 @@ export function useScripts(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("script_projects")
       .select(
-        "id, workspace_id, title, synopsis, cover_emoji, cover_image_url, position, created_at, updated_at",
+        "id, workspace_id, title, synopsis, cover_emoji, cover_image_url, position, created_at, updated_at, writing_style",
       )
       .eq("workspace_id", myWs)
       .order("position", { ascending: true });
@@ -209,7 +233,16 @@ export function useScripts(workspaceId: string | null) {
       setProjectsReady(true);
       return;
     }
-    const list = (data ?? []) as ScriptProject[];
+    // Normalise writing_style — DB column is JSONB so it may be `null`, an
+    // empty object, or our typed shape. Coerce to `{}` for consumers.
+    const list = ((data ?? []) as Array<ScriptProject & { writing_style: unknown }>).map(
+      (p) => ({
+        ...p,
+        writing_style: (p.writing_style && typeof p.writing_style === "object"
+          ? p.writing_style
+          : {}) as WritingStyle,
+      }),
+    ) as ScriptProject[];
     setProjects(list);
     // Ensure active project is valid for this workspace
     if (
@@ -527,6 +560,7 @@ export function useScripts(workspaceId: string | null) {
         position: Date.now(),
         created_at: now,
         updated_at: now,
+        writing_style: {},
       };
       // Optimistic: show in list immediately and switch to it.
       setProjects((cur) => [...cur, optimistic]);
@@ -576,6 +610,43 @@ export function useScripts(workspaceId: string | null) {
         .update({ ...patch, updated_by: user.id })
         .eq("id", id);
       if (error) console.error("updateProject", error);
+    },
+    [user],
+  );
+
+  /** Patch the JSONB `writing_style` column. Only the keys you pass are
+   *  merged onto the existing object — caller doesn't need to know the
+   *  current state. Optimistic; rolls back on failure. */
+  const updateWritingStyle = useCallback(
+    async (id: string, patch: Partial<WritingStyle>) => {
+      if (!user) return;
+      let snapshot: WritingStyle | undefined;
+      setProjects((cur) =>
+        cur.map((p) => {
+          if (p.id !== id) return p;
+          snapshot = p.writing_style;
+          return {
+            ...p,
+            writing_style: { ...p.writing_style, ...patch },
+          };
+        }),
+      );
+      const next = { ...(snapshot ?? {}), ...patch };
+      const { error } = await supabase
+        .from("script_projects")
+        .update({ writing_style: next as never, updated_by: user.id })
+        .eq("id", id);
+      if (error) {
+        console.error("updateWritingStyle", error);
+        if (snapshot) {
+          const rollback = snapshot;
+          setProjects((cur) =>
+            cur.map((p) =>
+              p.id === id ? { ...p, writing_style: rollback } : p,
+            ),
+          );
+        }
+      }
     },
     [user],
   );
@@ -1284,6 +1355,7 @@ export function useScripts(workspaceId: string | null) {
     setActiveProjectId,
     createProject,
     updateProject,
+    updateWritingStyle,
     deleteProject,
     uploadProjectCover,
     removeProjectCover,

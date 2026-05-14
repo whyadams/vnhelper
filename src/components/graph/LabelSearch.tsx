@@ -12,7 +12,9 @@ export interface SearchItem {
   sceneTitle: string;
   chapter: string | null;
   isEntry: boolean;
+  isOrphan: boolean;
   isUnreachable: boolean;
+  isEnding: boolean;
   brokenOutboundCount: number;
 }
 
@@ -150,9 +152,19 @@ export function LabelSearch({ open, items, onJumpToLabel, onClose }: Props) {
                       START
                     </span>
                   )}
-                  {item.isUnreachable && !item.isEntry && (
+                  {!item.isEntry && item.isOrphan && (
+                    <span className="graph-search-tag graph-search-tag-orphan">
+                      ORPHAN
+                    </span>
+                  )}
+                  {!item.isEntry && item.isUnreachable && !item.isOrphan && (
                     <span className="graph-search-tag graph-search-tag-unreach">
                       UNREACH
+                    </span>
+                  )}
+                  {!item.isEntry && item.isEnding && (
+                    <span className="graph-search-tag graph-search-tag-ending">
+                      END
                     </span>
                   )}
                   {item.brokenOutboundCount > 0 && (

@@ -235,29 +235,10 @@ function SelectionBubbleMenu({
     setCharPickerOpen(false);
   };
 
-  const Btn = ({
-    active,
-    onClick,
-    label,
-    title,
-  }: {
-    active?: boolean;
-    onClick: () => void;
-    label: ReactNode;
-    title?: string;
-  }) => (
-    <button
-      type="button"
-      className={"vn-bubble-btn" + (active ? " is-active" : "")}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onClick();
-      }}
-      title={title}
-    >
-      {label}
-    </button>
-  );
+  // `BubbleBtn` is defined at module scope (see bottom of file) — defining
+  // it inline inside SelectionBubbleMenu would create a brand-new component
+  // identity on every parent render, forcing React to unmount/remount each
+  // button and discard any internal state. Move-not-redefine.
 
   return (
     <div
@@ -266,26 +247,26 @@ function SelectionBubbleMenu({
       style={{ top: pos.top, left: pos.left }}
       onMouseDown={(e) => e.preventDefault()}
     >
-      <Btn
+      <BubbleBtn
         active={editor.isActive("bold")}
         onClick={() => editor.chain().focus().toggleBold().run()}
         label={<b>B</b>}
         title="Bold ⌘B"
       />
-      <Btn
+      <BubbleBtn
         active={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
         label={<i>I</i>}
         title="Italic ⌘I"
       />
-      <Btn
+      <BubbleBtn
         active={editor.isActive("strike")}
         onClick={() => editor.chain().focus().toggleStrike().run()}
         label={<s>S</s>}
         title="Strikethrough"
       />
       <span className="vn-bubble-sep" />
-      <Btn
+      <BubbleBtn
         active={editor.isActive("heading", { level: 1 })}
         onClick={() =>
           editor.chain().focus().toggleHeading({ level: 1 }).run()
@@ -293,7 +274,7 @@ function SelectionBubbleMenu({
         label="H1"
         title="Heading 1"
       />
-      <Btn
+      <BubbleBtn
         active={editor.isActive("heading", { level: 2 })}
         onClick={() =>
           editor.chain().focus().toggleHeading({ level: 2 }).run()
@@ -301,13 +282,13 @@ function SelectionBubbleMenu({
         label="H2"
         title="Heading 2"
       />
-      <Btn
+      <BubbleBtn
         active={editor.isActive("blockquote")}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         label="❝"
         title="Quote"
       />
-      <Btn
+      <BubbleBtn
         active={editor.isActive("bulletList")}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         label="•"
@@ -875,3 +856,36 @@ function ScriptToolbar({
 
 // `useScriptStats` moved to ./scriptStats so the Renpy tab can read counts
 // without static-importing TipTap. Import from "./scriptStats" instead.
+
+/**
+ * Toolbar button used by the bubble menu and the floating toolbar. Lives at
+ * module scope so its component identity is stable across renders of the
+ * parent — defining it inline would force React to unmount/remount every
+ * button on every parent update, throwing away their internal state and
+ * triggering style transitions on every selection change.
+ */
+function BubbleBtn({
+  active,
+  onClick,
+  label,
+  title,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  label: ReactNode;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={"vn-bubble-btn" + (active ? " is-active" : "")}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
+      title={title}
+    >
+      {label}
+    </button>
+  );
+}

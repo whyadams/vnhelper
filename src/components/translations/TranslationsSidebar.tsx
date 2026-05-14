@@ -9,6 +9,7 @@ import { TranslationSettingsScreen } from "./TranslationSettingsScreen";
 import { useKanban } from "../../state/kanbanStore";
 import { useSubscription } from "../../state/subscription";
 import { usePaywall } from "../subscription/Paywall";
+import { CopyButton } from "../ui/CopyButton";
 
 // One file in a multi-file import — keeps the relative folder path so the
 // sidebar tree can mirror the source project layout.
@@ -683,6 +684,11 @@ export function TranslationsSidebar({
               <h2 className="tr-pane-title tr-pane-title-detail" title={project.name}>
                 {project.name}
               </h2>
+              <CopyButton
+                value={project.id}
+                title="Copy translation project id (use as project_id in MCP translation tools)"
+                size="xs"
+              />
               <span
                 className={
                   "tr-pane-pct" +
@@ -875,6 +881,10 @@ function FileRow({
       </button>
       {canEdit && (
         <div className="tr-row-actions">
+          <CopyButton
+            value={file.id}
+            title="Copy file id (paste into a Claude prompt to translate this file via MCP)"
+          />
           <button
             type="button"
             className="tr-icon-btn"

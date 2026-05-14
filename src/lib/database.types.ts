@@ -88,6 +88,38 @@ export type Database = {
           },
         ]
       }
+      calendar_notification_log: {
+        Row: {
+          event_id: string
+          fired_at: string
+          id: string
+          kind: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          fired_at?: string
+          id?: string
+          kind: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          fired_at?: string
+          id?: string
+          kind?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_notification_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           color: string
@@ -415,6 +447,111 @@ export type Database = {
             columns: ["board_id"]
             isOneToOne: false
             referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_groups: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          id: string
+          label_names: string[]
+          name: string
+          project_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label_names?: string[]
+          name?: string
+          project_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label_names?: string[]
+          name?: string
+          project_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_groups_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "script_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_groups_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_annotations: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          id: string
+          project_id: string
+          text: string
+          updated_at: string
+          workspace_id: string
+          x: number
+          y: number
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id: string
+          text?: string
+          updated_at?: string
+          workspace_id: string
+          x?: number
+          y?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          project_id?: string
+          text?: string
+          updated_at?: string
+          workspace_id?: string
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_annotations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "script_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_annotations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -853,6 +990,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           workspace_id: string
+          writing_style: Json
         }
         Insert: {
           cover_emoji?: string | null
@@ -866,6 +1004,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           workspace_id: string
+          writing_style?: Json
         }
         Update: {
           cover_emoji?: string | null
@@ -879,6 +1018,7 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           workspace_id?: string
+          writing_style?: Json
         }
         Relationships: [
           {

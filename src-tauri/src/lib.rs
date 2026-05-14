@@ -238,6 +238,13 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_notification::init())
+        // Autostart: no args means the user enables/disables it explicitly
+        // from the Settings UI — we don't auto-register on first launch.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(TrayState::default())
         .invoke_handler(tauri::generate_handler![
             update_tray_tasks,

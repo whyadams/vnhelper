@@ -26,7 +26,8 @@ export type PaywallFeature =
   | "frozen_workspace"
   | "frozen_project"
   | "translation_limit"
-  | "frozen_translation";
+  | "frozen_translation"
+  | "trial_ending";
 
 interface FeatureCopy {
   title: string;
@@ -69,6 +70,10 @@ const COPY: Record<PaywallFeature, FeatureCopy> = {
   frozen_translation: {
     title: "This translation is frozen",
     body: "On the free plan each workspace keeps two translations active. Your translated strings here aren't deleted — upgrade to Pro to unfreeze this language instantly.",
+  },
+  trial_ending: {
+    title: "Stay on Pro",
+    body: "Your Pro trial is wrapping up. Upgrade now to keep every workspace, project, and translation active — nothing freezes, nothing locks. Your existing data is preserved either way.",
   },
 };
 

@@ -54,6 +54,12 @@ source, custom auth, HTTP transport, etc.).
 - `update_character` — patch fields (name/short_name/color/emoji/pronouns/age/role/voice_notes/rpy_var/aliases)
 - `delete_character`
 
+**Locations**
+- `list_locations`
+- `create_location` — name + optional description / mood / image_url
+- `update_location`
+- `delete_location` — scenes linked via location_id stay (FK is ON DELETE SET NULL)
+
 **Calendar**
 - `list_calendar_events` — optional `from`/`to` (YYYY-MM-DD) date-range filter; attachments are resolved to entity names inline
 - `create_calendar_event` — title + date + optional time/color/description
@@ -61,6 +67,30 @@ source, custom auth, HTTP transport, etc.).
 - `delete_calendar_event` — attachments cascade
 - `attach_to_calendar_event` — link card / script_node / character (idempotent)
 - `detach_from_calendar_event`
+
+**Subscription**
+- `get_subscription` — returns the user's tier (`free` | `pro`), raw status, trial countdown, and the resolved limit map. Call before attempting quota-bound actions so you can warn the user instead of surfacing a raw DB error.
+
+**Writing style (per project)**
+- `get_writing_style` — read the project's author voice preferences (language, tone, POV, tense, sentence length, vocabulary, do/don't examples, custom rules). Call before drafting new scenes so output matches the author.
+- `update_writing_style` — patch (or replace) the style. Use when the user says "make my style darker and more concise" — call `get_writing_style` first, then write the merged patch. `mode: 'replace'` discards the previous object entirely.
+
+**Translations** — designed so one prompt = 1-3 tool calls, not 50:
+- `translation_overview` — whole language → file → progress map in **one call**. Start here.
+- `list_translation_projects` / `list_translation_files`
+- `find_translation_strings` — cross-file search with `status` ('pending' / 'done' / 'all'), `file_path_glob` (`chapter_1/*`), `speaker`, free-text `query`. Default returns pending strings, paginated.
+- `read_translation_strings` — sequential dump of one file for context.
+- `update_translation_strings` — **bulk patch up to 500 rows per call**, returns per-row results.
+- `list_translation_speakers` — distinct speakers for "translate everything by Alice"-style prompts.
+- `delete_translation_file` / `delete_translation_project`
+
+Typical agent workflow for "translate pending in chapter_1":
+```
+1. find_translation_strings({status:'pending', file_path_glob:'chapter_1/*'})
+2. → think over translations →
+3. update_translation_strings({updates: [{id, translated_text}, …]})
+```
+Two tool calls regardless of file count.
 
 ## Build from source (dev)
 
