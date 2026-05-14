@@ -42,13 +42,18 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Install MCP sidecar deps
+        working-directory: packages/vnhelper-mcp
+        run: pnpm install --frozen-lockfile
+
       - name: Build MCP sidecar binary
         shell: pwsh
+        working-directory: packages/vnhelper-mcp
         run: |
-          pnpm --filter vnhelper-mcp run build
-          pnpm --filter vnhelper-mcp run bundle:win
-          New-Item -ItemType Directory -Force -Path src-tauri/binaries | Out-Null
-          Copy-Item packages/vnhelper-mcp/dist/vnhelper-mcp.exe src-tauri/binaries/vnhelper-mcp.exe -Force
+          pnpm run build
+          pnpm run bundle:win
+          New-Item -ItemType Directory -Force -Path ../../src-tauri/binaries | Out-Null
+          Copy-Item dist/vnhelper-mcp.exe ../../src-tauri/binaries/vnhelper-mcp.exe -Force
 
       - name: Build & publish (tauri-action)
         uses: tauri-apps/tauri-action@v0
