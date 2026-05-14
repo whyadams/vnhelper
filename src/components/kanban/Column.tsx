@@ -5,6 +5,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type { ColumnData } from "../../data/kanban";
 import { useKanban } from "../../state/kanbanStore";
 import { Card } from "./Card";
@@ -21,6 +22,7 @@ import { useDialog } from "../ui/Dialog";
 export function Column({ data }: { data: ColumnData }) {
   const { dispatch, renameColumn, deleteColumn } = useKanban();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -105,13 +107,13 @@ export function Column({ data }: { data: ColumnData }) {
     const cardCount = data.cards.length;
     const msg =
       cardCount > 0
-        ? `Delete "${data.title}" and ${cardCount} card(s) inside it? This cannot be undone.`
-        : `Delete "${data.title}"?`;
+        ? t("kanban.delete_column_with_cards", { title: data.title, count: cardCount })
+        : t("kanban.delete_column_empty", { title: data.title });
     const ok = await dialog.confirm({
-      title: "Delete column",
+      title: t("kanban.delete_column_title"),
       message: msg,
       variant: "danger",
-      confirmLabel: "Delete",
+      confirmLabel: t("common.delete"),
     });
     if (ok) void deleteColumn(data.id);
   };
@@ -139,7 +141,7 @@ export function Column({ data }: { data: ColumnData }) {
           <span
             className="title"
             onDoubleClick={() => setRenaming(true)}
-            title="Double-click to rename"
+            title={t("kanban.double_click_to_rename")}
           >
             {data.title}
           </span>
@@ -149,7 +151,7 @@ export function Column({ data }: { data: ColumnData }) {
           <button
             className="col-head-add"
             type="button"
-            aria-label="Add card"
+            aria-label={t("kanban.add_card")}
             onClick={() => setAdding(true)}
           >
             <PlusIcon size={12} />
@@ -159,25 +161,25 @@ export function Column({ data }: { data: ColumnData }) {
               <button
                 className="col-head-more"
                 type="button"
-                aria-label="Column actions"
-                title="Column actions"
+                aria-label={t("kanban.column_actions")}
+                title={t("kanban.column_actions")}
               >
                 <MoreHIcon />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-48">
               <DropdownMenuItem onSelect={() => setRenaming(true)}>
-                Rename
+                {t("kanban.rename_column")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setAdding(true)}>
-                Add card
+                {t("kanban.add_card")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
                 onSelect={() => void handleDelete()}
               >
-                Delete column
+                {t("kanban.delete_column")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -206,7 +208,7 @@ export function Column({ data }: { data: ColumnData }) {
               ref={inputRef}
               className="add-card-input"
               value={draft}
-              placeholder="Card title…"
+              placeholder={t("kanban.add_card_placeholder")}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={onDraftKey}
               onBlur={submitDraft}
@@ -219,7 +221,7 @@ export function Column({ data }: { data: ColumnData }) {
             onClick={() => setAdding(true)}
           >
             <PlusIcon className="ico" />
-            Add card
+            {t("kanban.add_card")}
           </button>
         )}
       </div>

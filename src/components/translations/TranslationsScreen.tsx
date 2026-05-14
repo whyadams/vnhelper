@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useKanban } from "../../state/kanbanStore";
 import { useTranslations } from "../../state/translations";
 import { canEdit } from "../../lib/roles";
@@ -15,6 +16,7 @@ import { FolderImportDialog } from "./FolderImportDialog";
 export function TranslationsScreen() {
   const { state } = useKanban();
   const api = useTranslations(state.workspaceId);
+  const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [folderItems, setFolderItems] = useState<FolderImportItem[] | null>(
@@ -64,10 +66,11 @@ export function TranslationsScreen() {
       <section className="tr-detail">
         {!hasProjects ? (
           <div className="tr-empty">
-            <h2>No translations yet.</h2>
+            <h2>{t("translations.no_projects")}</h2>
             <p>
-              A translation holds <code>.rpy</code> files for one target
-              language.
+              {t("translations.no_projects_hint")
+                .split(/<code>|<\/code>/)
+                .map((s, i) => (i % 2 === 1 ? <code key={i}>{s}</code> : s))}
             </p>
             {editable && (
               <button
@@ -75,7 +78,7 @@ export function TranslationsScreen() {
                 className="hbtn is-primary"
                 onClick={() => setCreateOpen(true)}
               >
-                Create translation
+                {t("translations.create_translation")}
               </button>
             )}
           </div>
@@ -87,7 +90,7 @@ export function TranslationsScreen() {
           />
         ) : (
           <div className="tr-empty">
-            <p>Select a translation on the left.</p>
+            <p>{t("translations.select_on_left")}</p>
           </div>
         )}
       </section>

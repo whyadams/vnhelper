@@ -6,48 +6,26 @@
   overflow: hidden;
 }
 
-.graph-header {
-  height: 64px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 28px;
-  gap: 16px;
-  border-bottom: 1px solid var(--border);
+/* Graph topbar uses the shared `.topbar` + `.crumb` chrome from kanban.css;
+   only the project switcher needs graph-local styling. */
+.graph-topbar {
+  justify-content: flex-start;
+  gap: 8px;
 }
-.graph-header-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.graph-header-eyebrow {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-.graph-header-title h1 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.graph-topbar .graph-project-select {
+  margin-left: auto;
 }
 
 .graph-project-select {
-  height: 32px;
-  padding: 0 12px;
+  height: 30px;
+  padding: 0 28px 0 12px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-1);
   font-family: Montserrat, sans-serif;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   appearance: none;
   background-image: linear-gradient(
@@ -63,7 +41,6 @@
     5px 5px,
     5px 5px;
   background-repeat: no-repeat;
-  padding-right: 28px;
 }
 .graph-project-select:hover {
   border-color: var(--border-strong);
@@ -73,6 +50,39 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.graph-canvas-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Canvas-anchored toolbar — replaces the old floating stats + search
+   overlays. Sits flush under the main topbar so the canvas underneath
+   stays uncluttered. */
+.graph-canvas-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-canvas);
+  min-height: 44px;
+}
+.graph-canvas-toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.graph-canvas-toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
 }
 
 .graph-loading,
@@ -106,24 +116,38 @@
   font-family: Montserrat, sans-serif;
 }
 .graph-canvas-wrap .react-flow__minimap {
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: rgba(28, 29, 31, 0.92) !important;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
   overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+.graph-canvas-wrap .react-flow__minimap-mask {
+  fill: rgba(19, 20, 22, 0.55) !important;
 }
 .graph-canvas-wrap .react-flow__controls {
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: rgba(28, 29, 31, 0.92);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
 }
 .graph-canvas-wrap .react-flow__controls-button {
-  background: var(--bg-elevated);
+  background: transparent;
   border: none;
   border-bottom: 1px solid var(--border);
   color: var(--text-2);
+  width: 28px;
+  height: 28px;
+  transition: background 0.12s, color 0.12s;
+}
+.graph-canvas-wrap .react-flow__controls-button:last-child {
+  border-bottom: none;
 }
 .graph-canvas-wrap .react-flow__controls-button:hover {
-  background: var(--bg-card-hover);
+  background: rgba(200, 199, 202, 0.06);
   color: var(--text-1);
 }
 .graph-canvas-wrap .react-flow__controls-button svg {
@@ -132,6 +156,9 @@
 .graph-canvas-wrap .react-flow__edge-text {
   font-family: Montserrat, sans-serif;
   font-size: 11px;
+}
+.graph-canvas-wrap .react-flow__attribution {
+  display: none;
 }
 
 /* ---- Label node ----
@@ -143,20 +170,22 @@
 .graph-node {
   width: 220px;
   min-height: 84px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 14px;
   color: var(--text-1);
   font-family: Montserrat, sans-serif;
   cursor: grab;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s,
+    transform 0.15s;
   position: relative;
 }
 .graph-node:hover {
+  background: var(--bg-card-hover);
   border-color: var(--border-strong);
 }
 .graph-node.is-selected {
@@ -280,7 +309,6 @@
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--text-3);
-  box-shadow: 0 0 0 1.5px var(--bg-elevated);
 }
 .graph-node-status-dot[data-status="todo"] {
   background: var(--text-3);
@@ -303,6 +331,73 @@
   opacity: 0.85;
   flex-shrink: 0;
   line-height: 0;
+}
+
+/* Subroutine glyph (⤴) next to the label name — marks labels that end with
+   `return`. Coloured in `--status-info` to match the dashed call edges
+   pointing AT this node, so the two read as a pair: "callers send control
+   here, control comes back to them". */
+.graph-node-subroutine {
+  color: var(--status-info);
+  opacity: 0.95;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+/* Subroutine label visual: dashed left rail so a subroutine reads as
+   "callable, not a normal flow node" even when no other integrity flag
+   wins the left edge. Status / POV / integrity stripes still preempt
+   via the existing higher-specificity rules. */
+.graph-node-label.is-subroutine {
+  border-left: 1px dashed var(--status-info);
+}
+.graph-node-label.is-subroutine:hover {
+  border-left-color: var(--status-info);
+}
+
+/* ============================================================
+   Chapter cluster frame — translucent rectangle behind every
+   label that belongs to the same chapter. Derived from the
+   dagre compound-graph cluster bbox; not stored, not editable.
+   The title sits in a top-left gutter so it doesn't overlap
+   labels inside.
+   ============================================================ */
+.graph-chapter-frame {
+  width: 100%;
+  height: 100%;
+  background: rgba(200, 199, 202, 0.025);
+  border: 1px dashed rgba(200, 199, 202, 0.12);
+  border-radius: 16px;
+  position: relative;
+  pointer-events: none;
+  /* Live behind labels visually even when xyflow's stacking order is
+     fighting us. zIndex on the node also helps. */
+  z-index: -1;
+}
+.graph-chapter-frame-title {
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  padding: 0 8px;
+  font-family: Montserrat, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--bg-canvas);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+/* xyflow wraps every node in a `.react-flow__node` with a default border
+   and rounded corners; for our frame we want a clean translucent box, so
+   override at the wrapper level. */
+.react-flow__node-chapter_frame {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 16px;
+  pointer-events: none !important;
+  box-shadow: none !important;
 }
 
 /* Word-count chip — leftmost in the counter row. Same monospace as the
@@ -424,20 +519,32 @@
 
 /* ---- Stats overlay ---- */
 
-.graph-stats {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+/* Shared floating-overlay surface — used by tools palette, filter-bar,
+   compare/group chips and other absolute panels. Matches the app's
+   elevated card palette so graph panels read as part of the same
+   design system. (Stats + search are now anchored in
+   `.graph-canvas-toolbar` and don't need the floating-surface look.) */
+.graph-tools,
+.graph-filter-bar,
+.graph-compare-chip,
+.graph-group-chip,
+.graph-group-editor,
+.graph-compare-panel,
+.graph-coverage-panel {
   background: rgba(28, 29, 31, 0.92);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.graph-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
   color: var(--text-2);
-  backdrop-filter: blur(8px);
+  font-family: Montserrat, sans-serif;
 }
 .graph-stats span {
   white-space: nowrap;
@@ -458,13 +565,14 @@
   text-underline-offset: 3px;
 }
 .graph-stat-reset {
-  margin-left: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
   font-family: Montserrat, sans-serif;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
   color: var(--text-2);
   cursor: pointer;
   transition: border-color 0.12s, color 0.12s;
@@ -475,13 +583,14 @@
 }
 
 .graph-stat-coverage-btn {
-  margin-left: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
   font-family: Montserrat, sans-serif;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 8px;
   color: var(--text-2);
   cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
@@ -503,17 +612,13 @@
    numbers live so they line up across rows. */
 .graph-coverage-panel {
   position: absolute;
-  top: 56px;
+  top: 12px;
   left: 12px;
   min-width: 260px;
   padding: 12px 14px;
-  background: rgba(28, 29, 31, 0.96);
-  border: 1px solid var(--border);
-  border-radius: 8px;
   font-family: Montserrat, sans-serif;
   font-size: 12px;
   color: var(--text-1);
-  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -576,8 +681,8 @@
   right: 0;
   bottom: 0;
   width: 360px;
-  background: var(--bg-elevated);
-  border-left: 1px solid var(--border);
+  background: #1a1b1d;
+  border-left: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
   font-family: Montserrat, sans-serif;
@@ -989,11 +1094,7 @@
   align-items: center;
   gap: 4px;
   padding: 4px 6px;
-  background: rgba(28, 29, 31, 0.92);
-  border: 1px solid var(--border);
-  border-radius: 10px;
   font-family: Montserrat, sans-serif;
-  backdrop-filter: blur(8px);
   z-index: 4;
   /* Sits above xyflow's Controls/MiniMap by default, but stops short of
      the right edge so it doesn't collide with the search palette button. */
@@ -1149,16 +1250,11 @@
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: rgba(20, 22, 26, 0.96);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
   font-family: Montserrat, sans-serif;
   font-size: 12px;
   color: var(--text-1);
   cursor: pointer;
   z-index: 5;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
   transition: border-color 0.12s, transform 0.12s;
   animation: graph-compare-chip-in 0.16s ease-out;
 }
@@ -1208,13 +1304,8 @@
   top: 12px;
   right: 12px;
   width: 280px;
-  background: rgba(20, 22, 26, 0.96);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
   font-family: Montserrat, sans-serif;
   color: var(--text-1);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -1357,21 +1448,18 @@
    hint for the Ctrl/Cmd+K shortcut. Sits top-right inside the
    canvas wrap, mirrors the stats plate position on the left. */
 .graph-search-trigger {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  background: rgba(28, 29, 31, 0.92);
+  height: 30px;
+  padding: 0 10px;
+  background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-2);
   font-family: Montserrat, sans-serif;
   font-size: 12px;
   cursor: pointer;
-  backdrop-filter: blur(8px);
   transition: border-color 0.12s, color 0.12s;
 }
 .graph-search-trigger:hover {
@@ -1596,14 +1684,14 @@
 /* Simulate button — sibling of Coverage, slightly louder (accent border on
    hover) since it opens a modal experience rather than a fly-out. */
 .graph-stat-sim-btn {
-  margin-left: 4px;
-  padding: 3px 10px;
-  font-size: 11px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
   font-family: Montserrat, sans-serif;
   font-weight: 500;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
   color: var(--text-1);
   cursor: pointer;
   transition: border-color 0.12s, color 0.12s, background 0.12s;
@@ -1718,9 +1806,6 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  background: rgba(20, 22, 26, 0.96);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
   font-family: Montserrat, sans-serif;
   font-size: 12px;
   font-weight: 500;
@@ -1742,12 +1827,7 @@
   bottom: 110px;
   right: 12px;
   width: 260px;
-  background: rgba(20, 22, 26, 0.97);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
   padding: 12px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -1859,11 +1939,6 @@
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  background: rgba(20, 22, 26, 0.95);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
 }
 .graph-tools-item {
   width: 32px;
@@ -1962,14 +2037,14 @@
 }
 
 .graph-stat-note-btn {
-  margin-left: 4px;
-  padding: 3px 10px;
-  font-size: 11px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
   font-family: Montserrat, sans-serif;
   font-weight: 500;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 8px;
   color: var(--text-2);
   cursor: pointer;
   transition: border-color 0.12s, color 0.12s, background 0.12s;
@@ -1978,6 +2053,49 @@
   border-color: rgba(220, 180, 110, 0.5);
   background: var(--bg-card-hover);
   color: var(--text-1);
+}
+
+/* "Auto-match photos" toolbar pair — the action button plus an ephemeral
+   status tag that appears for ~3 s after the run so the user can see the
+   match count without opening a modal. Tinted with the photos accent
+   (the same olive used for the upload-progress strip) so it reads as
+   "this lives in the Photos cross-cut". */
+.graph-stat-automatch-btn {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-family: Montserrat, sans-serif;
+  font-weight: 500;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.graph-stat-automatch-btn:hover {
+  border-color: rgba(141, 153, 130, 0.55);
+  background: var(--bg-card-hover);
+  color: var(--text-1);
+}
+.graph-stat-automatch-toast {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  background: rgba(141, 153, 130, 0.12);
+  border: 1px solid rgba(141, 153, 130, 0.32);
+  border-radius: 8px;
+  color: #c8c7ca;
+  font-family: Montserrat, sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  animation: graph-automatch-toast-in 0.18s ease-out;
+}
+@keyframes graph-automatch-toast-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================================
@@ -2179,17 +2297,19 @@
 }
 
 .path-sim {
-  width: min(1100px, 100%);
-  height: min(780px, 100%);
-  background: linear-gradient(180deg, #1a1c20 0%, #0f1013 100%);
+  /* Bumped from 1100×780 to ~16:9 cinematic so the photo backdrop has
+     room to breathe — the redesigned preview is Ren'Py-faithful and a
+     wider canvas keeps composition close to in-game proportions. */
+  width: min(1520px, 100%);
+  height: min(855px, 100%);
+  background: #0a0b0c;
   border: 1px solid var(--border-strong);
   border-radius: 14px;
   box-shadow:
     0 36px 72px rgba(0, 0, 0, 0.6),
     0 2px 6px rgba(0, 0, 0, 0.4);
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   font-family: Montserrat, sans-serif;
   color: var(--text-1);
   overflow: hidden;
@@ -2318,6 +2438,34 @@
 }
 .path-sim-stage.is-choosing {
   cursor: default;
+}
+.path-sim-stage.has-photo {
+  /* When a scene photo is bound, swap the soft radial gradient for a
+     darkened solid so the photo carries the mood instead. */
+  background-image: none;
+  background-color: #0a0b0c;
+}
+.path-sim-stage-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Keep the photo visually subordinate to character chips + dialogue:
+     slight darken so white text on the dialogue bar stays legible
+     regardless of the photo's exposure. */
+  filter: brightness(0.78) saturate(1.05);
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  z-index: 0;
+}
+/* Character chips + dialogue need to sit ABOVE the absolutely-positioned
+   photo backdrop. The chips already use z-index for choice overlays, so
+   we just raise the cast/dialogue lift above the photo. */
+.path-sim-stage.has-photo > *:not(.path-sim-stage-photo) {
+  position: relative;
+  z-index: 1;
 }
 
 /* Visible-character chips — top-half of the stage so dialogue at the
@@ -2527,6 +2675,23 @@
   text-decoration: line-through;
   text-decoration-color: rgba(168, 112, 128, 0.5);
 }
+/* Choice that wraps a `call` — visually paired with the subroutine glyph
+   on the target node. Dashed left rail reads as "this returns" not "this
+   transfers control permanently". */
+.path-sim-choice.is-call {
+  border-left: 3px dashed var(--status-info);
+}
+/* Synthetic "Return to caller" button rendered when the current label
+   ends with `return` and the call stack has a frame to pop. Distinct
+   from regular continue/choice options so the user knows the stack
+   pointer is moving. */
+.path-sim-choice.is-return {
+  border-left: 3px solid var(--status-info);
+  background: rgba(130, 140, 153, 0.06);
+}
+.path-sim-choice.is-return .path-sim-choice-label {
+  color: var(--status-info);
+}
 .path-sim-choice-label {
   font-size: 15px;
 }
@@ -2712,4 +2877,355 @@
   text-align: center;
   font-size: 13px;
   color: var(--text-3);
+}
+
+/* ============================================================
+   Path simulator — Ren'Py-style preview chrome
+   ----------------------------------------------------------------
+   Replaces the older debug-style topbar+dialogue with a Figma-driven
+   layout (file cJcLH0zJklMxySPU71imfE, nodes 1591:454 / 1594:473):
+     - full-bleed photo backdrop fills the stage
+     - bottom panel: speaker name in green + dialogue text (or pill
+       choices), divider, quick menu (Auto / F.Save / F.Load / History)
+     - floating control icons tucked into the top-right corner so the
+       photo stays unobstructed
+   Old `path-sim-topbar/action/dialogue/cast` rules above are now dead
+   for this layout; keeping them in place is harmless and avoids a
+   risky bulk-delete.
+   ============================================================ */
+
+/* Make sure the stage is a positioned flex child so the bottom panel
+   can overlay it via absolute positioning. */
+.path-sim > .path-sim-stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* The original `.path-sim-cast` block is no longer rendered, but if
+   it ever returns for debugging this keeps it from breaking layout. */
+.path-sim .path-sim-cast { display: none; }
+
+/* Floating top-right icons. Subtle by default; brighten on hover so
+   the photo stays the focal point. */
+.path-sim-floating-controls {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+.path-sim-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 10, 14, 0.45);
+  border: 1px solid rgba(200, 199, 202, 0.12);
+  border-radius: 8px;
+  color: rgba(200, 199, 202, 0.7);
+  font-size: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.path-sim-icon-btn:hover {
+  background: rgba(8, 10, 14, 0.7);
+  border-color: rgba(200, 199, 202, 0.28);
+  color: #c8c7ca;
+}
+
+/* === Bottom panel ============================================
+   Sits absolutely at the bottom of `.path-sim`. Height is content-
+   driven so the choice state (3 chunky pills) and dialogue state
+   (one speaker + a few lines of text) both fit cleanly. */
+.path-sim-renpy-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 32px clamp(28px, 4vw, 80px) 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 2;
+}
+/* Backdrop fade — soft dark gradient under the panel so text stays
+   readable on bright CGs. Mirrors the 75px blur rect from Figma. */
+.path-sim-renpy-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 280px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(19, 20, 22, 0) 0%,
+    rgba(19, 20, 22, 0.72) 55%,
+    rgba(19, 20, 22, 0.92) 100%
+  );
+}
+
+.path-sim-renpy-content {
+  position: relative;
+  max-width: 1138px;
+  width: 100%;
+  margin: 0 auto;
+  min-height: 80px;
+}
+
+/* --- Dialogue state ----------------------------------------- */
+.path-sim-renpy-dialogue {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Speaker line — overrides the older .path-sim-speaker pill style
+   for this layout. Uses the character's color when known, falling
+   back to the Figma's olive-green accent for unmatched speakers
+   (and narration / notes use their own muted variants below). */
+.path-sim-renpy-dialogue .path-sim-speaker,
+.path-sim-renpy-speaker {
+  position: static;
+  display: inline-block;
+  padding: 0;
+  background: transparent;
+  color: var(--char-color, #c3deab);
+  font-family: Montserrat, sans-serif;
+  font-weight: 800;
+  font-size: clamp(26px, 2.4vw, 40px);
+  letter-spacing: -0.005em;
+  text-transform: none;
+  box-shadow: none;
+  border-radius: 0;
+  line-height: 1.1;
+}
+.path-sim-renpy-speaker.is-narrator {
+  color: rgba(200, 199, 202, 0.55);
+  font-weight: 700;
+  font-size: clamp(22px, 2vw, 32px);
+}
+.path-sim-renpy-speaker.is-note {
+  color: rgba(168, 152, 130, 0.85);
+  font-weight: 700;
+  font-size: clamp(20px, 1.8vw, 28px);
+}
+.path-sim-renpy-text {
+  margin: 0;
+  font-family: Montserrat, sans-serif;
+  font-weight: 500;
+  font-size: clamp(13px, 1.05vw, 16px);
+  line-height: 1.55;
+  color: #c8c7ca;
+  max-width: 1138px;
+  /* Cinematic letter-spacing for body copy on photos — matches the
+     Figma sample where the text breathes against the backdrop. */
+  letter-spacing: 0.005em;
+}
+.path-sim-renpy-text.is-narrator {
+  font-style: italic;
+  color: rgba(200, 199, 202, 0.78);
+}
+.path-sim-renpy-text.is-note {
+  color: rgba(168, 152, 130, 0.85);
+  font-style: italic;
+}
+.path-sim-renpy-text.is-note::before {
+  content: "# ";
+  opacity: 0.6;
+}
+
+/* --- Choice state ------------------------------------------- */
+.path-sim-renpy-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  width: 100%;
+}
+.path-sim-renpy-choice {
+  flex: 1 1 280px;
+  max-width: 380px;
+  min-height: 53px;
+  padding: 10px 18px;
+  background: #c8c7ca;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #131416;
+  font-family: Montserrat, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.3;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.12s, transform 0.1s, opacity 0.12s,
+    border-color 0.12s;
+}
+.path-sim-renpy-choice:hover:not(:disabled) {
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+.path-sim-renpy-choice:disabled,
+.path-sim-renpy-choice.is-broken {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.path-sim-renpy-choice.is-conditional {
+  background: rgba(141, 153, 130, 0.95);
+  color: #0c0d0f;
+}
+.path-sim-renpy-choice.is-fallthrough {
+  background: rgba(200, 199, 202, 0.65);
+  color: rgba(19, 20, 22, 0.85);
+}
+.path-sim-renpy-choice.is-call {
+  background: rgba(168, 152, 130, 0.95);
+  color: #0c0d0f;
+}
+.path-sim-renpy-choice.is-return {
+  flex: 0 1 auto;
+  min-width: 320px;
+  background: rgba(130, 140, 153, 0.95);
+  color: #0c0d0f;
+}
+
+/* --- Divider + toolbar -------------------------------------- */
+.path-sim-renpy-divider {
+  height: 2px;
+  width: min(1138px, 100%);
+  margin: 0 auto;
+  border-radius: 14px;
+  background: rgba(217, 217, 217, 0.05);
+}
+.path-sim-renpy-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(1138px, 100%);
+  margin: 0 auto;
+}
+.path-sim-renpy-toolbar-spacer {
+  flex: 1;
+}
+.path-sim-renpy-toolbar-sep {
+  display: inline-block;
+  width: 2px;
+  height: 18px;
+  border-radius: 35px;
+  background: rgba(217, 217, 217, 0.07);
+  margin: 0 4px;
+}
+.path-sim-renpy-btn {
+  height: 38px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(200, 199, 202, 0.05);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(200, 199, 202, 0.7);
+  font-family: Montserrat, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.path-sim-renpy-btn:hover:not(:disabled) {
+  background: rgba(200, 199, 202, 0.1);
+  color: #c8c7ca;
+}
+.path-sim-renpy-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.path-sim-renpy-btn.is-primary {
+  background: #c8c7ca;
+  color: #131416;
+  opacity: 0.9;
+}
+.path-sim-renpy-btn.is-primary:hover:not(:disabled) {
+  background: #ffffff;
+  opacity: 1;
+}
+.path-sim-renpy-btn.is-active {
+  background: rgba(200, 199, 202, 0.16);
+  color: #c8c7ca;
+  border-color: rgba(200, 199, 202, 0.22);
+}
+
+/* Empty-state plate centered on the stage — used when a label has
+   no readable events and no choices yet. */
+.path-sim-stage > .path-sim-stage-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(200, 199, 202, 0.5);
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ============================================================
+   Standalone simulator-window shell
+   ----------------------------------------------------------------
+   When the simulator runs in its own Tauri WebviewWindow (label
+   "simulator", spawned from the Graph "▶ Simulate" button), the
+   shell wraps the same `<PathSimulator>` overlay used inline in
+   the main window — but we want it to fill the entire OS window
+   edge-to-edge instead of sitting in a centered 1520×855 card.
+   These rules override the inline-overlay sizing so the photo
+   backdrop covers every pixel of the fullscreen window.
+   ============================================================ */
+html:has(.simulator-window-shell),
+body:has(.simulator-window-shell) {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a0b0c;
+}
+.simulator-window-shell {
+  position: fixed;
+  inset: 0;
+  background: #0a0b0c;
+  color: #c8c7ca;
+}
+.simulator-window-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Montserrat, sans-serif;
+  font-size: 14px;
+  color: rgba(200, 199, 202, 0.55);
+}
+/* Drop the modal framing — no padding, no centered card, no
+   rounded card. The overlay backdrop is the OS window itself
+   and there's no surrounding app chrome to hide behind. */
+.simulator-window-shell .path-sim-overlay {
+  position: fixed;
+  inset: 0;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: none;
+}
+.simulator-window-shell .path-sim {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
 }

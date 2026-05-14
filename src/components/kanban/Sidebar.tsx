@@ -1,5 +1,6 @@
 import { type ComponentType, type SVGProps } from "react";
-import { Languages as LucideLanguages } from "lucide-react";
+import { LanguageIcon } from "@heroicons/react/24/solid";
+import { useTranslation } from "react-i18next";
 import { useKanban } from "../../state/kanbanStore";
 import { useNotifications } from "../../state/notifications";
 import { canSeeNav, type Role } from "../../lib/roles";
@@ -18,25 +19,31 @@ import {
 } from "./SidebarIcons";
 
 function LanguagesIcon(p: SVGProps<SVGSVGElement> & { size?: number }) {
-  const { size = 16, ...rest } = p;
-  return <LucideLanguages width={size} height={size} {...rest} />;
+  const { size = 16, style, ...rest } = p;
+  return (
+    <LanguageIcon
+      style={{ width: size, height: size, ...style }}
+      {...rest}
+    />
+  );
 }
 
 type IconCmp = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 
 interface NavItem {
   key: string;
-  label: string;
+  /** i18n key suffix under `sidebar.nav.*` — resolved at render time. */
+  i18nKey: string;
   Icon: IconCmp;
 }
 
 const essentialItems: NavItem[] = [
-  { key: "task", label: "Tasks", Icon: CategoryFilledIcon },
-  { key: "calendar", label: "Calendar", Icon: CalendarFilledIcon },
-  { key: "graph", label: "Graph", Icon: ShareFilledIcon },
-  { key: "script", label: "Script", Icon: DocumentFilledIcon },
-  { key: "translations", label: "Translations", Icon: LanguagesIcon },
-  { key: "photos", label: "Photos", Icon: ImageFilledIcon },
+  { key: "task", i18nKey: "tasks", Icon: CategoryFilledIcon },
+  { key: "calendar", i18nKey: "calendar", Icon: CalendarFilledIcon },
+  { key: "graph", i18nKey: "graph", Icon: ShareFilledIcon },
+  { key: "script", i18nKey: "script", Icon: DocumentFilledIcon },
+  { key: "translations", i18nKey: "translations", Icon: LanguagesIcon },
+  { key: "photos", i18nKey: "photos", Icon: ImageFilledIcon },
 ];
 
 const MembersGlyph = UsersFilledIcon;
@@ -70,11 +77,12 @@ export function Sidebar() {
   const notifications = useNotifications();
   const { limits } = useSubscription();
   const paywall = usePaywall();
+  const { t } = useTranslation();
 
   const pendingInvites = state.incomingInvitations.length;
   const unreadNotifs = notifications.unreadCount;
 
-  const wsName = state.workspaceName || "Workspace";
+  const wsName = state.workspaceName || t("common.workspace");
   const wsInitials = wsName.trim().charAt(0).toUpperCase() || "W";
   const wsAvatar =
     state.workspaces.find((w) => w.id === state.workspaceId)?.avatar_url ??
@@ -84,8 +92,10 @@ export function Sidebar() {
 
   const role = (state.myRole ?? null) as Role | null;
   const baseRoleLabel = state.myRole
-    ? `${state.myRole.charAt(0).toUpperCase()}${state.myRole.slice(1)}`
-    : "Member";
+    ? t(`sidebar.role.${state.myRole}`, {
+        defaultValue: `${state.myRole.charAt(0).toUpperCase()}${state.myRole.slice(1)}`,
+      })
+    : t("sidebar.role.member");
   const wsRoleLabel =
     role === "translator" && state.myTargetLanguage
       ? `${baseRoleLabel} · ${state.myTargetLanguage}`
@@ -122,7 +132,7 @@ export function Sidebar() {
       {/* Search — no left icon, only placeholder + ⌘K kbd */}
       <label className="search">
         <input
-          placeholder="Search..."
+          placeholder={t("sidebar.search_placeholder")}
           value={state.search}
           onChange={(e) =>
             dispatch({ type: "SET_SEARCH", value: e.target.value })
@@ -135,8 +145,8 @@ export function Sidebar() {
 
       {/* Essentials */}
       <div className="nav-section">
-        <div className="nav-section-label">ESSENTIALS</div>
-        {visibleNav.map(({ key, label, Icon }) => {
+        <div className="nav-section-label">{t("sidebar.section.essentials")}</div>
+        {visibleNav.map(({ key, i18nKey, Icon }) => {
           const isLocked = key === "graph" && !limits.canUseGraph;
           return (
             <button
@@ -156,7 +166,7 @@ export function Sidebar() {
               }}
             >
               <Icon className="ico" />
-              <span className="nav-item-label">{label}</span>
+              <span className="nav-item-label">{t(`sidebar.nav.${i18nKey}`)}</span>
               {isLocked && (
                 <span className="nav-item-lock" aria-hidden>
                   <LockIcon />
@@ -171,7 +181,7 @@ export function Sidebar() {
         <>
           <div className="sidebar-spacer-18" />
           <div className="nav-section">
-            <div className="nav-section-label">WORKSPACE</div>
+            <div className="nav-section-label">{t("sidebar.section.workspace")}</div>
             <button
               className={"nav-item" + (isActive("members") ? " is-active" : "")}
               type="button"
@@ -180,7 +190,7 @@ export function Sidebar() {
               }
             >
               <MembersGlyph className="ico" />
-              <span className="nav-item-label">Members</span>
+              <span className="nav-item-label">{t("sidebar.nav.members")}</span>
             </button>
             <button
               className={
@@ -192,7 +202,7 @@ export function Sidebar() {
               }
             >
               <InvitesGlyph className="ico" />
-              <span className="nav-item-label">Invitations</span>
+              <span className="nav-item-label">{t("sidebar.nav.invitations")}</span>
               {pendingInvites > 0 && (
                 <span className="nav-badge">{pendingInvites}</span>
               )}
@@ -207,7 +217,7 @@ export function Sidebar() {
               }
             >
               <BellGlyph className="ico" />
-              <span className="nav-item-label">Notifications</span>
+              <span className="nav-item-label">{t("sidebar.nav.notifications")}</span>
               {unreadNotifs > 0 && <span className="nav-dot" />}
             </button>
           </div>

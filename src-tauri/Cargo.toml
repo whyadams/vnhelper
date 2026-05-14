@@ -1,7 +1,11 @@
 [package]
+# Rust crate name kept as `vnhelper` so the Cargo.lock / target paths /
+# `vnhelper_lib` symbol references all stay stable across the rename to
+# RenHub. Only the user-visible `productName` (in tauri.conf.json) and
+# branding strings change in v0.4.0.
 name = "vnhelper"
-version = "0.3.0"
-description = "VnHelper - Visual Novel Helper"
+version = "0.4.0"
+description = "RenHub — Ren'Py-friendly visual novel helper"
 authors = ["you"]
 edition = "2021"
 

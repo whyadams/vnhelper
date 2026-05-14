@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { EyeIcon as Eye, EyeSlashIcon as EyeOff } from "@heroicons/react/24/solid";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../state/AuthProvider";
 
 type Mode = "signin" | "signup";
@@ -53,6 +54,7 @@ function GlassField({
 
 export function AuthScreen() {
   const { signIn, signUp } = useAuth();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -78,10 +80,7 @@ export function AuthScreen() {
         name || email.split("@")[0],
       );
       if (error) setError(error);
-      else
-        setInfo(
-          "Account created. Check your inbox if email confirmation is required, then sign in.",
-        );
+      else setInfo(t("auth.signup_success"));
     }
     setBusy(false);
   };
@@ -92,28 +91,26 @@ export function AuthScreen() {
     setInfo(null);
   };
 
-  const heading = mode === "signin" ? "Welcome back" : "Create account";
+  const heading = mode === "signin" ? t("auth.welcome_back") : t("auth.create_account");
   const subheading =
-    mode === "signin"
-      ? "Sign in to continue working on your visual novel."
-      : "Start drafting scripts, scenes, and story graphs in minutes.";
+    mode === "signin" ? t("auth.signin_subtitle") : t("auth.signup_subtitle");
 
   return (
     <div className="auth-screen">
       <section className="auth-pane">
         <form className="auth-form" onSubmit={submit}>
-          <div className="auth-brand">VnHelper</div>
+          <div className="auth-brand">RenHub</div>
           <h1 className="auth-title auth-anim auth-d-1">{heading}</h1>
           <p className="auth-subtitle auth-anim auth-d-2">{subheading}</p>
 
           {mode === "signup" && (
             <div className="auth-anim auth-d-3">
-              <GlassField label="Name">
+              <GlassField label={t("auth.name")}>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Jane Doe"
+                  placeholder={t("auth.name_placeholder")}
                   autoComplete="name"
                 />
               </GlassField>
@@ -121,20 +118,20 @@ export function AuthScreen() {
           )}
 
           <div className="auth-anim auth-d-3">
-            <GlassField label="Email">
+            <GlassField label={t("auth.email")}>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                placeholder="you@example.com"
+                placeholder={t("auth.email_placeholder")}
               />
             </GlassField>
           </div>
 
           <div className="auth-anim auth-d-4">
-            <GlassField label="Password">
+            <GlassField label={t("auth.password")}>
               <div className="auth-pass-wrap">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -145,7 +142,7 @@ export function AuthScreen() {
                   autoComplete={
                     mode === "signin" ? "current-password" : "new-password"
                   }
-                  placeholder="••••••••"
+                  placeholder={t("auth.password_placeholder")}
                 />
                 <button
                   type="button"
@@ -153,13 +150,13 @@ export function AuthScreen() {
                   onClick={() => setShowPassword((v) => !v)}
                   tabIndex={-1}
                   aria-label={
-                    showPassword ? "Hide password" : "Show password"
+                    showPassword ? t("auth.hide_password") : t("auth.show_password")
                   }
                 >
                   {showPassword ? (
-                    <EyeOff size={16} />
+                    <EyeOff style={{ width: 16, height: 16 }} />
                   ) : (
-                    <Eye size={16} />
+                    <Eye style={{ width: 16, height: 16 }} />
                   )}
                 </button>
               </div>
@@ -174,18 +171,14 @@ export function AuthScreen() {
                   checked={keepSignedIn}
                   onChange={(e) => setKeepSignedIn(e.target.checked)}
                 />
-                <span>Keep me signed in</span>
+                <span>{t("auth.keep_signed_in")}</span>
               </label>
               <button
                 type="button"
                 className="auth-link"
-                onClick={() =>
-                  setInfo(
-                    "Password reset is not configured yet. Contact your workspace admin.",
-                  )
-                }
+                onClick={() => setInfo(t("auth.reset_unconfigured"))}
               >
-                Reset password
+                {t("auth.reset_password")}
               </button>
             </div>
           )}
@@ -198,30 +191,30 @@ export function AuthScreen() {
             className="auth-submit auth-anim auth-d-6"
             disabled={busy}
           >
-            {busy ? "…" : mode === "signin" ? "Sign in" : "Create account"}
+            {busy ? "…" : mode === "signin" ? t("auth.submit_sign_in") : t("auth.submit_sign_up")}
           </button>
 
           <p className="auth-foot auth-anim auth-d-7">
             {mode === "signin" ? (
               <>
-                New to VnHelper?{" "}
+                {t("auth.new_to_vnhelper")}{" "}
                 <button
                   type="button"
                   className="auth-link"
                   onClick={switchMode}
                 >
-                  Create account
+                  {t("auth.create_account")}
                 </button>
               </>
             ) : (
               <>
-                Already registered?{" "}
+                {t("auth.already_registered")}{" "}
                 <button
                   type="button"
                   className="auth-link"
                   onClick={switchMode}
                 >
-                  Sign in
+                  {t("auth.tab_sign_in")}
                 </button>
               </>
             )}

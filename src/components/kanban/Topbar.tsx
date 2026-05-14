@@ -1,6 +1,7 @@
-import { Pin } from "lucide-react";
+import { MapPinIcon as Pin } from "@heroicons/react/24/solid";
 import { Webview } from "@tauri-apps/api/webview";
 import { Window } from "@tauri-apps/api/window";
+import { useTranslation } from "react-i18next";
 import { useKanban } from "../../state/kanbanStore";
 import { CategoryFilledIcon } from "./SidebarIcons";
 
@@ -23,7 +24,7 @@ async function openWidget() {
   // Fallback: create the window if for some reason it isn't registered.
   try {
     const w = new Window("widget", {
-      title: "VnHelper Widget",
+      title: "RenHub Widget",
       width: 360,
       height: 540,
       decorations: false,
@@ -43,15 +44,16 @@ async function openWidget() {
   }
 }
 
-const navTitle: Record<string, string> = {
-  task: "Tasks",
-  calendar: "Calendar",
-  notes: "Notes",
-  photos: "Photos",
-};
-
 export function Topbar() {
   const { state, dispatch } = useKanban();
+  const { t } = useTranslation();
+
+  const navTitleKey: Record<string, string> = {
+    task: "sidebar.nav.tasks",
+    calendar: "sidebar.nav.calendar",
+    notes: "script.crumb",
+    photos: "sidebar.nav.photos",
+  };
 
   // Kanban "tmt" topbar (Figma 1509:4662): icon + board name + dot + task count + spacer + "New task"
   if (state.activeNav === "task") {
@@ -65,24 +67,24 @@ export function Topbar() {
       dispatch({
         type: "ADD_CARD",
         columnKey: firstCol.key,
-        title: "New task",
+        title: t("kanban.new_task_title"),
       });
     };
     return (
       <div className="topbar tmt-bar">
         <CategoryFilledIcon size={21} className="tmt-ico" />
-        <span className="tmt-title">{state.boardName || "Main Board"}</span>
+        <span className="tmt-title">{state.boardName || t("kanban.main_board")}</span>
         <span className="tmt-sep">·</span>
         <span className="tmt-meta">
-          {totalCards} {totalCards === 1 ? "task" : "tasks"}
+          {t("kanban.task_count", { count: totalCards })}
         </span>
         <span className="tmt-spacer" />
         <button
           type="button"
           className="tmt-widget"
           onClick={() => void openWidget()}
-          title="Pin board on desktop"
-          aria-label="Open desktop widget"
+          title={t("kanban.open_widget_tooltip")}
+          aria-label={t("kanban.open_widget_aria")}
         >
           <Pin className="size-3.5" />
         </button>
@@ -92,7 +94,7 @@ export function Topbar() {
           onClick={onAdd}
           disabled={!firstCol}
         >
-          New task
+          {t("kanban.new_task")}
         </button>
       </div>
     );
@@ -100,10 +102,10 @@ export function Topbar() {
 
   return (
     <div className="topbar">
-      <span className="crumb">{state.workspaceName || "Workspace"}</span>
+      <span className="crumb">{state.workspaceName || t("common.workspace")}</span>
       <span className="crumb-sep">/</span>
       <span className="crumb is-current">
-        {navTitle[state.activeNav] ?? "Tasks"}
+        {t(navTitleKey[state.activeNav] ?? "sidebar.nav.tasks")}
       </span>
     </div>
   );

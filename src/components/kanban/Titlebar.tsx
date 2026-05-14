@@ -39,7 +39,7 @@ export function Titlebar() {
       onDoubleClick={onTitlebarDoubleClick}
     >
       <span className="titlebar-title" data-tauri-drag-region>
-        VnHelper
+        RenHub
       </span>
       <div className="titlebar-controls">
         <button

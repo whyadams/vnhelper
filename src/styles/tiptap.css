@@ -392,6 +392,10 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Tail spacing so the sticky `.rs-quick-add` bar at bottom: 16px never
+     visually covers the last virtualized section when scrolled all the
+     way down. ~80px = bar height (~48px) + breathing room. */
+  padding-bottom: 80px;
   /* Critical for virtualized lists with dynamic measurements:
      - `overflow-anchor: none` stops the browser from auto-anchoring the
        scroll position when content above the viewport changes height

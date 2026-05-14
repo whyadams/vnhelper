@@ -1,0 +1,56 @@
+/* Global custom scrollbars — applied to every scrollable element so the
+   look stays consistent across screens (Sidebar, Kanban, Translations,
+   Graph, Calendar, Script, dialogs, modals, etc.). Per-screen overrides
+   that still ship in their own stylesheets win via specificity.
+
+   Tauri WebView2 / WKWebView both support `::-webkit-scrollbar`.
+   Firefox-style `scrollbar-width` / `scrollbar-color` is set on `html`
+   as a graceful fallback for environments that ignore the WebKit rules. */
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 199, 202, 0.16) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(200, 199, 202, 0.1);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  min-height: 32px;
+  min-width: 32px;
+  transition: background-color 0.12s;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(200, 199, 202, 0.22);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: rgba(200, 199, 202, 0.32);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Some scrollable containers should never expose a scrollbar — e.g. the
+   horizontal tab strip in the always-on-top widget, react-flow's pan
+   surface. Opt out per-element by adding this class. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

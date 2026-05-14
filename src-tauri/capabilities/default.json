@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main and widget windows",
-  "windows": ["main", "widget"],
+  "description": "Capability for the main, widget, and simulator windows. The fs:* permissions are scoped to '**' because the only two consumers — TranslationsSidebar (Ren'Py translation folder import/export at src/components/translations/TranslationsSidebar.tsx) and PhotosScreen (local photo library at src/components/photos/PhotosScreen.tsx) — operate on a folder the user picks at runtime via the dialog plugin. That folder lives anywhere on disk by design (e.g. an external drive holding a Ren'Py project's /game/tl/ tree), so $APPDATA / $DOCUMENT / $DOWNLOAD scoping would break both flows. fs:allow-exists was previously granted but is not called anywhere — removed.",
+  "windows": ["main", "widget", "simulator"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
@@ -21,6 +21,8 @@
     "core:window:allow-get-all-windows",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "core:webview:default",
+    "core:webview:allow-create-webview-window",
     "opener:default",
     "updater:default",
     "process:default",
@@ -42,6 +44,10 @@
       "allow": [{ "path": "**" }]
     },
     {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "**" }]
+    },
+    {
       "identifier": "fs:allow-read-dir",
       "allow": [{ "path": "**" }]
     },
@@ -55,10 +61,6 @@
     },
     {
       "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-exists",
       "allow": [{ "path": "**" }]
     },
     {

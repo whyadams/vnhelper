@@ -21,6 +21,8 @@ import "./styles/widget.css";
 import "./styles/settings.css";
 import "./styles/subscription.css";
 import "./styles/copy-button.css";
+import "./styles/scrollbars.css";
+import "./i18n";
 import { AutoUpdater } from "./components/AutoUpdater";
 import { AuthScreen } from "./components/auth/AuthScreen";
 import { CalendarScreen } from "./components/calendar/CalendarScreen";
@@ -36,9 +38,10 @@ import { MembersScreen } from "./components/members/MembersScreen";
 import { NotificationsScreen } from "./components/notifications/NotificationsScreen";
 import { ScriptScreen } from "./components/scripts/ScriptScreen";
 import { TranslationsScreen } from "./components/translations/TranslationsScreen";
-import { ComingSoonScreen } from "./components/ui/ComingSoonScreen";
+import { PhotosScreen } from "./components/photos/PhotosScreen";
 import { DialogProvider } from "./components/ui/Dialog";
 import { KanbanWidget } from "./components/widget/KanbanWidget";
+import { SimulatorWindow } from "./components/graph/SimulatorWindow";
 import { AuthProvider, useAuth } from "./state/AuthProvider";
 import { KanbanProvider, useKanban } from "./state/kanbanStore";
 import { SubscriptionProvider } from "./state/subscription";
@@ -58,6 +61,7 @@ const WINDOW_LABEL = (() => {
   }
 })();
 const IS_WIDGET = WINDOW_LABEL === "widget";
+const IS_SIMULATOR = WINDOW_LABEL === "simulator";
 
 // Widget mode needs transparent <html>/<body> so the rounded shell sits over
 // the desktop. Mark the root nodes once at boot — pure DOM, no React state.
@@ -117,13 +121,7 @@ function ActiveScreen() {
   if (state.activeNav === "script") return <ScriptScreen />;
   if (state.activeNav === "translations") return <TranslationsScreen />;
   if (state.activeNav === "calendar") return <CalendarScreen />;
-  if (state.activeNav === "photos")
-    return (
-      <ComingSoonScreen
-        title="Photos"
-        description="Фотогалерея временно недоступна — выбираем подход к хранилищу (Google Drive / BYO bucket)."
-      />
-    );
+  if (state.activeNav === "photos") return <PhotosScreen />;
   if (state.activeNav === "members") return <MembersScreen />;
   if (state.activeNav === "invitations") return <InvitationsScreen />;
   if (state.activeNav === "notifications") return <NotificationsScreen />;
@@ -195,8 +193,24 @@ function WidgetGate() {
   );
 }
 
+function SimulatorApp() {
+  // Standalone Path Simulator window. No AuthGate / shell chrome — the
+  // simulator is a player-facing preview, not a place to land cold. We
+  // rely on the parent window's Supabase session (shared via WebView2
+  // storage). The Supabase client reads the session synchronously from
+  // localStorage, so requests in `SimulatorWindow` work immediately.
+  return (
+    <DialogProvider>
+      <AuthProvider>
+        <SimulatorWindow />
+      </AuthProvider>
+    </DialogProvider>
+  );
+}
+
 export default function App() {
   if (IS_WIDGET) return <WidgetApp />;
+  if (IS_SIMULATOR) return <SimulatorApp />;
   return (
     <DialogProvider>
       <AutoUpdater />

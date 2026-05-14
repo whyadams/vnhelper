@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Background,
   Controls,
@@ -13,6 +14,8 @@ import {
 } from "@xyflow/react";
 import { NODE_HEIGHT, NODE_WIDTH } from "./graphLayout";
 import { supabase } from "../../lib/supabase";
+import { listPhotos } from "../../lib/photosDb";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { Json } from "../../lib/database.types";
 import type { RpyBlocks } from "../../lib/renpy/blocks";
 import {
@@ -24,6 +27,7 @@ import {
 import { layoutGraph, type LabelNodeDatum } from "./graphLayout";
 import { LabelInspector } from "./LabelInspector";
 import { LabelNode } from "./SceneNode";
+import { ChapterFrame } from "./ChapterFrame";
 import { LabelSearch, type SearchItem } from "./LabelSearch";
 import { PathSimulator } from "./PathSimulator";
 import { comparePaths, type CompareResult } from "./comparePaths";
@@ -76,6 +80,7 @@ type ScriptNodeRow = {
   rpy_label: string | null;
   rpy_blocks: Json | null;
   pov: string | null;
+  photo_id: string | null;
 };
 
 type CharacterRow = {
@@ -94,6 +99,7 @@ const nodeTypes = {
   label: LabelNode,
   note: StickyNoteNode,
   group: GroupRectangleNode,
+  chapter_frame: ChapterFrame,
 };
 
 interface AnnotationRow {
@@ -166,6 +172,71 @@ function matchesFilter(d: LabelNodeDatum, mode: FilterMode): boolean {
   }
 }
 
+/**
+ * Spawn (or recycle) the standalone Path Simulator window in fullscreen.
+ *
+ * Tauri WebviewWindows are identified by a stable label — `simulator` —
+ * so we never end up with two simulator windows fighting each other.
+ * The flow:
+ *   1. If a `simulator` window already exists, close it (its URL is
+ *      fixed at creation, so we can't just refocus it for a different
+ *      project) and wait briefly for the close to flush.
+ *   2. Create a fresh window pointing at the same `index.html` with a
+ *      `?simulator=1&projectId=<uuid>` query — `App.tsx` reads
+ *      `WINDOW_LABEL === "simulator"` and dispatches to
+ *      `SimulatorWindow`, which fetches the project rows and mounts the
+ *      `<PathSimulator />` overlay full-screen.
+ *
+ * Returns `true` when the window was successfully created, `false` when
+ * the API isn't available (e.g. running in a plain browser tab during
+ * `pnpm dev`). The caller falls back to the in-app overlay in that case.
+ */
+async function openSimulatorWindow(
+  projectId: string,
+  startLabel: string | null,
+): Promise<boolean> {
+  try {
+    const existing = await WebviewWindow.getByLabel("simulator");
+    if (existing) {
+      try {
+        await existing.close();
+      } catch (e) {
+        console.warn("simulator window: close existing failed", e);
+      }
+      // Tauri tears the window down asynchronously; give it a tick so
+      // the next `new WebviewWindow('simulator', …)` doesn't race
+      // against a still-existing label.
+      await new Promise<void>((resolve) => setTimeout(resolve, 60));
+    }
+    const params = new URLSearchParams({
+      simulator: "1",
+      projectId,
+    });
+    if (startLabel) params.set("start", startLabel);
+    const url = `index.html?${params.toString()}`;
+    const win = new WebviewWindow("simulator", {
+      url,
+      title: "Path simulator",
+      // Real OS fullscreen — borderless, edge-to-edge. The user exits
+      // via Esc (the simulator's onClose calls window.close()) or via
+      // the OS's standard fullscreen toggle.
+      fullscreen: true,
+      decorations: false,
+      visible: true,
+      focus: true,
+    });
+    // Surface Tauri-side creation failures (e.g. permission denied) so
+    // they don't silently disappear into the void.
+    win.once("tauri://error", (e) => {
+      console.error("simulator window error", e);
+    });
+    return true;
+  } catch (e) {
+    console.warn("openSimulatorWindow failed, falling back to overlay", e);
+    return false;
+  }
+}
+
 function GraphCanvasInner({
   projectId,
   workspaceId,
@@ -174,6 +245,7 @@ function GraphCanvasInner({
   updateNode,
   deleteNode,
 }: Props) {
+  const { t } = useTranslation();
   const { setCenter, fitView, getViewport } = useReactFlow();
   /** Wraps the canvas + overlays — used to compute viewport-centre for
    *  inserting a sticky note at the user's current attention. */
@@ -210,7 +282,7 @@ function GraphCanvasInner({
           supabase
             .from("script_nodes")
             .select(
-              "id, parent_id, kind, title, emoji, status, position, rpy_label, rpy_blocks, pov",
+              "id, parent_id, kind, title, emoji, status, position, rpy_label, rpy_blocks, pov, photo_id",
             )
             .eq("project_id", projectId)
             .order("position", { ascending: true }),
@@ -1079,6 +1151,221 @@ function GraphCanvasInner({
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [simulatorStart, setSimulatorStart] = useState<string | null>(null);
 
+  // "Auto-match photos" status — shown briefly as a toast next to the
+  // toolbar button so the user knows how many bindings just landed.
+  const [autoMatchToast, setAutoMatchToast] = useState<string | null>(null);
+  const autoMatchInFlightRef = useRef(false);
+
+  /** Try to bind every still-unbound scene to a photo whose filename
+   *  matches its `rpy_label`. Match is case-insensitive on the filename
+   *  stem (everything before the LAST dot), so `Detective_1.jpg`,
+   *  `detective_1.JPG`, and `detective_1.png` all match a `detective_1`
+   *  label. Nodes that already have a `photo_id` are skipped — the user
+   *  may have hand-picked something different, and we don't want to
+   *  silently overwrite that choice. Returns a summary string for the
+   *  toast: `"Bound 23 of 35 scenes"` etc. */
+  const autoMatchPhotos = useCallback(async () => {
+    if (autoMatchInFlightRef.current) return;
+    autoMatchInFlightRef.current = true;
+    try {
+      setAutoMatchToast("Matching…");
+      const photos = await listPhotos();
+      // Two indices, tried in order so an exact match wins over a loose
+      // prefix one. Both maps key on a lowercased "stem" — everything
+      // before the LAST dot — so casing and extension don't matter.
+      const exactByStem = new Map<string, string>();
+      // Loose index: stems that start with `<key>_`, `<key>-`, or
+      // `<key>.`. Built lazily inside the match loop below to avoid an
+      // O(N×M) pre-pass when nothing matches.
+      type StemEntry = { stem: string; id: string };
+      const photoStems: StemEntry[] = [];
+      for (const p of photos) {
+        const name = p.name ?? "";
+        const dot = name.lastIndexOf(".");
+        const stem = (dot >= 0 ? name.slice(0, dot) : name).toLowerCase();
+        if (!stem) continue;
+        photoStems.push({ stem, id: p.id });
+        if (!exactByStem.has(stem)) exactByStem.set(stem, p.id);
+      }
+      const current = rows ?? [];
+      const planned: Array<{ id: string; photo_id: string }> = [];
+      // Collect unmatched candidates for the console diagnostic at the
+      // end — far more useful than a generic "No new matches" when the
+      // user has thousands of photos and dozens of scenes that should
+      // have hit something.
+      const unmatched: Array<{
+        title: string | null;
+        rpy_label: string | null;
+        bg: string | null;
+      }> = [];
+      for (const r of current) {
+        if (r.photo_id) continue; // respect hand-picked bindings
+        // Match-key candidates, tried in order of how specific they are
+        // for a VN scene:
+        //   1. The Ren'Py `scene <bg>` background tag — the closest
+        //      thing to an actual image filename in the script. Photos
+        //      tend to be named after this (`pool_kira_14.jpg`), not
+        //      after the scene label.
+        //   2. The label — works for projects where someone named the
+        //      photo after the scene (`detective_1.jpg`).
+        //   3. The display title — last-resort fallback for projects
+        //      that don't use Ren'Py labels at all.
+        const firstSceneBg = (() => {
+          const blocks = r.rpy_blocks;
+          if (!blocks || !Array.isArray(blocks)) return null;
+          for (const b of blocks) {
+            if (b && typeof b === "object" && (b as { kind?: string }).kind === "scene") {
+              const bg = (b as { bg?: unknown }).bg;
+              if (typeof bg === "string" && bg.trim()) return bg.trim();
+            }
+          }
+          return null;
+        })();
+        // Build candidates with collapsed-whitespace variants too —
+        // Ren'Py allows multi-word bg tags like `bg room day` which the
+        // user might have stored on disk as `bg_room_day.jpg`.
+        const rawCandidates: string[] = [];
+        if (firstSceneBg) {
+          rawCandidates.push(firstSceneBg);
+          if (/\s/.test(firstSceneBg)) {
+            rawCandidates.push(firstSceneBg.replace(/\s+/g, "_"));
+            rawCandidates.push(firstSceneBg.replace(/\s+/g, "-"));
+            // First whitespace-separated token alone — covers the
+            // common `bg <name>` convention where the leading `bg`
+            // prefix isn't part of the asset filename.
+            const firstTok = firstSceneBg.split(/\s+/)[0];
+            if (firstTok) rawCandidates.push(firstTok);
+            // Everything AFTER an initial `bg ` prefix.
+            const stripped = firstSceneBg.replace(/^bg\s+/i, "");
+            if (stripped && stripped !== firstSceneBg) {
+              rawCandidates.push(stripped);
+              rawCandidates.push(stripped.replace(/\s+/g, "_"));
+            }
+          }
+        }
+        if (r.rpy_label) rawCandidates.push(r.rpy_label);
+        if (r.title) rawCandidates.push(r.title);
+        const candidates = rawCandidates
+          .map((v) => v.toLowerCase().trim())
+          .filter((v) => v.length > 0);
+        if (candidates.length === 0) continue;
+        let matchId: string | null = null;
+        // Pass 1: exact stem match.
+        for (const c of candidates) {
+          const hit = exactByStem.get(c);
+          if (hit) {
+            matchId = hit;
+            break;
+          }
+        }
+        // Pass 2: loose prefix match — photo stem begins with the label
+        // followed by a word-boundary separator. Lets `detective_1` bind
+        // to `detective_1_v2.jpg` etc. First match in photo-iteration
+        // order wins (deterministic across runs because `listPhotos`
+        // returns a stable order).
+        if (!matchId) {
+          for (const c of candidates) {
+            for (const ph of photoStems) {
+              if (
+                ph.stem.length > c.length &&
+                ph.stem.startsWith(c) &&
+                /[_\-. ]/.test(ph.stem.charAt(c.length))
+              ) {
+                matchId = ph.id;
+                break;
+              }
+            }
+            if (matchId) break;
+          }
+        }
+        if (matchId) {
+          planned.push({ id: r.id, photo_id: matchId });
+        } else {
+          unmatched.push({
+            title: r.title ?? null,
+            rpy_label: r.rpy_label ?? null,
+            bg: firstSceneBg,
+          });
+        }
+      }
+      if (planned.length === 0) {
+        // Dump a diagnostic so the user can see WHY nothing matched —
+        // this is the lever that turns "No new matches" from useless
+        // into actionable.
+        console.info("[auto-match photos] no matches", {
+          scenes: current.length,
+          photos: photos.length,
+          firstScenesWithoutPhoto: unmatched.slice(0, 20),
+          firstPhotoStems: photoStems.slice(0, 20).map((p) => p.stem),
+        });
+        setAutoMatchToast(
+          current.length === 0
+            ? "No scenes yet"
+            : "No new matches (see console)",
+        );
+        return;
+      }
+      if (unmatched.length > 0) {
+        console.info("[auto-match photos] partial", {
+          matched: planned.length,
+          unmatched: unmatched.slice(0, 30),
+        });
+      }
+      // Bulk-update in chunks so a single huge payload doesn't get
+      // rejected by PostgREST's URL length limit. Supabase has no batch-
+      // update primitive on disparate values, so we issue one update per
+      // node in parallel (cap concurrency so a 500-scene match doesn't
+      // open 500 sockets at once).
+      const CONCURRENCY = 8;
+      let i = 0;
+      let okCount = 0;
+      const errors: string[] = [];
+      const run = async () => {
+        while (i < planned.length) {
+          const idx = i++;
+          const row = planned[idx];
+          const { error } = await supabase
+            .from("script_nodes")
+            .update({ photo_id: row.photo_id } as never)
+            .eq("id", row.id);
+          if (error) {
+            errors.push(error.message);
+          } else {
+            okCount++;
+          }
+        }
+      };
+      await Promise.all(
+        Array.from({ length: CONCURRENCY }, () => run()),
+      );
+
+      // Patch local rows so the graph re-renders immediately — otherwise
+      // the user would have to refetch the project to see the matches.
+      setRows((curr) =>
+        curr
+          ? curr.map((r) => {
+              const hit = planned.find((p) => p.id === r.id);
+              return hit ? { ...r, photo_id: hit.photo_id } : r;
+            })
+          : curr,
+      );
+      const total = rows?.length ?? 0;
+      setAutoMatchToast(
+        errors.length > 0
+          ? `Bound ${okCount} (${errors.length} failed)`
+          : `Bound ${okCount} of ${total} scene${total === 1 ? "" : "s"}`,
+      );
+    } catch (e) {
+      console.error("autoMatchPhotos failed", e);
+      setAutoMatchToast("Auto-match failed");
+    } finally {
+      autoMatchInFlightRef.current = false;
+      // Toast clears itself after 3.2s — long enough to read, short
+      // enough not to clutter the toolbar.
+      setTimeout(() => setAutoMatchToast(null), 3200);
+    }
+  }, [rows]);
+
   // Compare-paths mode. Activated when the user has exactly two nodes
   // selected and clicks the "Compare" button. We snapshot the two ids so
   // the comparison survives a selection change (e.g. when the user clicks
@@ -1099,7 +1386,10 @@ function GraphCanvasInner({
     let choices = 0;
     let broken = 0;
     for (const n of built.layout.nodes) {
-      const d = n.data;
+      // Skip non-label nodes — chapter frames and any future synthetic
+      // background nodes don't carry choiceTexts / brokenOutboundCount.
+      if (n.type !== "label") continue;
+      const d = n.data as LabelNodeDatum;
       if (d.choiceTexts.length > 0) choices += 1;
       if (d.brokenOutboundCount > 0) broken += 1;
     }
@@ -1119,6 +1409,9 @@ function GraphCanvasInner({
     if (filterMode === "all") return new Set();
     const dim = new Set<string>();
     for (const n of nodes) {
+      // Frames / notes / groups aren't filterable label data — skip so the
+      // filter only ever dims actual labels (otherwise frames vanish).
+      if (n.type !== "label") continue;
       const d = n.data as LabelNodeDatum;
       if (!matchesFilter(d, filterMode)) dim.add(n.id);
     }
@@ -1606,10 +1899,10 @@ function GraphCanvasInner({
   );
 
   if (rows === null || savedLayouts === null) {
-    return <div className="graph-loading">Loading scenes…</div>;
+    return <div className="graph-loading">{t("graph.loading_scenes")}</div>;
   }
   if (error) {
-    return <div className="graph-error">Couldn't load: {error}</div>;
+    return <div className="graph-error">{t("graph.load_error", { error })}</div>;
   }
   if (!built || built.layout.nodes.length === 0) {
     return (
@@ -1634,6 +1927,118 @@ function GraphCanvasInner({
       // the OS menu through over minimap / controls / edges.
       onContextMenu={(e) => e.preventDefault()}
     >
+      <div className="graph-canvas-toolbar">
+        <div className="graph-stats">
+          <span>{t("graph.stats.labels", { count: built.stats.labelCount })}</span>
+          <span>{t("graph.stats.edges", { count: built.stats.edgeCount })}</span>
+          {built.stats.conditionalEdgeCount > 0 && (
+            <span>{t("graph.stats.conditional", { count: built.stats.conditionalEdgeCount })}</span>
+          )}
+          {built.stats.brokenEdgeCount > 0 && (
+            <span className="graph-stat-danger">
+              {t("graph.stats.broken", { count: built.stats.brokenEdgeCount })}
+            </span>
+          )}
+          {built.stats.orphanCount > 0 && (
+            <span className="graph-stat-warn">
+              {t("graph.stats.orphan", { count: built.stats.orphanCount })}
+            </span>
+          )}
+          {built.stats.unreachableCount > built.stats.orphanCount && (
+            <span className="graph-stat-warn">
+              {t("graph.stats.unreachable", { count: built.stats.unreachableCount })}
+            </span>
+          )}
+          {built.stats.endingCount > 0 && (
+            <span className="graph-stat-info">
+              {t("graph.stats.ending", { count: built.stats.endingCount })}
+            </span>
+          )}
+        </div>
+        <div className="graph-canvas-toolbar-actions">
+          <button
+            type="button"
+            className={
+              "graph-stat-coverage-btn" + (coverageOpen ? " is-open" : "")
+            }
+            onClick={() => setCoverageOpen((v) => !v)}
+            title="Path coverage: reachable labels, reachable endings, path lengths"
+            aria-expanded={coverageOpen}
+          >
+            {t("graph.coverage")}
+          </button>
+          <button
+            type="button"
+            className="graph-stat-sim-btn"
+            onClick={() => {
+              const sel = nodes.find((n) => n.selected);
+              const start = sel ? sel.id : null;
+              // Try to open the standalone fullscreen Tauri window
+              // first; if that fails (running outside Tauri, e.g. dev
+              // in a regular browser), fall back to the in-app overlay
+              // so the simulator is still usable.
+              void (async () => {
+                const ok = await openSimulatorWindow(projectId, start);
+                if (!ok) {
+                  setSimulatorStart(start);
+                  setSimulatorOpen(true);
+                }
+              })();
+            }}
+          >
+            {t("graph.simulate")}
+          </button>
+          <button
+            type="button"
+            className="graph-stat-note-btn"
+            onClick={onAddNote}
+          >
+            {t("graph.add_note")}
+          </button>
+          <button
+            type="button"
+            className="graph-stat-automatch-btn"
+            onClick={() => void autoMatchPhotos()}
+            title="Bind every scene to a local photo whose filename matches its label (e.g. detective_1 ↔ detective_1.jpg). Skips scenes that already have a photo attached."
+          >
+            🖼 Auto-match photos
+          </button>
+          {autoMatchToast && (
+            <span
+              className="graph-stat-automatch-toast"
+              role="status"
+              aria-live="polite"
+            >
+              {autoMatchToast}
+            </span>
+          )}
+          {savedLayouts.size > 0 && (
+            <button
+              type="button"
+              className="graph-stat-reset"
+              onClick={() => {
+                void onResetLayout();
+              }}
+            >
+              {t("graph.reset_layout")}
+            </button>
+          )}
+          <span className="graph-canvas-toolbar-sep" aria-hidden />
+          <button
+            type="button"
+            className="graph-search-trigger"
+            onClick={() => setSearchOpen(true)}
+            title={t("graph.search_labels")}
+          >
+            <span className="graph-search-trigger-icon">⌕</span>
+            <span className="graph-search-trigger-text">{t("graph.search_labels")}</span>
+            <span className="graph-search-trigger-kbd">
+              {isMac() ? "⌘" : "Ctrl"} K
+            </span>
+          </button>
+        </div>
+      </div>
+      <div className="graph-canvas-stage">
       <ReactFlow
         nodes={displayedNodes}
         edges={displayedEdges}
@@ -1669,88 +2074,6 @@ function GraphCanvasInner({
         />
         <Controls showInteractive={false} />
       </ReactFlow>
-      <div className="graph-stats">
-        <span>{built.stats.labelCount} labels</span>
-        <span>{built.stats.edgeCount} edges</span>
-        {built.stats.conditionalEdgeCount > 0 && (
-          <span>{built.stats.conditionalEdgeCount} conditional</span>
-        )}
-        {built.stats.brokenEdgeCount > 0 && (
-          <span
-            className="graph-stat-danger"
-            title="Outbound jump/call points at a label that doesn't exist"
-          >
-            {built.stats.brokenEdgeCount} broken
-          </span>
-        )}
-        {built.stats.orphanCount > 0 && (
-          <span
-            className="graph-stat-warn"
-            title="No other label jumps/calls/falls through into these"
-          >
-            {built.stats.orphanCount} orphan
-          </span>
-        )}
-        {built.stats.unreachableCount > built.stats.orphanCount && (
-          <span
-            className="graph-stat-warn"
-            title="Entry can't reach these via any path (orphans + disconnected islands)"
-          >
-            {built.stats.unreachableCount} unreachable
-          </span>
-        )}
-        {built.stats.endingCount > 0 && (
-          <span
-            className="graph-stat-info"
-            title="No outbound jump/call — story ending or forgotten transition"
-          >
-            {built.stats.endingCount} ending
-          </span>
-        )}
-        <button
-          type="button"
-          className={
-            "graph-stat-coverage-btn" + (coverageOpen ? " is-open" : "")
-          }
-          onClick={() => setCoverageOpen((v) => !v)}
-          title="Path coverage: reachable labels, reachable endings, path lengths"
-          aria-expanded={coverageOpen}
-        >
-          Coverage
-        </button>
-        <button
-          type="button"
-          className="graph-stat-sim-btn"
-          onClick={() => {
-            const sel = nodes.find((n) => n.selected);
-            setSimulatorStart(sel ? sel.id : null);
-            setSimulatorOpen(true);
-          }}
-          title="Play through this VN starting from the selected label (or entry)"
-        >
-          ▶ Simulate
-        </button>
-        <button
-          type="button"
-          className="graph-stat-note-btn"
-          onClick={onAddNote}
-          title="Add a sticky note at the viewport centre"
-        >
-          + Note
-        </button>
-        {savedLayouts.size > 0 && (
-          <button
-            type="button"
-            className="graph-stat-reset"
-            onClick={() => {
-              void onResetLayout();
-            }}
-            title="Discard your manual positions and re-run auto layout"
-          >
-            Reset layout
-          </button>
-        )}
-      </div>
       {coverageOpen && <CoveragePanel stats={built.stats} />}
       {selectedTwo && !compareResult && (
         <button
@@ -1800,18 +2123,6 @@ function GraphCanvasInner({
         counts={filterCounts}
         onChange={setFilterMode}
       />
-      <button
-        type="button"
-        className="graph-search-trigger"
-        onClick={() => setSearchOpen(true)}
-        title="Search labels"
-      >
-        <span className="graph-search-trigger-icon">⌕</span>
-        <span className="graph-search-trigger-text">Search labels</span>
-        <span className="graph-search-trigger-kbd">
-          {isMac() ? "⌘" : "Ctrl"} K
-        </span>
-      </button>
       <LabelInspector
         selected={selectedLabelNode}
         sourceRows={rows ?? []}
@@ -1836,6 +2147,7 @@ function GraphCanvasInner({
         onJumpToLabel={onJumpToLabel}
       />
       <ToolPalette mode={toolMode} onChange={setToolMode} />
+      </div>
     </div>
   );
 }
@@ -1860,36 +2172,38 @@ interface FilterToolbarProps {
  * stable layout makes the toolbar easier to scan as data changes.
  */
 function FilterToolbar({ mode, counts, onChange }: FilterToolbarProps) {
+  const { t } = useTranslation();
   const chips: Array<{
     kind: FilterMode;
-    label: string;
+    labelKey: string;
     count?: number;
     tone?: "warn" | "info" | "danger" | "accent";
   }> = [
-    { kind: "all", label: "All" },
-    { kind: "orphan", label: "Orphans", count: counts.orphan, tone: "warn" },
+    { kind: "all", labelKey: "graph.filter.all" },
+    { kind: "orphan", labelKey: "graph.filter.orphans", count: counts.orphan, tone: "warn" },
     {
       kind: "unreachable",
-      label: "Unreachable",
+      labelKey: "graph.filter.unreachable",
       count: counts.unreachable,
       tone: "warn",
     },
-    { kind: "ending", label: "Endings", count: counts.ending, tone: "info" },
+    { kind: "ending", labelKey: "graph.filter.endings", count: counts.ending, tone: "info" },
     {
       kind: "choices",
-      label: "With choices",
+      labelKey: "graph.filter.with_choices",
       count: counts.choices,
       tone: "accent",
     },
-    { kind: "broken", label: "Broken", count: counts.broken, tone: "danger" },
+    { kind: "broken", labelKey: "graph.filter.broken", count: counts.broken, tone: "danger" },
   ];
 
   return (
-    <div className="graph-filter-bar" role="toolbar" aria-label="Filter graph">
+    <div className="graph-filter-bar" role="toolbar">
       {chips.map((c) => {
         const isAll = c.kind === "all";
         const active = mode === c.kind;
         const disabled = !isAll && (c.count ?? 0) === 0;
+        const label = t(c.labelKey);
         return (
           <button
             key={c.kind}
@@ -1905,22 +2219,15 @@ function FilterToolbar({ mode, counts, onChange }: FilterToolbarProps) {
               onChange(active && !isAll ? "all" : c.kind);
             }}
             disabled={disabled}
-            title={
-              isAll
-                ? "Show every label"
-                : `Show only ${c.label.toLowerCase()} (${c.count})`
-            }
           >
-            <span>{c.label}</span>
+            <span>{label}</span>
             {!isAll && c.count !== undefined && (
               <span className="graph-filter-chip-count">{c.count}</span>
             )}
           </button>
         );
       })}
-      <span className="graph-filter-bar-kbd" title="Fit selection or filtered set">
-        ⌘F
-      </span>
+      <span className="graph-filter-bar-kbd">⌘F</span>
     </div>
   );
 }
@@ -1939,47 +2246,51 @@ interface ToolPaletteProps {
  * note at click point). Active tool is highlighted; Esc cancels.
  */
 function ToolPalette({ mode, onChange }: ToolPaletteProps) {
+  const { t } = useTranslation();
   const tools: Array<{
     id: ToolMode;
-    label: string;
+    labelKey: string;
     glyph: React.ReactElement;
     shortcut: string;
   }> = [
-    { id: "select", label: "Select", shortcut: "V", glyph: <CursorGlyph /> },
-    { id: "pan", label: "Pan", shortcut: "H", glyph: <HandGlyph /> },
+    { id: "select", labelKey: "graph.tool.select", shortcut: "V", glyph: <CursorGlyph /> },
+    { id: "pan", labelKey: "graph.tool.pan", shortcut: "H", glyph: <HandGlyph /> },
     {
       id: "add-scene",
-      label: "Add scene",
+      labelKey: "graph.tool.add_scene",
       shortcut: "S",
       glyph: <FrameGlyph />,
     },
     {
       id: "add-note",
-      label: "Add sticky note",
+      labelKey: "graph.tool.add_note",
       shortcut: "N",
       glyph: <NoteGlyph />,
     },
   ];
   return (
-    <div className="graph-tools" role="toolbar" aria-label="Canvas tools">
-      {tools.map((t, i) => (
-        <button
-          key={t.id}
-          type="button"
-          className={
-            "graph-tools-item" + (mode === t.id ? " is-active" : "")
-          }
-          onClick={() => onChange(t.id)}
-          title={`${t.label} (${t.shortcut})`}
-          aria-label={t.label}
-          aria-pressed={mode === t.id}
-          // Divider before the "creation" tools — visually pairs the
-          // navigation tools (select / pan) at the top.
-          data-divider={i === 2 ? "before" : undefined}
-        >
-          {t.glyph}
-        </button>
-      ))}
+    <div className="graph-tools" role="toolbar">
+      {tools.map((tool, i) => {
+        const label = t(tool.labelKey);
+        return (
+          <button
+            key={tool.id}
+            type="button"
+            className={
+              "graph-tools-item" + (mode === tool.id ? " is-active" : "")
+            }
+            onClick={() => onChange(tool.id)}
+            title={`${label} (${tool.shortcut})`}
+            aria-label={label}
+            aria-pressed={mode === tool.id}
+            // Divider before the "creation" tools — visually pairs the
+            // navigation tools (select / pan) at the top.
+            data-divider={i === 2 ? "before" : undefined}
+          >
+            {tool.glyph}
+          </button>
+        );
+      })}
     </div>
   );
 }

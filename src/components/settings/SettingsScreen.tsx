@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { AboutSection } from "./sections/AboutSection";
 import { AccountSection } from "./sections/AccountSection";
 import { AISection } from "./sections/AISection";
@@ -23,30 +24,29 @@ export type SettingsSectionKey =
 
 interface NavItem {
   key: SettingsSectionKey;
-  label: string;
 }
 interface NavGroup {
-  title?: string;
+  titleKey?: string;
   items: NavItem[];
 }
 
 const NAV: NavGroup[] = [
   {
     items: [
-      { key: "general", label: "General" },
-      { key: "account", label: "Account" },
-      { key: "subscribe", label: "Subscribe" },
-      { key: "ai", label: "AI" },
-      { key: "integrations", label: "Integrations" },
-      { key: "notifications", label: "Notifications" },
+      { key: "general" },
+      { key: "account" },
+      { key: "subscribe" },
+      { key: "ai" },
+      { key: "integrations" },
+      { key: "notifications" },
     ],
   },
   {
-    title: "Desktop app",
+    titleKey: "settings.group_desktop",
     items: [
-      { key: "tray", label: "Tray & Widget" },
-      { key: "updates", label: "Updates" },
-      { key: "about", label: "About" },
+      { key: "tray" },
+      { key: "updates" },
+      { key: "about" },
     ],
   },
 ];
@@ -63,6 +63,7 @@ export function SettingsScreen({
   initialSection = "general",
 }: Props) {
   const [active, setActive] = useState<SettingsSectionKey>(initialSection);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (open) setActive(initialSection);
@@ -86,7 +87,7 @@ export function SettingsScreen({
           type="button"
           className="set-back"
           onClick={onClose}
-          aria-label="Close settings"
+          aria-label={t("settings.close_aria")}
         >
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path
@@ -97,13 +98,13 @@ export function SettingsScreen({
               strokeLinejoin="round"
             />
           </svg>
-          Settings
+          {t("settings.title")}
         </button>
       </div>
       <div className="set-grid">
-        <nav className="set-nav" aria-label="Settings sections">
+        <nav className="set-nav">
           {NAV.map((group, gi) => (
-            <NavGroupBlock key={gi} title={group.title}>
+            <NavGroupBlock key={gi} title={group.titleKey ? t(group.titleKey) : undefined}>
               {group.items.map((it) => (
                 <button
                   key={it.key}
@@ -113,7 +114,7 @@ export function SettingsScreen({
                   }
                   onClick={() => setActive(it.key)}
                 >
-                  {it.label}
+                  {t(`settings.section.${it.key}`)}
                 </button>
               ))}
             </NavGroupBlock>

@@ -72,6 +72,13 @@ export function serializeRpyScript(
       case "call":
         out.push(`${indent}call ${b.target}`);
         break;
+      case "return":
+        out.push(
+          b.expression !== undefined
+            ? `${indent}return ${b.expression}`
+            : `${indent}return`,
+        );
+        break;
       case "with":
         out.push(`${indent}with ${b.transition}`);
         break;

@@ -1,5 +1,16 @@
 import * as React from "react"
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
+import { CheckIcon, ChevronRightIcon } from "@heroicons/react/24/solid"
+
+// Heroicons doesn't ship a plain filled-circle glyph — radio-item bullets
+// in Radix dropdowns need one — so inline a tiny SVG with the same API
+// shape (className passthrough) as Heroicons' icon components.
+function CircleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 8 8" className={className} aria-hidden>
+      <circle cx="4" cy="4" r="4" fill="currentColor" />
+    </svg>
+  )
+}
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"

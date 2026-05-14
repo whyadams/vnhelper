@@ -7,7 +7,10 @@ import type { RpyBlocks } from "../lib/renpy/blocks";
 export type NodeKind = "chapter" | "scene" | "block";
 export type ScriptContent = Json;
 
-/** Origin of a scene's Renpy-blocks: authored in VnHelper, or imported from .rpy. */
+/** Origin of a scene's Renpy-blocks: authored in RenHub, or imported from
+ *  .rpy. The string literal `"vnhelper"` is preserved as the wire value
+ *  to keep existing rows in Supabase / IndexedDB readable across the
+ *  rename — the type alias is just human-facing documentation. */
 export type ScriptSourceKind = "vnhelper" | "rpy_import";
 
 /** Per-project authoring style hints surfaced to AI / MCP. Every field is
@@ -58,6 +61,11 @@ export interface ScriptNodeSummary {
   status: string;
   pov: string | null;
   location_id: string | null;
+  /** Locally-stored Photo (IndexedDB) bound to this node. Surfaced as the
+   *  scene backdrop in the graph PathSimulator; null when the user hasn't
+   *  attached one. Lives on the summary so the simulator can read it
+   *  without a separate fetch per scene. */
+  photo_id: string | null;
   tags: string[];
   /** Project-unique Ren'Py label — used for jump/call autocompletion across
    * the editor without having to fetch each scene's full body. */
@@ -266,7 +274,7 @@ export function useScripts(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("script_nodes")
       .select(
-        "id, project_id, parent_id, kind, title, emoji, pinned, position, status, pov, location_id, tags, rpy_label, updated_at",
+        "id, project_id, parent_id, kind, title, emoji, pinned, position, status, pov, location_id, photo_id, tags, rpy_label, updated_at",
       )
       .eq("project_id", myProject)
       .order("pinned", { ascending: false })
@@ -327,7 +335,7 @@ export function useScripts(workspaceId: string | null) {
     const { data, error } = await supabase
       .from("script_nodes")
       .select(
-        "id, project_id, workspace_id, parent_id, kind, title, emoji, body, content, rpy_blocks, rpy_label, source_kind, tags, status, pov, location_id, pinned, position, updated_at, created_by, created_at",
+        "id, project_id, workspace_id, parent_id, kind, title, emoji, body, content, rpy_blocks, rpy_label, source_kind, tags, status, pov, location_id, photo_id, pinned, position, updated_at, created_by, created_at",
       )
       .eq("id", id)
       .single();
@@ -730,6 +738,7 @@ export function useScripts(workspaceId: string | null) {
         status: "draft",
         pov: null,
         location_id: null,
+        photo_id: null,
         tags: [],
         rpy_label: null,
         updated_at: now,
@@ -782,6 +791,7 @@ export function useScripts(workspaceId: string | null) {
           | "status"
           | "pov"
           | "location_id"
+          | "photo_id"
           | "kind"
         >
       >,
@@ -805,6 +815,10 @@ export function useScripts(workspaceId: string | null) {
                   patch.location_id !== undefined
                     ? patch.location_id
                     : n.location_id,
+                photo_id:
+                  patch.photo_id !== undefined
+                    ? patch.photo_id
+                    : n.photo_id,
                 kind: patch.kind ?? n.kind,
                 parent_id:
                   patch.parent_id !== undefined
@@ -874,6 +888,7 @@ export function useScripts(workspaceId: string | null) {
           status: "draft",
           pov: null,
           location_id: null,
+          photo_id: null,
           tags: [],
           rpy_label: null,
           updated_at: now,
@@ -926,6 +941,7 @@ export function useScripts(workspaceId: string | null) {
         status: "draft",
         pov: null,
         location_id: null,
+        photo_id: null,
         tags: [],
         rpy_label: null,
         updated_at: now,
@@ -986,6 +1002,7 @@ export function useScripts(workspaceId: string | null) {
         status: "draft",
         pov: null,
         location_id: null,
+        photo_id: null,
         tags: [],
         rpy_label: r.rpy_label,
         updated_at: now,

@@ -116,6 +116,16 @@ function tryCall(body: string): { target: string } | null {
   return m ? { target: m[1] } : null;
 }
 
+function tryReturn(body: string): { expression?: string } | null {
+  // `return` alone (most common) or `return <expr>` — author rarely supplies
+  // a value in VN scripts, but Ren'Py allows it (e.g. `return _set_volume(0.5)`).
+  // Anything after the keyword is captured verbatim and treated as an opaque
+  // expression on round-trip.
+  const m = /^return(?:\s+(.+?))?\s*$/.exec(body);
+  if (!m) return null;
+  return m[1] !== undefined ? { expression: m[1] } : {};
+}
+
 function tryWith(body: string): { transition: string } | null {
   const m = /^with\s+(\S+)\s*$/.exec(body);
   return m ? { transition: m[1] } : null;
@@ -128,7 +138,9 @@ function tryPause(body: string): { duration?: number } | null {
 }
 
 function tryMenu(body: string): boolean {
-  return /^menu\s*:\s*$/.test(body);
+  // Accept a trailing inline comment — `menu:  # walk hint` is still a menu.
+  const stripped = body.replace(/\s*#.*$/, "").trimEnd();
+  return /^menu\s*:\s*$/.test(stripped);
 }
 
 function tryComment(body: string): { text: string } | null {
@@ -268,7 +280,13 @@ function tryChoice(
 ): { text: string; condition?: string } | null {
   const q = findQuotedString(body);
   if (!q || q.start !== 0) return null;
-  const tail = body.slice(q.end + 1).trim();
+  // Everything after the closing quote is post-string — a `#` here is always
+  // a Ren'Py comment, never part of the choice header. Strip it before
+  // checking for the trailing `:` so `"Flirt": #(romance)` is still detected.
+  const tail = body
+    .slice(q.end + 1)
+    .replace(/\s*#.*$/, "")
+    .trim();
   if (!tail.endsWith(":")) return null;
   const beforeColon = tail.slice(0, -1).trim();
   if (beforeColon === "") return { text: q.text };
@@ -285,7 +303,12 @@ function tryNarrator(body: string): NarratorBlock | null {
   const q = findQuotedString(body);
   if (!q || q.start !== 0) return null;
   // Reject choice form (handled above) and say form (prefix before quote).
-  const tail = body.slice(q.end + 1).trim();
+  // Inline comments after the colon are stripped to stay symmetric with
+  // tryChoice — `"text": # foo` is a choice, not a narrator line.
+  const tail = body
+    .slice(q.end + 1)
+    .replace(/\s*#.*$/, "")
+    .trim();
   if (tail.endsWith(":")) return null;
   return {
     id: newBlockId(),
@@ -449,6 +472,16 @@ function dispatchLine(m: MeasuredLine): RpyBlock | null {
 
   const cl = tryCall(body);
   if (cl) return { id: newBlockId(), kind: "call", depth, target: cl.target };
+
+  const ret = tryReturn(body);
+  if (ret) {
+    return {
+      id: newBlockId(),
+      kind: "return",
+      depth,
+      expression: ret.expression,
+    };
+  }
 
   const sc = tryScene(body);
   if (sc) {

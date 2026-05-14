@@ -199,13 +199,15 @@ function SelectionBubbleMenu({
         }
       });
     };
+    // Listen only to `selectionUpdate` (cheap, fires on caret/range
+    // changes), `focus`, and `blur`. The previous `transaction` listener
+    // re-ran `update` on every keystroke and routinely called
+    // `setPos(null)` for empty selections — a re-render per key.
     editor.on("selectionUpdate", update);
-    editor.on("transaction", update);
     editor.on("focus", update);
     editor.on("blur", hide);
     return () => {
       editor.off("selectionUpdate", update);
-      editor.off("transaction", update);
       editor.off("focus", update);
       editor.off("blur", hide);
     };

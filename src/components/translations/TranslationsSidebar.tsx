@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { mkdir, readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { Settings } from "lucide-react";
+import { Cog6ToothIcon as Settings } from "@heroicons/react/24/solid";
 import { useDialog } from "../ui/Dialog";
 import type { TranslationFile, TranslationsApi } from "../../state/translations";
 import { SkeletonStack } from "../ui/Skeleton";
@@ -899,7 +899,7 @@ function FileRow({
           </button>
           <button
             type="button"
-            className="tr-icon-btn"
+            className="tr-icon-btn is-delete"
             title="Delete file"
             aria-label="Delete file"
             onClick={(e) => {

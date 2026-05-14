@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { applyFilters, useKanban } from "../../state/kanbanStore";
 import { Column } from "./Column";
 import { PlusIcon } from "./Icon";
@@ -10,6 +11,7 @@ const PAN_BLOCKLIST =
 
 export function Board() {
   const { state, addColumn } = useKanban();
+  const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const view = applyFilters(state.columns, state);
@@ -97,7 +99,7 @@ export function Board() {
             <div className="col-add-form">
               <input
                 className="col-add-input"
-                placeholder="Column title…"
+                placeholder={t("kanban.column_title_placeholder")}
                 value={draft}
                 autoFocus
                 onChange={(e) => setDraft(e.target.value)}
@@ -121,7 +123,7 @@ export function Board() {
               onClick={() => setAdding(true)}
             >
               <PlusIcon size={14} />
-              Add column
+              {t("kanban.add_column")}
             </button>
           )}
         </div>

@@ -129,6 +129,12 @@ export function RenpyTable({
   const [blocks, setBlocks] = useState<RpyBlocks>(initialBlocks ?? []);
   const [pasteText, setPasteText] = useState("");
   const [pasteWarnings, setPasteWarnings] = useState<string[]>([]);
+  /** Label-section ids that are currently collapsed (only the header shows).
+   *  Initialised on scene-load to "everything closed" so big imports don't
+   *  hit the user with a wall of 50 expanded sections. */
+  const [collapsedLabels, setCollapsedLabels] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   // Only resync local state when the *node* changes — depending on
   // `initialBlocks` here would clobber unsaved local edits during the
@@ -138,11 +144,49 @@ export function RenpyTable({
   // The trade-off is that external updates to the same scene (other user,
   // other tab) won't auto-merge — same behavior as the TipTap Doc editor.
   useEffect(() => {
-    setBlocks(normalizeBlocks(initialBlocks ?? []));
+    const normalised = normalizeBlocks(initialBlocks ?? []);
+    setBlocks(normalised);
     setPasteText("");
     setPasteWarnings([]);
+    // Default-collapse every label-section on scene-load. The user can
+    // expand the ones they want to work in — same model as a folder tree.
+    const initial = new Set<string>();
+    for (const b of normalised) {
+      if (b.kind === "label") initial.add(b.id);
+    }
+    setCollapsedLabels(initial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeId]);
+
+  /** Toggle one section. Newly-inserted labels (post-import edits) get
+   *  added to `collapsedLabels` automatically via the effect below so
+   *  they too start closed. */
+  const toggleCollapsed = useCallback((labelId: string) => {
+    setCollapsedLabels((curr) => {
+      const next = new Set(curr);
+      if (next.has(labelId)) next.delete(labelId);
+      else next.add(labelId);
+      return next;
+    });
+  }, []);
+
+  // Keep the collapsed set tidy: drop ids of labels that no longer exist
+  // (deleted or renamed-via-replace) so the Set doesn't leak forever.
+  useEffect(() => {
+    setCollapsedLabels((curr) => {
+      const liveIds = new Set<string>();
+      for (const b of blocks) {
+        if (b.kind === "label") liveIds.add(b.id);
+      }
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of curr) {
+        if (liveIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : curr;
+    });
+  }, [blocks]);
 
   /** Union of project-wide scene labels and any `label foo:` blocks defined
    * inside the current scene's body. Surface them via jump/call autocomplete
@@ -348,6 +392,8 @@ export function RenpyTable({
         charByVar={charByVar}
         characters={characters}
         knownLabels={knownLabels}
+        collapsedLabels={collapsedLabels}
+        onToggleCollapse={toggleCollapsed}
         onUpdate={updateById}
         onDelete={deleteById}
         onDuplicate={duplicateById}
@@ -368,9 +414,67 @@ export function RenpyTable({
       </button>
 
       {pasteWarnings.length > 0 && <Warnings warnings={pasteWarnings} />}
+
+      {/* Sticky quick-add bar — pinned to the bottom of the doc scroll area
+          so the most-used insertions are one click away regardless of how
+          far the user has scrolled. Appends a new block at the end of the
+          document (after the last existing block, or at top when empty). */}
+      <QuickAddBar
+        onPick={(kind) => {
+          const lastBlock = blocks[blocks.length - 1];
+          // Labels live at depth 0, everything else at depth 1. createEmptyBlock
+          // already handles this, so we just feed the kind through.
+          insertAfter(lastBlock?.id ?? null, [createEmptyBlock(kind, 1)]);
+        }}
+      />
     </div>
     </IndexCtx.Provider>
     </DragDropProvider>
+  );
+}
+
+/**
+ * Sticky quick-add bar at the bottom of the script doc. Floats with the
+ * scroll area thanks to `position: sticky; bottom: 12px`. Holds chips for
+ * the most-used block kinds — full Insert-picker menu still works via the
+ * "+ Add block" button inside each section if the user wants something
+ * exotic. */
+function QuickAddBar({ onPick }: { onPick: (kind: RpyBlockKind) => void }) {
+  const quick: Array<{ kind: RpyBlockKind; label: string; tone?: string }> = [
+    { kind: "say", label: "Dialogue" },
+    { kind: "narrator", label: "Narrator" },
+    { kind: "scene", label: "Scene" },
+    { kind: "show", label: "Show" },
+    { kind: "hide", label: "Hide" },
+    { kind: "menu", label: "Menu", tone: "menu" },
+    { kind: "jump", label: "Jump", tone: "flow" },
+    { kind: "call", label: "Call", tone: "flow" },
+    { kind: "return", label: "Return", tone: "flow" },
+    { kind: "note", label: "Note" },
+    { kind: "raw", label: "Raw", tone: "raw" },
+  ];
+  return (
+    <div
+      className="rs-quick-add"
+      role="toolbar"
+      aria-label="Quick add block"
+    >
+      <span className="rs-quick-add-prefix">+ Insert</span>
+      <span className="rs-quick-add-sep" aria-hidden />
+      {quick.map((q) => (
+        <button
+          key={q.kind}
+          type="button"
+          className={
+            "rs-quick-add-chip" + (q.tone ? ` is-tone-${q.tone}` : "")
+          }
+          onClick={() => onPick(q.kind)}
+          title={`Append ${q.label.toLowerCase()} block at end`}
+        >
+          {q.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -397,6 +501,8 @@ function VirtualizedSections({
   charByVar,
   characters,
   knownLabels,
+  collapsedLabels,
+  onToggleCollapse,
   onUpdate,
   onDelete,
   onDuplicate,
@@ -407,6 +513,8 @@ function VirtualizedSections({
   charByVar: Map<string, ScriptCharacter>;
   characters: ScriptCharacter[];
   knownLabels: string[];
+  collapsedLabels: Set<string>;
+  onToggleCollapse: (labelId: string) => void;
   onUpdate: (id: string, mut: (b: RpyBlock) => RpyBlock) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -482,7 +590,14 @@ function VirtualizedSections({
     // sections of pure dialogue (small cards) get a lower one. Accurate
     // estimates let TanStack put items in the right places on first paint,
     // which is what prevents the "blank gap on fast scroll" symptom.
-    estimateSize: (i) => estimateSectionHeight(sections[i]),
+    estimateSize: (i) => {
+      const s = sections[i];
+      // Collapsed sections render the header strip only — short and uniform.
+      // ~48px (label name baseline + glyph) + 28px vertical padding-as-gap
+      // ≈ 64px. The virtualizer will measure the real DOM and self-correct.
+      if (s.label && collapsedLabels.has(s.label.id)) return 64;
+      return estimateSectionHeight(s);
+    },
     // Tight overscan. Counterintuitively *raising* it makes fast scroll
     // worse: more mid-scroll mounts per frame == more jank. 3 is enough
     // to mask normal-speed scroll while keeping mount cost low.
@@ -560,6 +675,12 @@ function VirtualizedSections({
                 charByVar={charByVar}
                 characters={characters}
                 knownLabels={knownLabels}
+                isCollapsed={
+                  section.label
+                    ? collapsedLabels.has(section.label.id)
+                    : false
+                }
+                onToggleCollapse={onToggleCollapse}
                 onUpdate={onUpdate}
                 onDelete={onDelete}
                 onDuplicate={onDuplicate}
@@ -667,6 +788,8 @@ function estimateBlockHeight(b: RpyBlock): number {
     case "jump":
     case "call":
       return 64;
+    case "return":
+      return 44;
     case "with":
     case "pause":
       return 60;
@@ -935,6 +1058,8 @@ function SectionViewInner({
   charByVar,
   characters,
   knownLabels,
+  isCollapsed,
+  onToggleCollapse,
   onUpdate,
   onDelete,
   onDuplicate,
@@ -944,6 +1069,8 @@ function SectionViewInner({
   charByVar: Map<string, ScriptCharacter>;
   characters: ScriptCharacter[];
   knownLabels: string[];
+  isCollapsed: boolean;
+  onToggleCollapse: (labelId: string) => void;
 } & CommonHandlers) {
   const lastBlockId =
     section.body.length > 0
@@ -952,11 +1079,66 @@ function SectionViewInner({
 
   const items = useMemo(() => groupSceneItems(section.body), [section.body]);
 
+  // Body-summary for the collapsed header — "12 blocks · 3 menus · 2 jumps".
+  // Lets the user know what's inside without expanding. Costs O(body.length)
+  // but body is already in scope.
+  const bodySummary = useMemo(() => {
+    if (section.body.length === 0) return "empty";
+    const counts = new Map<string, number>();
+    for (const b of section.body) {
+      counts.set(b.kind, (counts.get(b.kind) ?? 0) + 1);
+    }
+    const total = section.body.length;
+    const parts: string[] = [`${total} block${total === 1 ? "" : "s"}`];
+    const menus = counts.get("menu") ?? 0;
+    const jumps = (counts.get("jump") ?? 0) + (counts.get("call") ?? 0);
+    if (menus > 0) parts.push(`${menus} menu${menus === 1 ? "" : "s"}`);
+    if (jumps > 0) parts.push(`${jumps} jump${jumps === 1 ? "" : "s"}`);
+    return parts.join(" · ");
+  }, [section.body]);
+
+  const canCollapse = !!section.label;
+  const collapsed = canCollapse && isCollapsed;
+
   return (
-    <section className="rs-section">
+    <section className={"rs-section" + (collapsed ? " is-collapsed" : "")}>
       {section.label ? (
-        <header className="rs-section-head">
-          <span className="rs-section-label-prefix">Label</span>
+        <header
+          className={
+            "rs-section-card" +
+            (canCollapse ? " is-clickable" : "") +
+            (collapsed ? " is-collapsed" : "")
+          }
+          // Click anywhere on the header to toggle — except on the label-name
+          // input (editing) and the action buttons (duplicate/delete).
+          onClick={(e) => {
+            if (!canCollapse) return;
+            const tgt = e.target as HTMLElement;
+            if (tgt.closest(".rs-label-name, .rs-actions")) return;
+            onToggleCollapse(section.label!.id);
+          }}
+          role={canCollapse ? "button" : undefined}
+          aria-expanded={canCollapse ? !collapsed : undefined}
+          tabIndex={canCollapse ? 0 : undefined}
+          onKeyDown={(e) => {
+            if (!canCollapse) return;
+            if (e.key === "Enter" || e.key === " ") {
+              const tgt = e.target as HTMLElement;
+              if (tgt.closest(".rs-label-name")) return;
+              e.preventDefault();
+              onToggleCollapse(section.label!.id);
+            }
+          }}
+        >
+          <span
+            className={
+              "rs-section-toggle" + (collapsed ? "" : " is-open")
+            }
+            aria-hidden
+          >
+            <ChevronGlyph />
+          </span>
+          <span className="rs-section-keyword">label</span>
           <input
             className="rs-label-name"
             value={section.label.name}
@@ -966,53 +1148,85 @@ function SectionViewInner({
                 ({ ...(b as LabelBlock), name: v }) satisfies LabelBlock,
               );
             }}
-            placeholder="label_name"
+            onClick={(e) => e.stopPropagation()}
+            placeholder="name"
             spellCheck={false}
           />
-          <span className="rs-section-divider" aria-hidden />
+          <span className="rs-section-colon" aria-hidden>
+            :
+          </span>
+          {collapsed && (
+            <span className="rs-section-meta-stats">{bodySummary}</span>
+          )}
+          <span className="rs-section-spacer" aria-hidden />
           <RowActions
             onDuplicate={() => onDuplicate(section.label!.id)}
             onDelete={() => onDelete(section.label!.id)}
           />
         </header>
       ) : (
-        <header className="rs-section-head">
-          <span className="rs-section-label-prefix">Pre-label</span>
-          <span className="rs-section-divider" aria-hidden />
+        <header className="rs-section-card rs-section-card-prelabel">
+          <span className="rs-section-keyword is-prelabel"># pre-label</span>
+          <span className="rs-section-meta-stats">
+            Lines before the first <code>label:</code>
+          </span>
         </header>
       )}
 
-      <div className="rs-section-body">
-        {items.map((item) => (
-          <SceneItemView
-            key={
-              item.kind === "scene-card"
-                ? item.scene.id
-                : item.kind === "menu-card"
-                  ? item.tree.menu.id
-                  : item.block.id
-            }
-            item={item}
-            charByVar={charByVar}
-            characters={characters}
-            knownLabels={knownLabels}
-            onUpdate={onUpdate}
-            onDelete={onDelete}
-            onDuplicate={onDuplicate}
-            onInsertAfter={onInsertAfter}
-          />
-        ))}
-        <div className="rs-section-add">
-          <InsertPicker
-            label="+ Add block"
-            allowed={SECTION_ALLOWED_KINDS}
-            onPick={(kind) =>
-              onInsertAfter(lastBlockId, [createEmptyBlock(kind, 1)])
-            }
-          />
+      {!collapsed && (
+        <div className="rs-section-body">
+          {items.map((item) => (
+            <SceneItemView
+              key={
+                item.kind === "scene-card"
+                  ? item.scene.id
+                  : item.kind === "menu-card"
+                    ? item.tree.menu.id
+                    : item.block.id
+              }
+              item={item}
+              charByVar={charByVar}
+              characters={characters}
+              knownLabels={knownLabels}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onDuplicate={onDuplicate}
+              onInsertAfter={onInsertAfter}
+            />
+          ))}
+          <div className="rs-section-add">
+            <InsertPicker
+              label="+ Add block"
+              allowed={SECTION_ALLOWED_KINDS}
+              onPick={(kind) =>
+                onInsertAfter(lastBlockId, [createEmptyBlock(kind, 1)])
+              }
+            />
+          </div>
         </div>
-      </div>
+      )}
     </section>
+  );
+}
+
+function ChevronGlyph() {
+  // 12×12 right-pointing chevron — rotated 90° when the section is open
+  // via the `.is-open` class on the parent button. Stroke-only so it
+  // inherits the muted text colour.
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 2l4 4-4 4" />
+    </svg>
   );
 }
 
@@ -1571,6 +1785,15 @@ function SingleBlockCardInner({
           onDuplicate={onDuplicate}
         />
       );
+    case "return":
+      return (
+        <ReturnCard
+          block={block}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onDuplicate={onDuplicate}
+        />
+      );
     case "raw":
       return classifyRaw(block) === "audio" ? (
         <AudioCard
@@ -1746,6 +1969,42 @@ function PauseCardInner({
         placeholder="(forever)"
       />
       <span className="rs-stage-kw">s</span>
+      <span style={{ flex: 1 }} />
+      <RowActions
+        onDuplicate={() => onDuplicate(block.id)}
+        onDelete={() => onDelete(block.id)}
+      />
+    </div>
+  );
+}
+
+function ReturnCardInner({
+  block,
+  onUpdate,
+  onDelete,
+  onDuplicate,
+}: {
+  block: Extract<RpyBlock, { kind: "return" }>;
+} & BlockHandlers) {
+  const s = useSortable(block.id);
+  return (
+    <div
+      className={"rs-card rs-card-return" + s.dragClassSuffix}
+      ref={s.setRef}
+    >
+      <DragHandle setHandleRef={s.setHandleRef} />
+      <span className="rs-chip rs-chip-return">return</span>
+      <BareInput
+        value={block.expression ?? ""}
+        onChange={(v) => {
+          const trimmed = v.trim();
+          onUpdate(block.id, () => ({
+            ...block,
+            expression: trimmed === "" ? undefined : v,
+          }));
+        }}
+        placeholder="(optional expression)"
+      />
       <span style={{ flex: 1 }} />
       <RowActions
         onDuplicate={() => onDuplicate(block.id)}
@@ -2624,6 +2883,7 @@ const KIND_LABEL: Record<RpyBlockKind, string> = {
   choice: "choice",
   jump: "jump",
   call: "call",
+  return: "return",
   with: "with",
   pause: "pause",
   note: "note",
@@ -2641,6 +2901,7 @@ const KIND_HINT: Record<RpyBlockKind, string> = {
   choice: "Menu option",
   jump: "Go to label",
   call: "Call label, will return",
+  return: "Return to caller (or end story)",
   with: "Standalone transition",
   pause: "Pause timing",
   note: "Comment, ignored by Ren'Py",
@@ -2659,10 +2920,16 @@ const SECTION_ALLOWED_KINDS: RpyBlockKind[] = [
   "note",
   "jump",
   "call",
+  "return",
+  // `raw` is the escape hatch for anything the structured editor doesn't
+  // model — `if`/`elif`/`else`, `$ flag = …`, `python:`, `screen`, `play`,
+  // etc. We expose it as a normal insertable so authors can drop these
+  // in without round-tripping through a paste.
+  "raw",
 ];
 
 // Strict: scene container holds only dialogue (say + narrator). All other
-// kinds — audio/show/hide/pause/note/jump/call — live at section level.
+// kinds — audio/show/hide/pause/note/jump/call/raw — live at section level.
 // The scene-add UI uses dedicated `+ Dialogue` / `+ Narrator` buttons,
 // so no general InsertPicker allow-list is needed for scene bodies.
 
@@ -2676,6 +2943,8 @@ const CHOICE_BODY_ALLOWED_KINDS: RpyBlockKind[] = [
   "note",
   "jump",
   "call",
+  "return",
+  "raw",
 ];
 
 function InsertPicker({
@@ -2830,6 +3099,8 @@ function createEmptyBlock(kind: RpyBlockKind, depth: number): RpyBlock {
       return { id, kind, depth, target: "" };
     case "call":
       return { id, kind, depth, target: "" };
+    case "return":
+      return { id, kind, depth };
     case "with":
       return { id, kind, depth, transition: "" };
     case "pause":
@@ -2862,6 +3133,7 @@ const SingleBlockCard = memo(SingleBlockCardInner);
 const SpriteCard = memo(SpriteCardInner);
 const TransitionCard = memo(TransitionCardInner);
 const PauseCard = memo(PauseCardInner);
+const ReturnCard = memo(ReturnCardInner);
 const NoteCard = memo(NoteCardInner);
 const DialogueCard = memo(DialogueCardInner);
 const NarratorCard = memo(NarratorCardInner);

@@ -48,6 +48,11 @@ export interface SimOption {
   target: string | null;
   /** Drives visual variant + sort order in the option list. */
   variant: "choice" | "continue" | "conditional" | "fallthrough";
+  /** When true, picking this option enters a subroutine via `call`: the UI
+   *  pushes a return-frame so a later `return` in the subroutine resumes
+   *  in this label, after the call. When false (the common `jump` case),
+   *  no frame is pushed — control transfers permanently. */
+  isCall?: boolean;
 }
 
 export interface SimStep {
@@ -55,19 +60,35 @@ export interface SimStep {
   labelName: string;
   sceneId: string;
   sceneTitle: string;
+  /** Locally-stored Photo bound to the underlying scene's script_node.
+   *  Surfaced into `SimStep` so PathSimulator can render the scene image
+   *  without a second lookup against the source rows. Null if the scene
+   *  has no photo attached (or the user hasn't added it to this device's
+   *  local gallery yet). */
+  photoId: string | null;
   /** Walk-order event stream for this label's body. */
   events: SimEvent[];
-  /** Outbound options. Empty → terminal label (an ending). */
+  /** Outbound options. Empty → terminal label (an ending OR a return). */
   options: SimOption[];
   isEnding: boolean;
+  /** True when this label terminates with `return`. The UI uses this to pop
+   *  the call stack (resume the caller after the call site) instead of
+   *  treating the no-options state as a story ending. When there is no
+   *  caller on the stack, `return` IS the ending (Ren'Py terminates). */
+  isReturn: boolean;
 }
 
 /** Scene + label index built once per simulator session from the source rows. */
 export interface SimContext {
   /** label → its full segment blocks (excludes the `label x:` block itself). */
   blocksByLabel: Map<string, RpyBlocks>;
-  /** label → scene metadata (id + display title). */
-  sceneByLabel: Map<string, { sceneId: string; sceneTitle: string }>;
+  /** label → scene metadata (id + display title + bound photo). The photo
+   *  travels alongside the title so PathSimulator can paint the scene
+   *  backdrop without a second lookup. */
+  sceneByLabel: Map<
+    string,
+    { sceneId: string; sceneTitle: string; photoId: string | null }
+  >;
   /** label → next label in tree-order within the same scene. Drives implicit
    *  fall-through when the current label doesn't terminate with jump/return. */
   fallthroughTarget: Map<string, string>;
@@ -80,6 +101,7 @@ interface InternalSegment {
   name: string;
   sceneId: string;
   sceneTitle: string;
+  photoId: string | null;
   blocks: RpyBlocks;
 }
 
@@ -90,6 +112,9 @@ export interface SimSourceRow {
   position: number;
   rpy_label: string | null;
   rpy_blocks: RpyBlocks | null;
+  /** Optional Photo binding from the script_node. Forwarded into each
+   *  generated `SimStep` so the simulator can render the bound image. */
+  photo_id?: string | null;
 }
 
 /**
@@ -120,6 +145,7 @@ export function buildSimContext(rows: SimSourceRow[]): SimContext {
         name: scene.rpy_label,
         sceneId: scene.id,
         sceneTitle: scene.title,
+        photoId: scene.photo_id ?? null,
         blocks,
       });
     } else {
@@ -131,6 +157,7 @@ export function buildSimContext(rows: SimSourceRow[]): SimContext {
           name: lbl.name,
           sceneId: scene.id,
           sceneTitle: scene.title,
+          photoId: scene.photo_id ?? null,
           // Exclude the label block itself — not part of the body.
           blocks: blocks.slice(start + 1, end),
         });
@@ -153,13 +180,14 @@ export function buildSimContext(rows: SimSourceRow[]): SimContext {
   const blocksByLabel = new Map<string, RpyBlocks>();
   const sceneByLabel = new Map<
     string,
-    { sceneId: string; sceneTitle: string }
+    { sceneId: string; sceneTitle: string; photoId: string | null }
   >();
   for (const s of segments) {
     blocksByLabel.set(s.name, s.blocks);
     sceneByLabel.set(s.name, {
       sceneId: s.sceneId,
       sceneTitle: s.sceneTitle,
+      photoId: s.photoId,
     });
   }
 
@@ -252,6 +280,7 @@ export function stepLabel(labelName: string, ctx: SimContext): SimStep | null {
               : undefined,
           target: outgoing ? knownLabel(outgoing) : null,
           variant: "choice",
+          isCall: outgoingKind === "call",
         });
         break;
       }
@@ -262,14 +291,29 @@ export function stepLabel(labelName: string, ctx: SimContext): SimStep | null {
             label: b.kind === "call" ? `call ${b.target}` : `→ ${b.target}`,
             target: knownLabel(b.target),
             variant: "continue",
+            isCall: b.kind === "call",
           });
           topFlowClaimed = true;
         }
         break;
       }
+      case "return": {
+        // Mark that this label terminates with `return`. The UI uses this
+        // signal to pop the call frame (resume caller) when one exists,
+        // or to surface a "story ends" message when the stack is empty.
+        topFlowClaimed = true;
+        break;
+      }
       case "raw": {
         const raw = b as RawBlock;
         const head = (raw.head ?? "").trim();
+        // Legacy: pre-`ReturnBlock` projects parsed `return` into a raw block.
+        // Detect that here so the simulator still pops the call stack on
+        // older imports.
+        if (/^return\b/.test(head)) {
+          topFlowClaimed = true;
+          break;
+        }
         if (/^(if\s|elif\s|else\b)/.test(head)) {
           const condition = head.replace(/:$/, "").trim();
           for (const line of raw.lines) {
@@ -281,6 +325,7 @@ export function stepLabel(labelName: string, ctx: SimContext): SimStep | null {
               hint: m[1] === "call" ? `call ${target}` : `→ ${target}`,
               target: knownLabel(target),
               variant: "conditional",
+              isCall: m[1] === "call",
             });
           }
         }
@@ -291,8 +336,30 @@ export function stepLabel(labelName: string, ctx: SimContext): SimStep | null {
     }
   }
 
+  // Whether the label terminates with `return`. We detect by scanning the
+  // tail of the blocks list — must come AFTER we've finished walking blocks
+  // so it accounts for the final block even though it sets topFlowClaimed.
+  let isReturn = false;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const tail = blocks[i];
+    if (tail.kind === "note") continue;
+    if (tail.kind === "return") {
+      isReturn = true;
+      break;
+    }
+    if (tail.kind === "raw") {
+      const head = (tail.head ?? "").trim();
+      if (/^return\b/.test(head)) {
+        isReturn = true;
+        break;
+      }
+    }
+    break;
+  }
+
   // No explicit outbound at top level → fall through to the next label in
-  // the same scene if one exists.
+  // the same scene if one exists. Suppressed when the label ends with
+  // `return`: control belongs to the call stack, not file order.
   if (options.length === 0 && !topFlowClaimed) {
     const next = ctx.fallthroughTarget.get(labelName);
     if (next) {
@@ -309,8 +376,10 @@ export function stepLabel(labelName: string, ctx: SimContext): SimStep | null {
     labelName,
     sceneId: scene.sceneId,
     sceneTitle: scene.sceneTitle,
+    photoId: scene.photoId,
     events,
     options,
-    isEnding: options.length === 0,
+    isReturn,
+    isEnding: options.length === 0 && !isReturn,
   };
 }

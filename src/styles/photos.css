@@ -91,6 +91,9 @@
   color: rgba(200, 199, 202, 0.5);
 }
 .ph-side-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-family: "Montserrat", sans-serif;
   font-weight: 700;
   font-size: 10px;
@@ -98,11 +101,181 @@
   color: rgba(200, 199, 202, 0.4);
   padding: 16px 8px 6px;
 }
+.ph-side-section-add {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(200, 199, 202, 0.18);
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(200, 199, 202, 0.45);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ph-side-section-add:hover {
+  background: rgba(200, 199, 202, 0.06);
+  color: #c8c7ca;
+  border-color: rgba(200, 199, 202, 0.3);
+}
 .ph-side-empty {
   padding: 8px 12px;
   font-size: 11px;
   color: rgba(200, 199, 202, 0.35);
   font-style: italic;
+}
+
+/* Folder row in the sidebar — coloured dot + name + count + delete button
+   on hover. Clicking the row opens the folder; double-click renames in
+   place. */
+.ph-side-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: rgba(200, 199, 202, 0.7);
+  font-family: "Montserrat", sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background 0.12s, color 0.12s;
+}
+.ph-side-folder:hover {
+  background: rgba(200, 199, 202, 0.04);
+  color: #c8c7ca;
+}
+.ph-side-folder.is-active {
+  background: rgba(200, 199, 202, 0.08);
+  color: #c8c7ca;
+}
+.ph-side-folder-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ph-side-folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph-side-folder-del {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: rgba(200, 199, 202, 0.4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+.ph-side-folder:hover .ph-side-folder-del {
+  opacity: 1;
+}
+.ph-side-folder-del:hover {
+  background: rgba(168, 112, 128, 0.18);
+  color: #d3a3ad;
+}
+/* Per-row "new subfolder" button. Same opacity-on-hover affordance as
+   the delete button so a quiet row stays quiet. */
+.ph-side-folder-add {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: rgba(200, 199, 202, 0.4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+.ph-side-folder:hover .ph-side-folder-add {
+  opacity: 1;
+}
+.ph-side-folder-add:hover {
+  background: rgba(200, 199, 202, 0.08);
+  color: #c8c7ca;
+}
+/* Expand/collapse chevron. Width is fixed so siblings line up; the icon
+   rotates 90deg when expanded, giving the standard tree-node look. */
+.ph-side-folder-chev {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  padding: 0;
+  color: rgba(200, 199, 202, 0.5);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.12s ease, color 0.12s;
+}
+.ph-side-folder-chev:hover {
+  color: #c8c7ca;
+}
+.ph-side-folder-chev.is-open {
+  transform: rotate(90deg);
+}
+.ph-side-folder-input {
+  width: calc(100% - 16px);
+  margin: 4px 8px;
+  height: 30px;
+  padding: 0 10px;
+  background: rgba(200, 199, 202, 0.05);
+  border: 1px solid rgba(200, 199, 202, 0.18);
+  border-radius: 6px;
+  color: #c8c7ca;
+  font-family: "Montserrat", sans-serif;
+  font-size: 12.5px;
+  outline: none;
+}
+.ph-side-folder-input:focus {
+  border-color: rgba(200, 199, 202, 0.4);
+}
+.ph-side-folder-input.is-inline {
+  margin: 0;
+  flex: 1;
+  height: 22px;
+  padding: 0 6px;
+  font-weight: 500;
+}
+
+/* Sidebar footer — pinned at bottom showing local storage usage. */
+.ph-sidebar-foot {
+  margin-top: auto;
+  padding: 14px 12px;
+  border-top: 1px solid rgba(200, 199, 202, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+}
+.ph-sidebar-foot-label {
+  color: rgba(200, 199, 202, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  font-size: 10px;
+}
+.ph-sidebar-foot-value {
+  color: rgba(200, 199, 202, 0.7);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
 }
 
 /* === Main area === */
@@ -139,19 +312,124 @@
 }
 .ph-spacer { flex: 1; }
 .ph-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 30px;
-  padding: 0 12px;
+  padding: 0 14px;
   background: var(--text-1);
   color: var(--bg-canvas);
-  border: none;
+  border: 1px solid transparent;
   border-radius: 37px;
   font-family: "Montserrat", sans-serif;
   font-weight: 500;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .ph-upload-btn:hover { background: #ffffff; }
+.ph-upload-btn svg {
+  width: 14px;
+  height: 14px;
+}
+/* Secondary variant for "Upload folder" — same shape as the primary so the
+   two read as a pair, but the brand inversion is dialled back so the
+   "Upload" (files) button keeps top hierarchy. */
+.ph-upload-btn-secondary {
+  background: transparent;
+  color: rgba(200, 199, 202, 0.85);
+  border-color: rgba(200, 199, 202, 0.2);
+  margin-right: 8px;
+}
+.ph-upload-btn-secondary:hover {
+  background: rgba(200, 199, 202, 0.06);
+  color: #c8c7ca;
+  border-color: rgba(200, 199, 202, 0.34);
+}
+
+/* Selection bar — appears between the topbar and grid when any photo is
+   selected. Holds bulk actions (favorite / move / delete) + selection
+   count + a close button. */
+.ph-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 32px;
+  background: rgba(200, 199, 202, 0.04);
+  border-bottom: 1px solid rgba(200, 199, 202, 0.08);
+}
+.ph-selection-count {
+  font: 600 12px/1 Montserrat, sans-serif;
+  color: #c8c7ca;
+  padding: 0 4px;
+}
+.ph-selection-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(200, 199, 202, 0.12);
+  margin: 0 4px;
+}
+.ph-selection-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: rgba(200, 199, 202, 0.75);
+  font: 500 12px/1 Montserrat, sans-serif;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ph-selection-btn:hover {
+  background: rgba(200, 199, 202, 0.06);
+  color: #c8c7ca;
+  border-color: rgba(200, 199, 202, 0.12);
+}
+.ph-selection-btn.ph-danger:hover {
+  background: rgba(168, 112, 128, 0.12);
+  color: #d3a3ad;
+  border-color: rgba(168, 112, 128, 0.32);
+}
+.ph-selection-move-wrap {
+  position: relative;
+}
+.ph-selection-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  min-width: 200px;
+  padding: 4px;
+  background: #1a1b1d;
+  border: 1px solid rgba(200, 199, 202, 0.18);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+.ph-selection-menu-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: rgba(200, 199, 202, 0.8);
+  font: 500 12px/1.2 Montserrat, sans-serif;
+  cursor: pointer;
+  text-align: left;
+}
+.ph-selection-menu-row:hover:not(:disabled) {
+  background: rgba(200, 199, 202, 0.06);
+  color: #c8c7ca;
+}
+.ph-selection-menu-row:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 .ph-main-body {
   flex: 1;
@@ -161,6 +439,156 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+/* === Upload progress — inline, lives in the topbar ===
+   Replaces the Upload / Upload-folder buttons for the duration of an
+   import so it's impossible to miss: spinner + label + done/total +
+   percentage, all on a single row. The thin progress strip below the
+   topbar (`.ph-upload-progress-bar`) gives the determinate-vs-
+   indeterminate signal at a glance even from across the room. */
+.ph-upload-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 14px;
+  background: rgba(141, 153, 130, 0.1);
+  border: 1px solid rgba(141, 153, 130, 0.28);
+  border-radius: 8px;
+  color: var(--text-1, #c8c7ca);
+  font-family: "Montserrat", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  max-width: 520px;
+  min-width: 0;
+}
+.ph-upload-inline-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(200, 199, 202, 0.22);
+  border-top-color: #c8c7ca;
+  animation: ph-upload-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+.ph-upload-inline-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.ph-upload-inline-count {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(200, 199, 202, 0.65);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.ph-upload-inline-pct {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: #c8c7ca;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+/* Thin determinate strip below the topbar — second visibility channel
+   for the same progress state, glance-able without reading text. */
+.ph-upload-progress-bar {
+  height: 3px;
+  width: 100%;
+  background: rgba(200, 199, 202, 0.05);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.ph-upload-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(141, 153, 130, 0.85),
+    rgba(168, 152, 130, 0.85)
+  );
+  transition: width 0.18s ease-out;
+}
+
+/* Legacy block version — kept around for any callers that still mount
+   the old `UploadProgressBar` (none today, but defining the rules
+   defensively means a stale reference won't show as an unstyled
+   rectangle). */
+.ph-upload-progress {
+  margin: 0 32px;
+  padding: 10px 14px 12px;
+  border-radius: 10px;
+  background: rgba(200, 199, 202, 0.05);
+  border: 1px solid rgba(200, 199, 202, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ph-upload-progress-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 12px;
+  color: var(--text-2, rgba(200, 199, 202, 0.7));
+}
+.ph-upload-progress-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(200, 199, 202, 0.18);
+  border-top-color: #c8c7ca;
+  animation: ph-upload-spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes ph-upload-spin {
+  to { transform: rotate(360deg); }
+}
+.ph-upload-progress-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1, #c8c7ca);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph-upload-progress-count {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-3, rgba(200, 199, 202, 0.5));
+  font-variant-numeric: tabular-nums;
+}
+.ph-upload-progress-pct {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: #c8c7ca;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: right;
+}
+.ph-upload-progress-track {
+  height: 4px;
+  background: rgba(200, 199, 202, 0.07);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ph-upload-progress-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(141, 153, 130, 0.85),
+    rgba(168, 152, 130, 0.85)
+  );
+  border-radius: 4px;
+  transition: width 0.18s ease-out;
 }
 
 /* === Section header === */
@@ -263,6 +691,62 @@
 .ph-tile-preview:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+}
+.ph-tile.is-selected .ph-tile-preview {
+  box-shadow: 0 0 0 2px var(--accent-strong, #c8c7ca),
+    0 10px 22px rgba(0, 0, 0, 0.4);
+}
+
+/* Selection checkbox — appears top-left of every tile on hover, and stays
+   visible when checked. Click toggles selection (range with shift). */
+.ph-tile-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(19, 20, 22, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 12px/1 "JetBrains Mono", monospace;
+  color: var(--bg-canvas, #131416);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s, background 0.12s, border-color 0.12s;
+  z-index: 2;
+}
+.ph-tile:hover .ph-tile-checkbox,
+.ph-tile-checkbox.is-checked {
+  opacity: 1;
+}
+.ph-tile-checkbox.is-checked {
+  background: #c8c7ca;
+  border-color: #c8c7ca;
+  color: #131416;
+}
+/* Placeholder shown while the thumbnail is being backfilled for a legacy
+   photo that was imported before the thumbnail pipeline existed. Same
+   shape as the tile so layout doesn't shift when the real thumb lands. */
+.ph-tile-placeholder {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(200, 199, 202, 0.04) 0%,
+      rgba(200, 199, 202, 0.08) 50%,
+      rgba(200, 199, 202, 0.04) 100%
+    );
+  background-size: 200% 100%;
+  animation: ph-tile-skel 1.4s ease-in-out infinite;
+}
+@keyframes ph-tile-skel {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 .ph-tile-preview img {
   width: 100%;
@@ -448,3 +932,236 @@
 .lightbox-nav:hover { background: rgba(255, 255, 255, 0.12); }
 .lightbox-prev { left: 16px; }
 .lightbox-next { right: 16px; }
+
+/* === Photo picker (modal) ============================================
+   Compact two-pane picker used from the Script editor + anywhere else
+   that needs to bind a node to a photo from the local gallery. Matches
+   the gallery's monochrome palette so it doesn't feel like a separate
+   product. */
+.photo-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 11, 12, 0.65);
+  backdrop-filter: blur(2px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+.photo-picker {
+  width: min(960px, 100%);
+  height: min(640px, 90vh);
+  background: var(--bg-canvas, #131416);
+  border: 1px solid rgba(200, 199, 202, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text-1, #c8c7ca);
+  font-family: "Montserrat", sans-serif;
+}
+.photo-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(200, 199, 202, 0.07);
+}
+.photo-picker-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.photo-picker-search {
+  flex: 1;
+  height: 32px;
+  padding: 0 12px;
+  background: rgba(200, 199, 202, 0.05);
+  border: 1px solid rgba(200, 199, 202, 0.1);
+  border-radius: 8px;
+  color: var(--text-1, #c8c7ca);
+  font-family: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+.photo-picker-search:focus {
+  border-color: rgba(200, 199, 202, 0.32);
+}
+.photo-picker-close {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid rgba(200, 199, 202, 0.1);
+  border-radius: 7px;
+  color: rgba(200, 199, 202, 0.6);
+  cursor: pointer;
+  font-size: 12px;
+}
+.photo-picker-close:hover {
+  background: rgba(200, 199, 202, 0.06);
+  color: #c8c7ca;
+}
+.photo-picker-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.photo-picker-side {
+  width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(200, 199, 202, 0.07);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.photo-picker-side-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(200, 199, 202, 0.7);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+.photo-picker-side-row:hover {
+  background: rgba(200, 199, 202, 0.04);
+  color: #c8c7ca;
+}
+.photo-picker-side-row.is-active {
+  background: rgba(200, 199, 202, 0.08);
+  color: #c8c7ca;
+}
+.photo-picker-side-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-picker-side-count {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  color: rgba(200, 199, 202, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+.photo-picker-side-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.photo-picker-side-sep {
+  height: 1px;
+  background: rgba(200, 199, 202, 0.07);
+  margin: 8px 4px;
+}
+.photo-picker-grid-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+.photo-picker-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(200, 199, 202, 0.45);
+  font-size: 12.5px;
+  text-align: center;
+  padding: 0 24px;
+}
+.photo-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+}
+.photo-picker-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+}
+.photo-picker-tile > img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #2a2b2d;
+  border: 2px solid transparent;
+  transition: border-color 0.12s, transform 0.12s;
+}
+.photo-picker-tile:hover > img {
+  transform: translateY(-1px);
+  border-color: rgba(200, 199, 202, 0.18);
+}
+.photo-picker-tile.is-current > img {
+  border-color: #c8c7ca;
+}
+.photo-picker-tile-name {
+  font-size: 10.5px;
+  color: rgba(200, 199, 202, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.photo-picker-tile-skel {
+  width: 100%;
+  height: 110px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(200, 199, 202, 0.04),
+    rgba(200, 199, 202, 0.08),
+    rgba(200, 199, 202, 0.04)
+  );
+  background-size: 200% 100%;
+  animation: ph-tile-skel 1.4s ease-in-out infinite;
+}
+.photo-picker-detach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 110px;
+  background: rgba(168, 112, 128, 0.1);
+  border: 1px dashed rgba(168, 112, 128, 0.35);
+  border-radius: 8px;
+  color: #d3a3ad;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.photo-picker-detach:hover {
+  background: rgba(168, 112, 128, 0.18);
+  border-color: rgba(168, 112, 128, 0.55);
+}
+.photo-picker-detach-glyph {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(168, 112, 128, 0.4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}

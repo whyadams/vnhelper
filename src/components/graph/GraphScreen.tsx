@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useKanban } from "../../state/kanbanStore";
 import { useScripts } from "../../state/scripts";
 import { GraphCanvas } from "./GraphCanvas";
@@ -6,6 +7,7 @@ import { GraphCanvas } from "./GraphCanvas";
 export function GraphScreen() {
   const { state, dispatch } = useKanban();
   const scripts = useScripts(state.workspaceId);
+  const { t } = useTranslation();
 
   const onOpenScene = useCallback(
     (sceneId: string) => {
@@ -16,18 +18,15 @@ export function GraphScreen() {
   );
 
   if (!scripts.projectsReady) {
-    return <div className="graph-loading">Loading projects…</div>;
+    return <div className="graph-loading">{t("graph.loading_projects")}</div>;
   }
 
   if (scripts.projects.length === 0) {
     return (
       <main className="main graph-main">
         <div className="graph-empty">
-          <p>You don't have any script projects yet.</p>
-          <p className="graph-empty-hint">
-            Create one in Script — the story-flow graph builds itself from
-            your scenes.
-          </p>
+          <p>{t("graph.empty_no_projects")}</p>
+          <p className="graph-empty-hint">{t("graph.empty_no_projects_hint")}</p>
         </div>
       </main>
     );
@@ -35,16 +34,27 @@ export function GraphScreen() {
 
   return (
     <main className="main graph-main">
-      <header className="graph-header">
-        <div className="graph-header-title">
-          <span className="graph-header-eyebrow">Story flow</span>
-          <h1>{scripts.activeProject?.title ?? "Select a project"}</h1>
-        </div>
+      <div className="topbar graph-topbar">
+        <span className="crumb">{t("graph.crumb")}</span>
+        {scripts.activeProject && (
+          <>
+            <span className="crumb-sep">/</span>
+            <span className="crumb is-current">
+              {scripts.activeProject.cover_emoji ? (
+                <span className="crumb-glyph" aria-hidden>
+                  {scripts.activeProject.cover_emoji}
+                </span>
+              ) : null}
+              {scripts.activeProject.title}
+            </span>
+          </>
+        )}
         {scripts.projects.length > 1 && (
           <select
             className="graph-project-select"
             value={scripts.activeProjectId ?? ""}
             onChange={(e) => scripts.setActiveProjectId(e.target.value || null)}
+            aria-label={t("graph.switch_project_aria")}
           >
             {scripts.projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -54,7 +64,7 @@ export function GraphScreen() {
             ))}
           </select>
         )}
-      </header>
+      </div>
       {scripts.activeProjectId && state.workspaceId ? (
         <GraphCanvas
           key={scripts.activeProjectId}
@@ -67,7 +77,7 @@ export function GraphScreen() {
         />
       ) : (
         <div className="graph-empty">
-          <p>Pick a project to view its story flow.</p>
+          <p>{t("graph.empty_pick")}</p>
         </div>
       )}
     </main>

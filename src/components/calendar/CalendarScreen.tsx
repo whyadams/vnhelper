@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useKanban } from "../../state/kanbanStore";
 import {
   useCalendar,
@@ -32,11 +33,11 @@ const TYPE_GLYPH: Record<AttachmentEntityType, string> = {
 
 type ViewMode = "month" | "week" | "day" | "agenda";
 
-const VIEW_LABEL: Record<ViewMode, string> = {
-  month: "Month",
-  week: "Week",
-  day: "Day",
-  agenda: "Agenda",
+const VIEW_LABEL_KEY: Record<ViewMode, string> = {
+  month: "calendar.view_month",
+  week: "calendar.view_week",
+  day: "calendar.view_day",
+  agenda: "calendar.view_agenda",
 };
 
 const VIEW_KEY = "vnhelper.calendar.view";
@@ -123,6 +124,7 @@ function formatDateLong(d: Date): string {
 
 export function CalendarScreen() {
   const { state, dispatch } = useKanban();
+  const { t } = useTranslation();
   const {
     events,
     createEvent,
@@ -326,11 +328,11 @@ export function CalendarScreen() {
           </button>
         </div>
         <button type="button" className="cal-today-btn" onClick={goToday}>
-          Today
+          {t("calendar.today")}
         </button>
 
         {/* View switcher — segmented control. */}
-        <div className="cal-view-toggle" role="tablist" aria-label="Calendar view">
+        <div className="cal-view-toggle" role="tablist">
           {(["month", "week", "day", "agenda"] as ViewMode[]).map((v) => (
             <button
               key={v}
@@ -340,14 +342,14 @@ export function CalendarScreen() {
               className={"cal-view-btn" + (view === v ? " is-active" : "")}
               onClick={() => setView(v)}
             >
-              {VIEW_LABEL[v]}
+              {t(VIEW_LABEL_KEY[v])}
             </button>
           ))}
         </div>
 
         <span className="tmt-spacer" />
         <button type="button" className="tmt-add" onClick={() => openNew()}>
-          + New event
+          + {t("calendar.new_event")}
         </button>
       </div>
 

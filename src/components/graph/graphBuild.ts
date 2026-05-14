@@ -42,6 +42,10 @@ export interface GraphSourceRow {
    *  imports may store the character name. Resolved in `buildGraph` via the
    *  provided `characters` map. */
   pov: string | null;
+  /** Locally-stored Photo bound to this scene. Carried by the row so it
+   *  can be forwarded into `SimSourceRow` (path simulator) without an
+   *  extra fetch. */
+  photo_id?: string | null;
 }
 
 /** Character lookup table — passed into `buildGraph` so the build can resolve
@@ -110,6 +114,15 @@ export interface GraphNodeData {
   /** Display name of the resolved POV character — surfaced in tooltips so
    *  the colour above has a textual anchor. Null when no POV is set. */
   povName: string | null;
+  /** True when this label's segment terminates with `return`. The label acts
+   *  as a subroutine: anyone who `call`s it gets control back inline after
+   *  the call statement. Surfaced visually with a ⤴ glyph + dashed outline. */
+  isSubroutine: boolean;
+  /** Names of labels that `call` this one. Empty for non-subroutine labels
+   *  or subroutines that nobody calls (a real "dead" subroutine). Used by
+   *  the inspector ("Called from") and by reachability (a subroutine is
+   *  reachable iff at least one caller is reachable). */
+  callers: string[];
 }
 
 export type EdgeOrigin =
@@ -135,6 +148,11 @@ export interface GraphEdgeData {
   broken: boolean;
   /** When broken, the original target label string for the UI. */
   brokenTarget?: string;
+  /** True when this edge represents `call` semantics (the target returns
+   *  control to the source after `return`). Independent of `origin` —
+   *  a `menu` choice can wrap a `call`, and a conditional can `call`.
+   *  Surfaced visually with a dashed stroke + ◇ glyph on the edge. */
+  viaCall: boolean;
 }
 
 export interface GraphBuildResult {
@@ -270,6 +288,7 @@ export function buildGraph(
         condition: ref.condition,
         broken,
         brokenTarget: broken ? ref.target : undefined,
+        viaCall: ref.viaCall,
       });
     });
   }
@@ -295,6 +314,7 @@ export function buildGraph(
       target: next.name,
       origin: "fallthrough",
       broken: false,
+      viaCall: false,
     });
   }
 
@@ -305,6 +325,23 @@ export function buildGraph(
   const outboundCount = new Map<string, number>();
   for (const e of edges) {
     outboundCount.set(e.source, (outboundCount.get(e.source) ?? 0) + 1);
+  }
+
+  // Build a callers map for every label reached via `call` (top-level OR
+  // inside a menu choice OR inside an if/elif). `call X` from segment Y
+  // registers Y as a caller of X. Used by:
+  //   - inspector "Called from" list
+  //   - reachability: a subroutine is "live" iff at least one caller is live.
+  const callers = new Map<string, Set<string>>();
+  for (const e of edges) {
+    if (e.broken) continue;
+    if (!e.viaCall) continue;
+    let s = callers.get(e.target);
+    if (!s) {
+      s = new Set<string>();
+      callers.set(e.target, s);
+    }
+    s.add(e.source);
   }
 
   const entrySegmentName = segments[0]?.name;
@@ -351,6 +388,8 @@ export function buildGraph(
     const out = outboundCount.get(s.name) ?? 0;
     const isEntry = s.name === entrySegmentName;
     const pov = resolvePov(sceneRow?.pov ?? null);
+    const segCallers = callers.get(s.name);
+    const isSubroutine = endsWithReturn(s.blocks);
     return {
       id: s.name,
       label: s.name,
@@ -367,10 +406,16 @@ export function buildGraph(
       isEntry,
       isOrphan: !isEntry && !inbound.has(s.name),
       isUnreachable: !isEntry && !reachable.has(s.name),
-      isEnding: out === 0,
+      // A subroutine never "ends" the story even though its `return` makes
+      // its segment lack outbound jump/call/fallthrough edges — control
+      // resumes inline at the caller. Suppress the ending flag there to
+      // avoid noisy false positives in the integrity panel.
+      isEnding: out === 0 && !isSubroutine,
       wordCount: countWords(s.blocks),
       povColor: pov.color,
       povName: pov.name,
+      isSubroutine,
+      callers: segCallers ? Array.from(segCallers).sort() : [],
     };
   });
 
@@ -481,6 +526,10 @@ interface CollectedRef {
   target: string;
   choiceText?: string;
   condition?: string;
+  /** True when the underlying line was `call` (not `jump`). Carried through
+   *  regardless of whether the reference came from a top-level line, a menu
+   *  choice, or a conditional branch. */
+  viaCall: boolean;
 }
 
 function collectAllRefs(blocks: RpyBlocks): CollectedRef[] {
@@ -488,6 +537,7 @@ function collectAllRefs(blocks: RpyBlocks): CollectedRef[] {
     origin: r.choiceText ? "menu" : r.kind,
     target: r.target,
     choiceText: r.choiceText,
+    viaCall: r.kind === "call",
   }));
   const conditional = collectConditionalRefs(blocks);
   return [...direct, ...conditional];
@@ -567,13 +617,36 @@ function isTerminalSegment(blocks: RpyBlocks): boolean {
     const b = blocks[i];
     if (b.kind === "note") continue;
     if (b.kind === "jump") return true;
+    if (b.kind === "return") return true;
     if (b.kind === "raw") {
+      // Legacy: pre-`ReturnBlock` projects parsed `return` into a raw block.
+      // Keep the heuristic so older `rpy_blocks` JSON still flow correctly.
       const head = (b.head ?? "").trim();
       if (/^return\b/.test(head)) return true;
     }
     return false;
   }
   return true;
+}
+
+/**
+ * Whether a segment ends with `return` (structured ReturnBlock or legacy
+ * raw form). A subroutine is any callable label that comes back to its
+ * caller — surfaced visually with a ⤴ glyph and used by reachability
+ * (caller's reachability flows through to subroutine target).
+ */
+function endsWithReturn(blocks: RpyBlocks): boolean {
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const b = blocks[i];
+    if (b.kind === "note") continue;
+    if (b.kind === "return") return true;
+    if (b.kind === "raw") {
+      const head = (b.head ?? "").trim();
+      if (/^return\b/.test(head)) return true;
+    }
+    return false;
+  }
+  return false;
 }
 
 function collectConditionalRefs(blocks: RpyBlocks): CollectedRef[] {
@@ -591,6 +664,7 @@ function collectConditionalRefs(blocks: RpyBlocks): CollectedRef[] {
           origin: "conditional",
           target: m[2],
           condition,
+          viaCall: m[1] === "call",
         });
       }
     }

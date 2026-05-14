@@ -42,7 +42,7 @@ fn build_menu(app: &AppHandle, tasks: &[TrayTask]) -> tauri::Result<Menu<Wry>> {
         let empty = MenuItem::with_id(
             app,
             "empty",
-            "Open VnHelper to add tasks",
+            "Open RenHub to add tasks",
             false,
             None::<&str>,
         )?;
@@ -68,7 +68,7 @@ fn build_menu(app: &AppHandle, tasks: &[TrayTask]) -> tauri::Result<Menu<Wry>> {
     }
 
     menu.append(&PredefinedMenuItem::separator(app)?)?;
-    let show = MenuItem::with_id(app, MENU_SHOW, "Show VnHelper", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, MENU_SHOW, "Show RenHub", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit", true, None::<&str>)?;
     menu.append(&show)?;
     menu.append(&quit)?;
@@ -220,9 +220,9 @@ fn update_tray_tasks(
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         tray.set_menu(Some(menu)).map_err(|e| e.to_string())?;
         let tooltip = if tasks.is_empty() {
-            "VnHelper — no active tasks".to_string()
+            "RenHub — no active tasks".to_string()
         } else {
-            format!("VnHelper — {} active task(s)", tasks.len())
+            format!("RenHub — {} active task(s)", tasks.len())
         };
         let _ = tray.set_tooltip(Some(tooltip));
     }
@@ -262,7 +262,7 @@ pub fn run() {
                 .clone();
             let _tray = TrayIconBuilder::with_id(TRAY_ID)
                 .icon(icon)
-                .tooltip("VnHelper")
+                .tooltip("RenHub")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| handle_menu_event(app, event))

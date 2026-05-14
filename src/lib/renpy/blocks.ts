@@ -26,6 +26,7 @@ export type RpyBlockKind =
   | "choice"
   | "jump"
   | "call"
+  | "return"
   | "with"
   | "pause"
   | "note"
@@ -165,6 +166,18 @@ export interface PauseBlock extends BlockBase {
 }
 
 /**
+ * `return` — terminates the current label. If we arrived here via `call`,
+ * Ren'Py pops the call stack and resumes after the `call` statement. Without
+ * a callsite, `return` ends the game (or main menu). The graph view uses the
+ * presence of `return` to flag a label as a subroutine (callable + comes back).
+ */
+export interface ReturnBlock extends BlockBase {
+  kind: "return";
+  /** Optional return expression (`return value`). Most VN scripts never use it. */
+  expression?: string;
+}
+
+/**
  * `# comment` — author note that is preserved in the `.rpy` output as a
  * comment but never rendered in-game. Doubles as the migration target for
  * the legacy `direction` blocks (stage directions).
@@ -205,6 +218,7 @@ export type RpyBlock =
   | ChoiceBlock
   | JumpBlock
   | CallBlock
+  | ReturnBlock
   | WithBlock
   | PauseBlock
   | NoteBlock

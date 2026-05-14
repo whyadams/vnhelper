@@ -13,7 +13,7 @@ export function AccountSection() {
   const signOut = async () => {
     const ok = await dialog.confirm({
       title: "Sign out",
-      message: "Sign out of VnHelper? You'll need to sign in again next time.",
+      message: "Sign out of RenHub? You'll need to sign in again next time.",
       confirmLabel: "Sign out",
     });
     if (ok) await supabase.auth.signOut();

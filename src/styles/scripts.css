@@ -230,6 +230,44 @@
 .vn-meta-chip:hover { color: var(--text-1); }
 .vn-meta-empty { font-style: italic; color: rgba(200, 199, 202, 0.35); }
 
+/* "Attach photo" chip in the meta-row. When bound it shows a small
+   thumbnail + filename; when empty it falls back to the dashed-pill
+   style shared with `— pov —` / `— location —`. The thumbnail is the
+   IndexedDB JPEG (~480 px longest side) downscaled by the browser, no
+   extra processing needed. */
+.vn-meta-photo {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+}
+.vn-meta-photo.has-photo {
+  background: rgba(141, 153, 130, 0.12);
+  border: 1px solid rgba(141, 153, 130, 0.28);
+  border-radius: 6px;
+  padding: 2px 8px 2px 2px;
+  color: var(--text-1);
+}
+.vn-meta-photo.has-photo:hover {
+  background: rgba(141, 153, 130, 0.18);
+}
+.vn-meta-photo-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: cover;
+  display: block;
+}
+.vn-meta-photo-name {
+  font-weight: 500;
+  font-size: 11.5px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .vn-meta-status {
   color: rgba(200, 199, 202, 0.5);
   font-weight: 500;
@@ -3132,6 +3170,232 @@
   flex-direction: column;
   gap: 21px;
 }
+/* Collapsed sections drop the body gap so the header strip reads as a tight
+   row instead of leaving a phantom 21px gutter below it. */
+.rs-section.is-collapsed {
+  gap: 0;
+}
+
+/* Section header — code-syntax row that mirrors the literal Ren'Py source
+   `label name:`. No card / box chrome; just typography. The whole row is
+   a click target on collapsible sections; hover surfaces a subtle bg.
+   Vertical padding intentionally generous so a long list of collapsed
+   labels reads as a comfortable index, not a wall of text. */
+.rs-section-card {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  /* Token gap is the gap BETWEEN words like `label`, `name`, `:` — kept
+     tight (6px) so the row reads as a single line of code, not a sentence
+     with awkward spacing. Larger gaps before stats / actions come from
+     margin overrides further down. */
+  gap: 6px;
+  /* Bottom padding doubles as the gap between virtualized rows because
+     `getBoundingClientRect().height` (used by the virtualizer) includes
+     padding but not margins. */
+  padding: 14px 18px 20px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  font: 500 16px/1.2 "JetBrains Mono", ui-monospace, monospace;
+}
+/* Hairline separator between every collapsed row — gives the long
+   index a clear visual rhythm without adding card chrome.
+   Drawn as a ::after pseudo positioned at the bottom of the card so it
+   sits inside the padding gap rather than on the row content. */
+.rs-section-card.is-collapsed::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 8px;
+  height: 1px;
+  background: rgba(200, 199, 202, 0.05);
+  pointer-events: none;
+}
+.rs-section-card.is-clickable {
+  cursor: pointer;
+}
+.rs-section-card.is-clickable:hover {
+  background: rgba(200, 199, 202, 0.04);
+}
+.rs-section-card.is-clickable:hover::after {
+  background: transparent;
+}
+.rs-section-card.is-clickable:focus-visible {
+  outline: none;
+  background: rgba(200, 199, 202, 0.06);
+  border-color: rgba(200, 199, 202, 0.18);
+}
+
+/* Chevron — pure visual; the row owns the click. Sits slightly above the
+   text baseline because the row uses align-items: baseline for the keyword. */
+.rs-section-toggle {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(200, 199, 202, 0.45);
+  flex-shrink: 0;
+  pointer-events: none;
+  align-self: center;
+  transition: color 0.12s;
+}
+.rs-section-card.is-clickable:hover .rs-section-toggle {
+  color: #c8c7ca;
+}
+.rs-section-toggle svg {
+  transition: transform 0.16s ease;
+}
+.rs-section-toggle.is-open svg {
+  transform: rotate(90deg);
+}
+
+/* The `label` keyword — coloured like a syntax token, dimmed when collapsed
+   to push focus onto the name. */
+.rs-section-keyword {
+  color: var(--status-warn);
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
+}
+.rs-section-keyword.is-prelabel {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.rs-section-card.is-collapsed .rs-section-keyword {
+  opacity: 0.7;
+}
+
+/* Label name — primary visual. Plain input that lets you click-to-edit, but
+   styled to look like a code identifier so the whole row reads as a single
+   line of Ren'Py source. `min-width: 180px` keeps the colon+stats aligned
+   across rows for short label names (`ch1`, `morning`) — long names still
+   grow naturally via `field-sizing: content`. */
+.rs-section-card .rs-label-name {
+  font: 600 16px/1.2 "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: 0;
+  padding: 1px 4px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: #c8c7ca;
+  min-width: 180px;
+  field-sizing: content;
+  outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+.rs-section-card .rs-label-name:hover {
+  background: rgba(200, 199, 202, 0.05);
+  border-radius: 3px;
+}
+.rs-section-card .rs-label-name:focus {
+  background: rgba(200, 199, 202, 0.08);
+  border-radius: 3px;
+}
+.rs-section-card .rs-label-name::placeholder {
+  color: var(--text-4);
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* `:` after the label name — punctuation token, dimmed. Pulled tight to
+   the name so it reads as `name:` rather than `name :`. */
+.rs-section-colon {
+  color: rgba(200, 199, 202, 0.5);
+  margin-left: -6px;
+  user-select: none;
+}
+
+/* Stats hint shown only when collapsed — small monospace string like
+   `12 blocks · 2 menus`. Pushed to a column ~24px after the colon so the
+   eye can scan name | stats as two distinct columns. */
+.rs-section-card .rs-section-meta-stats {
+  font: 500 11.5px/1.2 "JetBrains Mono", ui-monospace, monospace;
+  color: var(--text-3);
+  margin-left: 24px;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+/* Pushes the row-actions block to the far right. */
+.rs-section-spacer {
+  flex: 1;
+}
+
+/* Sticky quick-add bar — pinned to the bottom of the script scroll area.
+   Holds chips for the most-used block kinds. Same overlay-surface recipe
+   as graph-stats / graph-tools so it reads as the same family of chrome
+   across the app. */
+.rs-quick-add {
+  position: sticky;
+  bottom: 12px;
+  left: 0;
+  margin: 20px auto 12px;
+  z-index: 5;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  width: fit-content;
+  max-width: 100%;
+  background: rgba(28, 29, 31, 0.94);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.rs-quick-add-prefix {
+  font: 700 10px/1 Montserrat, system-ui, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 0 6px;
+}
+.rs-quick-add-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.rs-quick-add-chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(200, 199, 202, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font: 500 12px/1 Montserrat, system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rs-quick-add-chip:hover {
+  background: rgba(200, 199, 202, 0.1);
+  border-color: var(--border-strong);
+  color: #c8c7ca;
+}
+.rs-quick-add-chip.is-tone-menu:hover {
+  border-color: rgba(180, 152, 130, 0.5);
+}
+.rs-quick-add-chip.is-tone-flow:hover {
+  border-color: rgba(168, 130, 152, 0.45);
+}
+.rs-quick-add-chip.is-tone-raw:hover {
+  border-color: rgba(180, 130, 130, 0.45);
+}
+
+/* Body summary chip shown in the collapsed header — "12 blocks · 2 menus".
+   Sits between the label name and the divider so the user can see scale
+   at-a-glance without expanding. */
+.rs-section-body-summary {
+  font: 500 11px/normal "JetBrains Mono", ui-monospace, monospace;
+  color: rgba(200, 199, 202, 0.4);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
 
 /* Skeleton stand-in for a SectionView before it intersects the viewport.
    Stays the same height as the real section (parent reserves space via
@@ -3237,6 +3501,7 @@
 .rs-chip-narrator { background: rgba(200, 199, 202, 0.06); color: rgba(200, 199, 202, 0.55); }
 .rs-chip-jump,
 .rs-chip-call     { background: rgba(168, 130, 152, 0.12); color: #c898a8; }
+.rs-chip-return   { background: rgba(130, 140, 153, 0.12); color: #98a3b3; }
 .rs-chip-menu     { background: rgba(180, 152, 130, 0.12); color: #b89882; }
 .rs-chip-choice   { background: rgba(180, 152, 130, 0.08); color: rgba(184, 152, 130, 0.85); }
 .rs-chip-orphan   { background: rgba(168, 130, 130, 0.12); color: #c898a0; }
@@ -4342,7 +4607,7 @@
 .rs-scene-line:hover .rs-actions,
 .rs-card-dialogue:hover .rs-actions,
 .rs-card-narrator:hover .rs-actions,
-.rs-section-head:hover .rs-actions,
+.rs-section-card:hover .rs-actions,
 .rs-menu:hover > .rs-menu-head .rs-actions,
 .rs-choice:hover > .rs-choice-head .rs-actions,
 .rs-card-raw:hover .rs-actions,
@@ -4410,6 +4675,73 @@
   background: rgba(200, 199, 202, 0.04);
   color: var(--text-1);
   border-color: rgba(200, 199, 202, 0.3);
+}
+
+/* ---- Sticky quick-add bar ----
+   Pinned to the bottom of the doc-scroll viewport via `position: sticky`.
+   Holds chips for the most-used block kinds — full Insert-picker still
+   lives inside each section ("+ Add block"). Same glass surface as graph
+   floating panels so it reads as the app's standard "floating toolbar". */
+.rs-quick-add {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  margin-top: 24px;
+  background: rgba(28, 29, 31, 0.92);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  max-width: calc(100% - 24px);
+  width: fit-content;
+}
+.rs-quick-add-prefix {
+  font: 600 10px/1 Montserrat, system-ui, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 0 8px;
+}
+.rs-quick-add-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.rs-quick-add-chip {
+  height: 28px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text-2);
+  font: 500 12px/1 Montserrat, system-ui, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.rs-quick-add-chip:hover {
+  background: rgba(200, 199, 202, 0.06);
+  color: var(--text-1);
+  border-color: var(--border);
+}
+.rs-quick-add-chip.is-tone-menu:hover {
+  border-color: rgba(180, 152, 130, 0.4);
+  color: #b89882;
+}
+.rs-quick-add-chip.is-tone-flow:hover {
+  border-color: rgba(168, 130, 152, 0.4);
+  color: #c898a8;
+}
+.rs-quick-add-chip.is-tone-raw:hover {
+  border-color: rgba(180, 130, 130, 0.4);
+  color: #c89090;
 }
 
 /* ---- Empty state ---- */

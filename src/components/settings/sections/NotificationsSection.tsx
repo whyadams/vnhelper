@@ -55,7 +55,7 @@ export function NotificationsSection() {
       }
       if (!granted) {
         setError(
-          "Не получили разрешение на уведомления. Открой настройки Windows → Notifications → VnHelper и включи их вручную.",
+          "Не получили разрешение на уведомления. Открой настройки Windows → Notifications → RenHub и включи их вручную.",
         );
         return;
       }
@@ -81,7 +81,7 @@ export function NotificationsSection() {
               Уведомлять о событиях календаря
             </div>
             <div className="set-row-desc" style={{ marginTop: 4 }}>
-              VnHelper будет показывать всплывающее уведомление Windows в
+              RenHub будет показывать всплывающее уведомление Windows в
               день события. Для своевременных уведомлений включи также
               автозапуск в General — иначе тосты придут только когда
               приложение открыто.
@@ -113,7 +113,7 @@ export function NotificationsSection() {
             style={{ marginTop: 8, color: "rgba(220, 140, 140, 0.85)" }}
           >
             Разрешение на уведомления отозвано в системе. Открой Параметры
-            Windows → Система → Уведомления → VnHelper и включи их.
+            Windows → Система → Уведомления → RenHub и включи их.
           </div>
         )}
         {error && <div className="set-error">{error}</div>}

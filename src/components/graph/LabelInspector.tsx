@@ -288,6 +288,40 @@ export function LabelInspector({
           </section>
         )}
 
+        {/* ---- Called from -------------------------------------------- */}
+        {/* Subset of Inbound: only labels that reach this one via `call`.
+            Surfaced separately because for a subroutine these are the
+            real "users" — control comes back to each of them via return. */}
+        {selected.isSubroutine && selected.callers.length > 0 && (
+          <section className="graph-inspector-section">
+            <h3 className="graph-inspector-heading">
+              Called from
+              <span className="graph-inspector-count">
+                {selected.callers.length}
+              </span>
+            </h3>
+            <ul className="graph-inspector-refs">
+              {selected.callers.map((src) => (
+                <li key={src}>
+                  <span className="graph-inspector-ref-kind">⤴ call</span>
+                  {renderTarget(src)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {selected.isSubroutine && selected.callers.length === 0 && (
+          <section className="graph-inspector-section">
+            <h3 className="graph-inspector-heading">Subroutine</h3>
+            <p className="graph-inspector-empty">
+              This label ends with <code>return</code> but nothing
+              <code> call</code>s it. It will run only if reached via a
+              fall-through or jump — control then ends the story instead
+              of resuming a caller.
+            </p>
+          </section>
+        )}
+
         {/* ---- Top-level $-effects ------------------------------------- */}
         {details && details.topLevelEffects.length > 0 && (
           <section className="graph-inspector-section">

@@ -9,6 +9,7 @@ import {
   type SimSourceRow,
   type SimStep,
 } from "./pathSimulate";
+import { getFullBlob, listPhotos } from "../../lib/photosDb";
 
 interface Props {
   open: boolean;
@@ -35,6 +36,9 @@ interface HistoryEntry {
   step: SimStep;
   /** Which option was picked to leave this step. null for the active one. */
   chosen: SimOption | null;
+  /** Call-stack snapshot at the moment this step started. Captured so Back
+   *  can restore the stack exactly. Older entries keep their original stack. */
+  stackSnapshot: string[];
 }
 
 /**
@@ -73,6 +77,10 @@ export function PathSimulator({
   const [bg, setBg] = useState<string | null>(null);
   const [visibleChars, setVisibleChars] = useState<VisibleChar[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** Active call frames — each entry is the caller label to resume at when
+   *  the current execution path hits a `return`. Mutates on `call` (push)
+   *  and `return` (pop). Snapshotted into each HistoryEntry so Back works. */
+  const [callStack, setCallStack] = useState<string[]>([]);
 
   /** Replay events [0..targetIndex) on a fresh stage. Used by Back, by
    *  the initial step load, and any time we need to recompute the visible
@@ -118,6 +126,7 @@ export function PathSimulator({
       setEventIndex(0);
       setBg(null);
       setVisibleChars([]);
+      setCallStack([]);
       return;
     }
     const first = stepLabel(start, ctx);
@@ -125,7 +134,8 @@ export function PathSimulator({
       setHistory([]);
       return;
     }
-    setHistory([{ step: first, chosen: null }]);
+    setHistory([{ step: first, chosen: null, stackSnapshot: [] }]);
+    setCallStack([]);
     // Auto-advance past leading scene/show/hide events — they're stage
     // setup, not "click to read" content. Stop at the first say/narrator/note
     // (or at the choice menu if none exists).
@@ -140,6 +150,124 @@ export function PathSimulator({
   }, [open, ctx, startLabel, replayStage]);
 
   const current = history.length > 0 ? history[history.length - 1] : null;
+
+  /** Lookup table for resolving Ren'Py `scene <bg>` tags to local photo
+   *  ids. Built once per simulator session — the user's gallery is a
+   *  closed set during a single playthrough, so paying to rescan it
+   *  on every `bg` change would just burn CPU. Stems are lowercased so
+   *  `Drive_Jacob_84.JPG` and `drive_jacob_84.png` both resolve. */
+  const [photoIdByStem, setPhotoIdByStem] = useState<Map<string, string> | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      const photos = await listPhotos();
+      if (cancelled) return;
+      const m = new Map<string, string>();
+      for (const p of photos) {
+        const name = p.name ?? "";
+        const dot = name.lastIndexOf(".");
+        const stem = (dot >= 0 ? name.slice(0, dot) : name).toLowerCase();
+        if (stem && !m.has(stem)) m.set(stem, p.id);
+      }
+      setPhotoIdByStem(m);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  /** Photo to render right now. Resolution order matches what a Ren'Py
+   *  runtime would do:
+   *
+   *  1. The live `bg` tag — set by the most recent `scene <name>` block
+   *     the user has stepped past. This is the per-step authoritative
+   *     image and what makes long labels with multiple `scene` swaps
+   *     actually show different photos as you click through.
+   *  2. The scene-level `photo_id` (from script_nodes) — fallback for
+   *     dialogue-only labels that never set a `scene` background.
+   *
+   *  The bg resolves via two passes:
+   *   - exact stem match: `drive_jacob_84` ↔ `drive_jacob_84.jpg`
+   *   - loose prefix match: bg like `bg room day` matches
+   *     `bg_room_day_v2.jpg` via the same separator-aware rule used in
+   *     the Graph auto-matcher.
+   */
+  const resolveBgPhotoId = useCallback(
+    (bgName: string | null): string | null => {
+      if (!bgName || !photoIdByStem) return null;
+      const stem = bgName.toLowerCase().trim();
+      if (!stem) return null;
+      const exact = photoIdByStem.get(stem);
+      if (exact) return exact;
+      // Also try whitespace-collapsed variants since Ren'Py allows
+      // multi-word bg tags but local files don't.
+      if (/\s/.test(stem)) {
+        const underscored = stem.replace(/\s+/g, "_");
+        const dashed = stem.replace(/\s+/g, "-");
+        const u = photoIdByStem.get(underscored);
+        if (u) return u;
+        const d = photoIdByStem.get(dashed);
+        if (d) return d;
+      }
+      // Loose prefix fallback.
+      for (const [s, id] of photoIdByStem) {
+        if (
+          s.length > stem.length &&
+          s.startsWith(stem) &&
+          /[_\-. ]/.test(s.charAt(stem.length))
+        ) {
+          return id;
+        }
+      }
+      return null;
+    },
+    [photoIdByStem],
+  );
+
+  const activePhotoId = useMemo(() => {
+    const fromBg = resolveBgPhotoId(bg);
+    if (fromBg) return fromBg;
+    return current?.step.photoId ?? null;
+  }, [bg, resolveBgPhotoId, current]);
+
+  /** Resolved ObjectURL for the active backdrop photo. Re-materialized
+   *  whenever `activePhotoId` changes (i.e. on every `scene` swap or
+   *  step transition that swaps photo). The previous URL is revoked so
+   *  we don't leak ObjectURLs across a long label with 20+ bg swaps. */
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!activePhotoId) {
+      setPhotoUrl((cur) => {
+        if (cur) URL.revokeObjectURL(cur);
+        return null;
+      });
+      return;
+    }
+    let cancelled = false;
+    let created: string | null = null;
+    void (async () => {
+      const blob = await getFullBlob(activePhotoId);
+      if (cancelled) return;
+      if (!blob) {
+        setPhotoUrl((cur) => {
+          if (cur) URL.revokeObjectURL(cur);
+          return null;
+        });
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      created = url;
+      setPhotoUrl((cur) => {
+        if (cur) URL.revokeObjectURL(cur);
+        return url;
+      });
+    })();
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [activePhotoId]);
 
   /** Speaker that "owns" the currently-displayed dialogue line, if any. */
   const currentSayEvent = useMemo<
@@ -214,11 +342,36 @@ export function PathSimulator({
       if (!opt.target) return;
       const nextStep = stepLabel(opt.target, ctx);
       if (!nextStep) return;
+      // Two synthetic markers piggy-back on `variant` from the simulator UI:
+      // an option with `data-return` semantics (rendered when isReturn && stack
+      // non-empty) pops a frame; an option with `isCall` pushes the current
+      // label as a return point. Both interactions happen here so history's
+      // stack snapshot captures the post-mutation state.
+      const isReturnAction = (opt as SimOption & { isReturnPop?: boolean })
+        .isReturnPop === true;
+      let nextStack = callStack;
+      if (isReturnAction) {
+        // Pop the topmost frame. Caller label IS opt.target.
+        nextStack = callStack.slice(0, -1);
+      } else if (opt.isCall) {
+        // Push the current label so a future `return` resumes here.
+        const currentLabel = history[history.length - 1]?.step.labelName;
+        if (currentLabel) nextStack = [...callStack, currentLabel];
+      }
+      setCallStack(nextStack);
       setHistory((curr) => {
         const last = curr[curr.length - 1];
         if (!last) return curr;
-        const stamped: HistoryEntry = { step: last.step, chosen: opt };
-        return [...curr.slice(0, -1), stamped, { step: nextStep, chosen: null }];
+        const stamped: HistoryEntry = {
+          step: last.step,
+          chosen: opt,
+          stackSnapshot: last.stackSnapshot,
+        };
+        return [
+          ...curr.slice(0, -1),
+          stamped,
+          { step: nextStep, chosen: null, stackSnapshot: nextStack },
+        ];
       });
       // Reset stage to fresh for the new label, then auto-skip its setup
       // events the same way the initial step did.
@@ -231,7 +384,7 @@ export function PathSimulator({
       setEventIndex(firstReadable);
       replayStage(nextStep, firstReadable);
     },
-    [ctx, replayStage],
+    [ctx, replayStage, callStack, history],
   );
 
   const onBack = useCallback(() => {
@@ -242,10 +395,16 @@ export function PathSimulator({
       if (!tail) return trimmed;
       // Restore the previous step to the moment AFTER its readable events
       // (i.e. the choice screen the user was looking at when they advanced).
-      const restored: HistoryEntry = { step: tail.step, chosen: null };
+      const restored: HistoryEntry = {
+        step: tail.step,
+        chosen: null,
+        stackSnapshot: tail.stackSnapshot,
+      };
       const result = [...trimmed.slice(0, -1), restored];
       setEventIndex(tail.step.events.length);
       replayStage(tail.step, tail.step.events.length);
+      // Restore the call-stack to the snapshot captured when this step started.
+      setCallStack(tail.stackSnapshot);
       return result;
     });
   }, [replayStage]);
@@ -255,7 +414,8 @@ export function PathSimulator({
     if (!start) return;
     const first = stepLabel(start, ctx);
     if (!first) return;
-    setHistory([{ step: first, chosen: null }]);
+    setHistory([{ step: first, chosen: null, stackSnapshot: [] }]);
+    setCallStack([]);
     let firstReadable = 0;
     while (firstReadable < first.events.length) {
       const k = first.events[firstReadable].kind;
@@ -341,186 +501,243 @@ export function PathSimulator({
         aria-modal="true"
         aria-label="Path simulator"
       >
-        {/* Top bar: scene/label info + chrome (back / restart / history / close) */}
-        <header className="path-sim-topbar">
-          <div className="path-sim-topbar-left">
-            <span className="path-sim-eyebrow">{current.step.sceneTitle}</span>
-            <span className="path-sim-label-name">{current.step.labelName}</span>
-          </div>
-          <div className="path-sim-topbar-right">
-            {bg && (
-              <span className="path-sim-bg-tag" title="Current scene background">
-                bg: {bg}
-              </span>
-            )}
+        {/* Discreet floating controls — top-right of the stage. Mirrors
+            Ren'Py's affordance of keeping the photo unobstructed; the
+            user reaches for keyboard shortcuts most of the time, these
+            icons are a fallback for mouse-only users. */}
+        <div className="path-sim-floating-controls">
+          {onJumpToLabel && (
             <button
               type="button"
-              className="path-sim-action"
+              className="path-sim-icon-btn"
+              onClick={() => onJumpToLabel(current.step.labelName)}
+              title={`Reveal "${current.step.labelName}" on canvas`}
+              aria-label="Reveal on canvas"
+            >
+              ↗
+            </button>
+          )}
+          <button
+            type="button"
+            className="path-sim-icon-btn"
+            onClick={onRestart}
+            title="Restart from entry"
+            aria-label="Restart"
+          >
+            ⟲
+          </button>
+          <button
+            type="button"
+            className="path-sim-icon-btn"
+            onClick={onClose}
+            title="Close (Esc)"
+            aria-label="Close simulator"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div
+          className={
+            "path-sim-stage" +
+            (choicesActive ? " is-choosing" : "") +
+            (photoUrl ? " has-photo" : "")
+          }
+          onClick={onStageClick}
+        >
+          {photoUrl && (
+            <img
+              className="path-sim-stage-photo"
+              src={photoUrl}
+              alt=""
+              aria-hidden
+              draggable={false}
+            />
+          )}
+
+          {/* Empty state — when a label has zero readable events AND no
+              choices visible yet (rare, but possible for label that's
+              just show/hide and then nothing). */}
+          {!currentSayEvent && !choicesActive && (
+            <div className="path-sim-stage-empty">
+              <p>This label has no dialogue.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Ren'Py panel. Replaces the old top-bar + dialogue chrome
+            with a single bottom strip that swaps content based on state:
+              - dialogue: speaker name in green + text
+              - choices: a row of pill buttons
+              - ending: a small "THE END" plate
+            Below either content is a horizontal divider and the quick-
+            menu toolbar (Auto / F.Save / F.Load / History) styled after
+            Ren'Py's default UI. */}
+        <div
+          className={
+            "path-sim-renpy-panel" +
+            (choicesActive ? " is-choosing" : "")
+          }
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Backdrop fade — softens the photo behind the panel so the
+              text stays readable on bright CGs. Positioned as a separate
+              div so its blur doesn't bleed into the text rendering. */}
+          <div className="path-sim-renpy-fade" aria-hidden />
+
+          <div className="path-sim-renpy-content">
+            {choicesActive ? (
+              <div className="path-sim-renpy-choices">
+                {current.step.isReturn && callStack.length > 0 ? (
+                  (() => {
+                    const caller = callStack[callStack.length - 1];
+                    const returnOpt: SimOption & { isReturnPop?: boolean } = {
+                      label: `↩ Return to ${caller}`,
+                      target: caller,
+                      variant: "continue",
+                      isReturnPop: true,
+                    };
+                    return (
+                      <button
+                        key="__return__"
+                        type="button"
+                        className="path-sim-renpy-choice is-return"
+                        onClick={() => onChoose(returnOpt)}
+                        title={`Pop call stack and resume in ${caller}`}
+                      >
+                        {returnOpt.label}
+                      </button>
+                    );
+                  })()
+                ) : current.step.isEnding ? (
+                  <div className="path-sim-end">
+                    <span className="path-sim-end-tag">▣ THE END</span>
+                    <p>
+                      This label has no outbound flow. Use{" "}
+                      <kbd>Backspace</kbd> to step back or{" "}
+                      <kbd>R</kbd> to restart.
+                    </p>
+                  </div>
+                ) : (
+                  current.step.options.map((opt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={
+                        "path-sim-renpy-choice is-" +
+                        opt.variant +
+                        (opt.target ? "" : " is-broken") +
+                        (opt.isCall ? " is-call" : "")
+                      }
+                      onClick={() => onChoose(opt)}
+                      disabled={!opt.target}
+                      title={
+                        opt.target
+                          ? opt.isCall
+                            ? `call ${opt.target} (returns here)`
+                            : `Go to ${opt.target}`
+                          : "Target label doesn't exist in this project"
+                      }
+                    >
+                      {opt.label}
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : currentSayEvent ? (
+              <div className="path-sim-renpy-dialogue">
+                {currentSayEvent.kind === "say" && (
+                  <SpeakerPlate
+                    speaker={currentSayEvent.speaker}
+                    speakerVar={currentSayEvent.speakerVar}
+                    charByVar={charByVar}
+                  />
+                )}
+                {currentSayEvent.kind === "narrator" && (
+                  <div className="path-sim-renpy-speaker is-narrator">
+                    Narration
+                  </div>
+                )}
+                {currentSayEvent.kind === "note" && (
+                  <div className="path-sim-renpy-speaker is-note">
+                    Note
+                  </div>
+                )}
+                <p
+                  className={
+                    "path-sim-renpy-text is-" + currentSayEvent.kind
+                  }
+                >
+                  {currentSayEvent.text}
+                </p>
+              </div>
+            ) : (
+              <div className="path-sim-renpy-dialogue">
+                <div className="path-sim-renpy-speaker is-narrator">
+                  {current.step.labelName}
+                </div>
+                <p className="path-sim-renpy-text is-narrator">
+                  Click anywhere or press <kbd>Space</kbd> to begin.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Divider strip — design token from Figma (1138px max-width,
+              centered, very subtle alpha). */}
+          <div className="path-sim-renpy-divider" aria-hidden />
+
+          {/* Quick menu — Auto / F.Save / F.Load / [stretch] / History.
+              Matches Ren'Py's default bottom-bar layout. Save/Load/Auto
+              are stubbed for now; History toggles the existing side
+              panel. */}
+          <div className="path-sim-renpy-toolbar">
+            <button
+              type="button"
+              className="path-sim-renpy-btn is-primary"
+              disabled
+              title="Auto-advance — coming soon"
+            >
+              Auto
+            </button>
+            <span className="path-sim-renpy-toolbar-sep" aria-hidden />
+            <button
+              type="button"
+              className="path-sim-renpy-btn"
+              disabled
+              title="Quick save — coming soon"
+            >
+              F. Save
+            </button>
+            <button
+              type="button"
+              className="path-sim-renpy-btn"
+              disabled
+              title="Quick load — coming soon"
+            >
+              F. Load
+            </button>
+            <button
+              type="button"
+              className="path-sim-renpy-btn"
               onClick={onBack}
               disabled={history.length <= 1}
               title="Step back (Backspace)"
             >
               ← Back
             </button>
-            <button
-              type="button"
-              className="path-sim-action"
-              onClick={onRestart}
-              title="Restart from entry"
-            >
-              ⟲ Restart
-            </button>
+            <span className="path-sim-renpy-toolbar-spacer" aria-hidden />
             <button
               type="button"
               className={
-                "path-sim-action" + (historyOpen ? " is-active" : "")
+                "path-sim-renpy-btn" + (historyOpen ? " is-active" : "")
               }
               onClick={() => setHistoryOpen((v) => !v)}
               title="Toggle history"
             >
-              ☰ {history.length}
-            </button>
-            {onJumpToLabel && (
-              <button
-                type="button"
-                className="path-sim-action"
-                onClick={() => onJumpToLabel(current.step.labelName)}
-                title="Reveal this label on canvas"
-              >
-                ↗ Reveal
-              </button>
-            )}
-            <button
-              type="button"
-              className="path-sim-close"
-              onClick={onClose}
-              aria-label="Close simulator"
-              title="Close (Esc)"
-            >
-              ✕
+              History
             </button>
           </div>
-        </header>
-
-        <div
-          className={"path-sim-stage" + (choicesActive ? " is-choosing" : "")}
-          onClick={onStageClick}
-        >
-          {/* Character chips — drift left/center/right based on `position`. */}
-          <div className="path-sim-cast">
-            {visibleChars.map((c) => {
-              const resolved = charByVar.get(c.char.toLowerCase());
-              return (
-                <div
-                  key={c.char}
-                  className={
-                    "path-sim-cast-chip is-pos-" + (c.position || "center")
-                  }
-                  style={
-                    resolved
-                      ? ({ "--char-color": resolved.color } as React.CSSProperties)
-                      : undefined
-                  }
-                >
-                  <span className="path-sim-cast-emoji">
-                    {resolved && resolved.name
-                      ? resolved.name.charAt(0).toUpperCase()
-                      : c.char.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="path-sim-cast-name">
-                    {resolved ? resolved.name : c.char}
-                  </span>
-                  {c.expression && (
-                    <span className="path-sim-cast-expr">[{c.expression}]</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Choice overlay — shown after all events in this step are read. */}
-          {choicesActive && (
-            <div className="path-sim-choices" onClick={(e) => e.stopPropagation()}>
-              {current.step.isEnding ? (
-                <div className="path-sim-end">
-                  <span className="path-sim-end-tag">▣ THE END</span>
-                  <p>
-                    This label has no outbound flow.<br />
-                    Use <kbd>Back</kbd> to explore a different branch or
-                    {" "}<kbd>Restart</kbd> to begin again.
-                  </p>
-                </div>
-              ) : (
-                current.step.options.map((opt, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={
-                      "path-sim-choice is-" +
-                      opt.variant +
-                      (opt.target ? "" : " is-broken")
-                    }
-                    onClick={() => onChoose(opt)}
-                    disabled={!opt.target}
-                    title={
-                      opt.target
-                        ? `Go to ${opt.target}`
-                        : "Target label doesn't exist in this project"
-                    }
-                  >
-                    <span className="path-sim-choice-label">{opt.label}</span>
-                    {opt.hint && (
-                      <span className="path-sim-choice-hint">{opt.hint}</span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* Bottom dialogue bar — Ren'Py-shaped. Speaker plate sits above
-              the text panel; clicking anywhere on the stage advances. */}
-          {currentSayEvent && (
-            <div className="path-sim-dialogue">
-              {currentSayEvent.kind === "say" && (
-                <SpeakerPlate
-                  speaker={currentSayEvent.speaker}
-                  speakerVar={currentSayEvent.speakerVar}
-                  charByVar={charByVar}
-                />
-              )}
-              <div
-                className={
-                  "path-sim-dialogue-body is-" + currentSayEvent.kind
-                }
-              >
-                <p className="path-sim-dialogue-text">
-                  {currentSayEvent.kind === "note"
-                    ? `# ${currentSayEvent.text}`
-                    : currentSayEvent.text}
-                </p>
-                <span className="path-sim-advance-hint" aria-hidden>
-                  Click ▸ <kbd>Space</kbd>
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Empty state — when a label has zero readable events AND no
-              choices visible yet (rare, but possible for label that's just
-              show/hide and then nothing). */}
-          {!currentSayEvent && !choicesActive && (
-            <div className="path-sim-stage-empty">
-              <p>This label has no dialogue.</p>
-              <button
-                type="button"
-                className="path-sim-action"
-                onClick={advance}
-              >
-                Skip to options →
-              </button>
-            </div>
-          )}
         </div>
 
         {/* History side drawer — collapsible, doesn't steal space when closed. */}

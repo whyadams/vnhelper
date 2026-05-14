@@ -8,6 +8,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   ScriptCharacter,
   ScriptContent,
@@ -29,6 +30,8 @@ import type { RpyBlocks } from "../../lib/renpy/blocks";
 import { useDialog } from "../ui/Dialog";
 import { SkeletonBlock, SkeletonBox } from "../ui/Skeleton";
 import { LinkedEventsSection } from "../calendar/LinkedEventsSection";
+import { PhotoPicker } from "../photos/PhotoPicker";
+import { getPhoto } from "../../lib/photosDb";
 import { useSubscription } from "../../state/subscription";
 import { usePaywall } from "../subscription/Paywall";
 import {
@@ -103,10 +106,15 @@ interface DocProps {
   onAddCharacter: () => void;
 }
 
-export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
+export function ScriptDoc({ scripts, onAddCharacter: _onAddCharacter }: DocProps) {
+  // `onAddCharacter` is still passed by the parent so the Quick-add Character
+  // modal stays available — we just stopped rendering the bottom cast bar
+  // that used it. Marking it underscored to silence "unused variable" lint
+  // without changing the public contract of ScriptDoc.
   const dialog = useDialog();
   const { limits } = useSubscription();
   const paywall = usePaywall();
+  const { t } = useTranslation();
   const node = scripts.activeNode;
 
   const [titleDraft, setTitleDraft] = useState("");
@@ -122,6 +130,16 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     }
   };
   const [importOpen, setImportOpen] = useState(false);
+  // Photo picker modal + the resolved thumbnail of whatever this node has
+  // bound right now. The thumbUrl is created from the IndexedDB Blob on
+  // mount and revoked when the binding changes / component unmounts, so
+  // we never leak ObjectURLs across scene navigations.
+  const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
+  const [boundPhotoThumb, setBoundPhotoThumb] = useState<{
+    id: string;
+    url: string;
+    name: string;
+  } | null>(null);
   const [rpyImportOpen, setRpyImportOpen] = useState(false);
   // Bumped on every external content replacement (e.g. Import) so the
   // TipTap editor and Table view get fresh `key` and remount with new state.
@@ -169,6 +187,44 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     const i = setInterval(update, 30_000);
     return () => clearInterval(i);
   }, [node?.updated_at, node?.id]);
+
+  // Hydrate the bound-photo thumbnail whenever the node's photo_id
+  // changes. We resolve against the LOCAL IndexedDB gallery; a node
+  // bound to a photo that doesn't exist on this device just shows the
+  // "attach" affordance again, no error.
+  useEffect(() => {
+    const photoId = node?.photo_id ?? null;
+    if (!photoId) {
+      setBoundPhotoThumb((cur) => {
+        if (cur) URL.revokeObjectURL(cur.url);
+        return null;
+      });
+      return;
+    }
+    let cancelled = false;
+    let createdUrl: string | null = null;
+    void (async () => {
+      const stored = await getPhoto(photoId);
+      if (cancelled) return;
+      if (!stored?.thumbnail) {
+        setBoundPhotoThumb((cur) => {
+          if (cur) URL.revokeObjectURL(cur.url);
+          return null;
+        });
+        return;
+      }
+      const url = URL.createObjectURL(stored.thumbnail);
+      createdUrl = url;
+      setBoundPhotoThumb((cur) => {
+        if (cur) URL.revokeObjectURL(cur.url);
+        return { id: stored.id, url, name: stored.name };
+      });
+    })();
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [node?.photo_id]);
 
   const scheduleMetaSave = (nextTitle: string, nextEmoji: string) => {
     if (!node) return;
@@ -334,7 +390,7 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     return (
       <main className="main">
         <div className="topbar notes-topbar">
-          <span className="crumb">Script</span>
+          <span className="crumb">{t("script.crumb")}</span>
         </div>
         <div className="notes-empty-doc">
           <SkeletonBox style={{ width: 320, maxWidth: "60%" }}>
@@ -351,10 +407,10 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     return (
       <main className="main">
         <div className="topbar notes-topbar">
-          <span className="crumb">Script</span>
+          <span className="crumb">{t("script.crumb")}</span>
         </div>
         <div className="notes-empty-doc fade-in">
-          <p>Pick or create a script project from the sidebar.</p>
+          <p>{t("script.pick_or_create")}</p>
         </div>
       </main>
     );
@@ -364,7 +420,7 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     return (
       <main className="main">
         <div className="topbar notes-topbar">
-          <span className="crumb">Script</span>
+          <span className="crumb">{t("script.crumb")}</span>
           <span className="crumb-sep">/</span>
           <span className="crumb is-current">
             {scripts.activeProject?.title ?? ""}
@@ -386,7 +442,7 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     return (
       <main className="main">
         <div className="topbar notes-topbar">
-          <span className="crumb">Script</span>
+          <span className="crumb">{t("script.crumb")}</span>
           <span className="crumb-sep">/</span>
           <span className="crumb is-current">
             {scripts.activeProject?.title ?? "Untitled"}
@@ -468,10 +524,14 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
     void scripts.updateNode(node.id, { location_id: locId });
   };
 
+  const setPhotoId = (id: string | null) => {
+    void scripts.updateNode(node.id, { photo_id: id });
+  };
+
   return (
     <main className="main vn-main">
       <div className="topbar notes-topbar">
-        <span className="crumb">Script</span>
+        <span className="crumb">{t("script.crumb")}</span>
         <span className="crumb-sep">/</span>
         <span className="crumb">{scripts.activeProject?.title}</span>
         <span className="crumb-sep">/</span>
@@ -673,10 +733,46 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
               </SelectContent>
             </Select>
             <span className="vn-meta-sep">·</span>
+            <button
+              type="button"
+              className={
+                "vn-meta-chip vn-meta-photo" +
+                (boundPhotoThumb ? " has-photo" : " vn-meta-empty")
+              }
+              onClick={() => setPhotoPickerOpen(true)}
+              title={
+                boundPhotoThumb
+                  ? `Scene photo: ${boundPhotoThumb.name} — click to change`
+                  : "Attach a photo from the local gallery"
+              }
+            >
+              {boundPhotoThumb ? (
+                <>
+                  <img
+                    src={boundPhotoThumb.url}
+                    alt=""
+                    className="vn-meta-photo-thumb"
+                  />
+                  <span className="vn-meta-photo-name">
+                    {boundPhotoThumb.name}
+                  </span>
+                </>
+              ) : (
+                "— photo —"
+              )}
+            </button>
+            <span className="vn-meta-sep">·</span>
             <span className="vn-meta-stat" title="Words">
               {stats.words} words
             </span>
           </div>
+
+          <PhotoPicker
+            open={photoPickerOpen}
+            currentId={node.photo_id ?? null}
+            onSelect={(id) => setPhotoId(id)}
+            onClose={() => setPhotoPickerOpen(false)}
+          />
 
           {(node.tags.length > 0 || tagDraft) && (
             <div className="vn-meta-tags">
@@ -753,53 +849,6 @@ export function ScriptDoc({ scripts, onAddCharacter }: DocProps) {
             entity_type="script_node"
             entity_id={scripts.activeNodeId}
           />
-
-          <div className="vn-cast-bar">
-            <div className="vn-cast-bar-list">
-              {scripts.characters.length === 0 ? (
-                <span className="vn-cast-bar-empty">
-                  No characters yet — add one and their name will start
-                  highlighting in the script automatically.
-                </span>
-              ) : (
-                scripts.characters.map((c) => (
-                  <span
-                    key={c.id}
-                    className="vn-cast-bar-chip"
-                    title={
-                      c.aliases.length > 0
-                        ? `Aliases: ${c.aliases.join(", ")}`
-                        : c.name
-                    }
-                  >
-                    {c.avatar_url ? (
-                      <img
-                        src={c.avatar_url}
-                        alt=""
-                        className="vn-cast-bar-av-img"
-                      />
-                    ) : (
-                      <span
-                        className="vn-cast-bar-av"
-                        style={{ background: c.color }}
-                      >
-                        {(c.short_name ?? c.name).slice(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="vn-cast-bar-chip-name">{c.name}</span>
-                  </span>
-                ))
-              )}
-            </div>
-            <button
-              type="button"
-              className="vn-cast-bar-add"
-              onClick={onAddCharacter}
-            >
-              <span className="vn-cast-bar-add-plus">+</span>
-              Add character
-            </button>
-          </div>
         </div>
       </div>
 

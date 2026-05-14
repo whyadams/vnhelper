@@ -70,7 +70,7 @@ export function UpdatesSection() {
       <div className="set-row">
         <div className="set-row-label">
           <div className="set-row-title">Текущая версия</div>
-          <div className="set-row-desc">VnHelper {version || "…"}</div>
+          <div className="set-row-desc">RenHub {version || "…"}</div>
         </div>
         <div className="set-row-control">
           <button

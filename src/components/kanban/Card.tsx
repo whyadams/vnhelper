@@ -1,4 +1,5 @@
 import { useState, type DragEvent, type MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { CardData, CardPriority } from "../../data/kanban";
 import { useKanban } from "../../state/kanbanStore";
 import {
@@ -20,16 +21,17 @@ function assigneeInitials(name: string | null, email: string | null): string {
   return src.slice(0, 2).toUpperCase();
 }
 
-const priorityLabel: Record<CardPriority, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  urgent: "Urgent",
+const priorityKey: Record<CardPriority, string> = {
+  low: "kanban.priority.low",
+  medium: "kanban.priority.medium",
+  high: "kanban.priority.high",
+  urgent: "kanban.priority.urgent",
 };
 
 export function Card({ data }: { data: CardData }) {
   const { state, dispatch } = useKanban();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const { title, description, tags, meta, assignees, date, priority } = data;
   const focused = state.focusedId === data.id;
 
@@ -63,7 +65,7 @@ export function Card({ data }: { data: CardData }) {
       <div className="card-top-row">
         {priority && (
           <span className={"priority-chip pri-" + priority}>
-            {priorityLabel[priority]}
+            {t(priorityKey[priority])}
           </span>
         )}
         {tags.slice(0, 2).map((t) => (
@@ -80,7 +82,7 @@ export function Card({ data }: { data: CardData }) {
             <button
               className="card-more"
               type="button"
-              aria-label="More"
+              aria-label={t("kanban.more")}
               onClick={(e) => e.stopPropagation()}
             >
               <MoreHIcon />
@@ -94,7 +96,7 @@ export function Card({ data }: { data: CardData }) {
             <DropdownMenuItem
               onSelect={() => dispatch({ type: "FOCUS_CARD", id: data.id })}
             >
-              Open
+              {t("common.edit")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -102,16 +104,16 @@ export function Card({ data }: { data: CardData }) {
               onSelect={() => {
                 void (async () => {
                   const ok = await dialog.confirm({
-                    title: "Delete card",
-                    message: `Delete "${data.title}"? This cannot be undone.`,
+                    title: t("kanban.delete_card_title"),
+                    message: t("card_panel.delete_card_confirm"),
                     variant: "danger",
-                    confirmLabel: "Delete",
+                    confirmLabel: t("common.delete"),
                   });
                   if (ok) dispatch({ type: "DELETE_CARD", id: data.id });
                 })();
               }}
             >
-              Delete
+              {t("common.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

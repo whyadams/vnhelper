@@ -28,6 +28,7 @@ export const LabelNode = memo(function LabelNode({ data, selected }: Props) {
     !data.isEntry && data.isEnding ? "is-ending" : "",
     data.brokenOutboundCount > 0 ? "has-broken-out" : "",
     data.choiceTexts.length > 0 ? "has-choices" : "",
+    data.isSubroutine ? "is-subroutine" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -50,6 +51,13 @@ export const LabelNode = memo(function LabelNode({ data, selected }: Props) {
       : "";
   const povNote = data.povName ? `\nPOV: ${data.povName}` : "";
   const wordNote = data.wordCount > 0 ? `\n${data.wordCount} words` : "";
+  const subroutineNote = data.isSubroutine
+    ? `\nSubroutine — ends with \`return\`${
+        data.callers.length > 0
+          ? ` (called from ${data.callers.length}: ${data.callers.slice(0, 3).join(", ")}${data.callers.length > 3 ? "…" : ""})`
+          : " (no callers yet)"
+      }`
+    : "";
 
   // POV-character colour is fed in as a CSS custom property so the stylesheet
   // can paint the left border + the small avatar dot from one source of
@@ -64,7 +72,7 @@ export const LabelNode = memo(function LabelNode({ data, selected }: Props) {
       className={cls + (data.povColor ? " has-pov" : "")}
       data-status={data.status}
       style={style}
-      title={`Scene: ${data.sceneTitle}${data.chapter ? `\nChapter: ${data.chapter}` : ""}${povNote}${wordNote}${reachabilityNote}${endingNote}${data.brokenOutboundCount > 0 ? `\n${data.brokenOutboundCount} broken outbound ref(s)` : ""}${choicesTooltip}`}
+      title={`Scene: ${data.sceneTitle}${data.chapter ? `\nChapter: ${data.chapter}` : ""}${povNote}${wordNote}${reachabilityNote}${endingNote}${subroutineNote}${data.brokenOutboundCount > 0 ? `\n${data.brokenOutboundCount} broken outbound ref(s)` : ""}${choicesTooltip}`}
     >
       <Handle
         type="target"
@@ -99,6 +107,19 @@ export const LabelNode = memo(function LabelNode({ data, selected }: Props) {
             title="Choice node — branches via menu"
           >
             <ForkGlyph />
+          </span>
+        )}
+        {data.isSubroutine && (
+          <span
+            className="graph-node-subroutine"
+            aria-hidden
+            title={
+              data.callers.length > 0
+                ? `Subroutine — called from ${data.callers.length} label(s)`
+                : "Subroutine — ends with `return` (no callers yet)"
+            }
+          >
+            <SubroutineGlyph />
           </span>
         )}
         {/* Status dot — small coloured circle in the upper-right corner.
@@ -166,6 +187,27 @@ function ForkGlyph() {
       <path d="M3 2v3a2 2 0 0 0 2 2h4" />
       <path d="M3 5v5" />
       <path d="M9 4l2 3-2 3" />
+    </svg>
+  );
+}
+
+function SubroutineGlyph() {
+  // Inline subroutine glyph (12×12): a hooked return arrow. Reads as "this
+  // label is callable AND comes back" — pairs with the dashed left rail
+  // applied in graph.css when `.is-subroutine` is set.
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 3h-5a3 3 0 0 0 0 6h2" />
+      <path d="M4 7l-2 2 2 2" />
     </svg>
   );
 }

@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useSubscription } from "../../state/subscription";
 
 /**
@@ -132,8 +133,12 @@ interface ModalProps {
 }
 
 function PaywallModal({ feature, onClose }: ModalProps) {
-  const { tier, isTrial, trialDaysLeft, trialEndsAt } = useSubscription();
+  const { tier, isTrial, trialDaysLeft } = useSubscription();
+  const { t, i18n } = useTranslation();
   if (!feature) return null;
+  // Feature-specific COPY is still in English — translating ~10 long marketing
+  // strings × 5 languages is queued for a follow-up. The chrome around it is
+  // already localised so the modal at minimum doesn't look mixed.
   const copy = COPY[feature];
 
   return (
@@ -152,7 +157,7 @@ function PaywallModal({ feature, onClose }: ModalProps) {
             type="button"
             className="vn-drawer-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("paywall.close")}
           >
             ×
           </button>
@@ -161,32 +166,32 @@ function PaywallModal({ feature, onClose }: ModalProps) {
         <div className="vn-modal-body paywall-body">
           {isTrial && trialDaysLeft !== null && (
             <div className="paywall-trial-badge">
-              You're on the free trial — {trialDaysLeft}{" "}
-              day{trialDaysLeft === 1 ? "" : "s"} left
-              {trialEndsAt && ` (until ${trialEndsAt.toLocaleDateString()})`}.
-              Pro features are unlocked until then.
+              {t("paywall.trial_days", {
+                count: trialDaysLeft,
+                lng: i18n.language,
+              })}
             </div>
           )}
           {!isTrial && tier === "free" && (
             <div className="paywall-trial-badge paywall-trial-ended">
-              Your trial has ended. Upgrade to keep Pro features.
+              {t("paywall.trial_ended")}
             </div>
           )}
 
           <p className="paywall-copy">{copy.body}</p>
 
           <ul className="paywall-features">
-            <li>Unlimited workspaces & script projects</li>
-            <li>Collaborator invites with role management</li>
-            <li>Story Graph view (labels, jumps, choices)</li>
-            <li>Ren'Py project export</li>
-            <li>Priority support</li>
+            <li>{t("paywall.feat_unlimited")}</li>
+            <li>{t("paywall.feat_invites")}</li>
+            <li>{t("paywall.feat_graph")}</li>
+            <li>{t("paywall.feat_export")}</li>
+            <li>{t("paywall.feat_support")}</li>
           </ul>
         </div>
 
         <div className="vn-modal-foot">
           <button type="button" className="hbtn" onClick={onClose}>
-            Maybe later
+            {t("paywall.cta_later")}
           </button>
           <button
             type="button"
@@ -194,12 +199,10 @@ function PaywallModal({ feature, onClose }: ModalProps) {
             onClick={() => {
               // Billing integration not wired yet — surface intent without
               // navigating to a broken URL.
-              alert(
-                "Billing isn't connected yet. Drop a note to the maintainer and you'll be upgraded manually.",
-              );
+              alert(t("paywall.billing_not_wired"));
             }}
           >
-            Upgrade to Pro
+            {t("paywall.title")}
           </button>
         </div>
       </div>

@@ -870,6 +870,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["script_node_kind"]
           location_id: string | null
           parent_id: string | null
+          photo_id: string | null
           pinned: boolean
           position: number
           pov: string | null
@@ -894,6 +895,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["script_node_kind"]
           location_id?: string | null
           parent_id?: string | null
+          photo_id?: string | null
           pinned?: boolean
           position?: number
           pov?: string | null
@@ -918,6 +920,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["script_node_kind"]
           location_id?: string | null
           parent_id?: string | null
+          photo_id?: string | null
           pinned?: boolean
           position?: number
           pov?: string | null

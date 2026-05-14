@@ -4,6 +4,8 @@ import {
   enable as enableAutostart,
   isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LANGUAGES } from "../../../i18n";
 import { SectionHead } from "./shared";
 
 const isTauri = (): boolean =>
@@ -15,14 +17,19 @@ const isTauri = (): boolean =>
  *     (writes to HKCU\Software\Microsoft\Windows\CurrentVersion\Run on
  *     Windows; LaunchAgent on macOS; .desktop file on Linux).
  *
- * Pairs with the Notifications section: with autostart on, VnHelper sits
+ * Pairs with the Notifications section: with autostart on, RenHub sits
  * in the tray and event-day notifications can fire even when the user
  * hasn't manually opened the app.
  */
 export function GeneralSection() {
+  const { t, i18n } = useTranslation();
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const currentLang =
+    SUPPORTED_LANGUAGES.find((l) => l.code === i18n.resolvedLanguage)?.code ??
+    "en";
 
   useEffect(() => {
     if (!isTauri()) {
@@ -60,24 +67,20 @@ export function GeneralSection() {
   return (
     <>
       <SectionHead
-        title="General"
-        subtitle="Базовые настройки приложения."
+        title={t("settings.section.general")}
       />
 
       <div className="set-card">
         <div className="set-card-row">
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="set-row-title">Запускать вместе с Windows</div>
+            <div className="set-row-title">{t("settings.general.autostart_title")}</div>
             <div className="set-row-desc" style={{ marginTop: 4 }}>
-              VnHelper будет автоматически открываться при входе в систему
-              и тихо висеть в трее. Нужно, чтобы уведомления о событиях
-              календаря приходили вовремя, даже если ты не запускал
-              приложение вручную.
+              {t("settings.general.autostart_hint")}
             </div>
           </div>
           {!isTauri() ? (
             <div className="set-row-desc" style={{ minWidth: 0 }}>
-              Доступно только в desktop-сборке.
+              {t("settings.general.autostart_unavailable")}
             </div>
           ) : (
             <button
@@ -88,7 +91,7 @@ export function GeneralSection() {
               onClick={() => void toggle()}
               disabled={busy || autostart === null}
               aria-pressed={!!autostart}
-              aria-label="Toggle autostart"
+              aria-label={t("settings.general.autostart_title")}
             >
               <span className="set-toggle-thumb" />
             </button>
@@ -97,9 +100,29 @@ export function GeneralSection() {
         {error && <div className="set-error">{error}</div>}
       </div>
 
-      <div className="set-empty" style={{ marginTop: 16 }}>
-        Тема и язык интерфейса пока зашиты по умолчанию (тёмная,
-        русско-английский UI). Переключатели появятся в следующих версиях.
+      <div className="set-card" style={{ marginTop: 16 }}>
+        <div className="set-card-row">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="set-row-title">
+              {t("settings.general.language_title")}
+            </div>
+            <div className="set-row-desc" style={{ marginTop: 4 }}>
+              {t("settings.general.language_hint")}
+            </div>
+          </div>
+          <select
+            className="set-select"
+            value={currentLang}
+            onChange={(e) => void i18n.changeLanguage(e.target.value)}
+            aria-label={t("settings.general.language_title")}
+          >
+            {SUPPORTED_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.nativeLabel}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </>
   );

@@ -6,7 +6,7 @@ const isTauri = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export function AboutSection() {
-  const [name, setName] = useState("VnHelper");
+  const [name, setName] = useState("RenHub");
   const [version, setVersion] = useState("");
   const [tauriVersion, setTauriVersion] = useState("");
 
@@ -17,7 +17,7 @@ export function AboutSection() {
       return;
     }
     void Promise.all([
-      getName().catch(() => "VnHelper"),
+      getName().catch(() => "RenHub"),
       getVersion().catch(() => "?"),
       getTauriVersion().catch(() => "?"),
     ]).then(([n, v, t]) => {

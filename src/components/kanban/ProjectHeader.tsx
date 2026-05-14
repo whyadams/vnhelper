@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { EllipsisHorizontalIcon as MoreHorizontal } from "@heroicons/react/24/solid";
+import { useTranslation } from "react-i18next";
 import type { TagColor } from "../../data/kanban";
 import { useKanban, type SortMode } from "../../state/kanbanStore";
 import { FilterIcon, SortIcon } from "./Icon";
@@ -13,6 +14,8 @@ import {
 } from "../ui/dropdown-menu";
 import { useDialog } from "../ui/Dialog";
 
+// Tag colour swatch labels are project-specific user data, not UI chrome —
+// leave them in English. Sort/tabs are chrome and are translated below.
 const tagOptions: { color: TagColor; label: string }[] = [
   { color: "pink", label: "Branding" },
   { color: "green", label: "Marketing" },
@@ -23,24 +26,25 @@ const tagOptions: { color: TagColor; label: string }[] = [
   { color: "teal", label: "Web" },
 ];
 
-const sortOptions: { value: SortMode; label: string }[] = [
-  { value: "default", label: "Default order" },
-  { value: "date-desc", label: "Date — newest first" },
-  { value: "date-asc", label: "Date — oldest first" },
-  { value: "title-asc", label: "Title (A → Z)" },
+const sortOptions: { value: SortMode; labelKey: string }[] = [
+  { value: "default", labelKey: "kanban.sort_default" },
+  { value: "date-desc", labelKey: "kanban.sort_date_desc" },
+  { value: "date-asc", labelKey: "kanban.sort_date_asc" },
+  { value: "title-asc", labelKey: "kanban.sort_title_asc" },
 ];
 
-const subTabs: { key: string; label: string; available: boolean }[] = [
-  { key: "overview", label: "Overview", available: false },
-  { key: "list", label: "List", available: false },
-  { key: "board", label: "Board", available: true },
-  { key: "timeline", label: "Timeline", available: false },
+const subTabs: { key: string; labelKey: string; available: boolean }[] = [
+  { key: "overview", labelKey: "kanban.view_overview", available: false },
+  { key: "list", labelKey: "kanban.view_list", available: false },
+  { key: "board", labelKey: "kanban.view_board", available: true },
+  { key: "timeline", labelKey: "kanban.view_timeline", available: false },
 ];
 
 export function ProjectHeader() {
   const { state, dispatch, renameBoard, clearBoardCards, resetBoardColumns } =
     useKanban();
   const dialog = useDialog();
+  const { t } = useTranslation();
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(state.boardName);
@@ -61,7 +65,8 @@ export function ProjectHeader() {
   };
 
   const filterCount = state.filterTags.length;
-  const sortLabel = sortOptions.find((o) => o.value === state.sort)?.label;
+  const sortLabel = sortOptions.find((o) => o.value === state.sort)?.labelKey;
+  const sortLabelText = sortLabel ? t(sortLabel) : "";
 
   const totalCards = state.columns.reduce(
     (sum, c) => sum + c.cards.length,
@@ -90,13 +95,13 @@ export function ProjectHeader() {
           ) : (
             <h1
               onDoubleClick={() => setEditingTitle(true)}
-              title="Double-click to rename board"
+              title={t("kanban.double_click_to_rename_board")}
             >
-              {state.boardName || "Board"}
+              {state.boardName || t("kanban.board_default")}
             </h1>
           )}
           <span className="header-card-count">
-            {totalCards} {totalCards === 1 ? "card" : "cards"}
+            {t("kanban.task_count", { count: totalCards })}
           </span>
         </div>
 
@@ -108,14 +113,14 @@ export function ProjectHeader() {
                 type="button"
               >
                 <FilterIcon className="ico" />
-                <span>Filter</span>
+                <span>{t("kanban.filter")}</span>
                 {filterCount > 0 && (
                   <span className="hbtn-count">{filterCount}</span>
                 )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-64">
-              <DropdownMenuLabel>Filter by tag</DropdownMenuLabel>
+              <DropdownMenuLabel>{t("kanban.filter_by_tag")}</DropdownMenuLabel>
               <div className="flex flex-wrap gap-1.5 px-2 pb-2">
                 {tagOptions.map((t) => {
                   const active = state.filterTags.includes(t.color);
@@ -137,7 +142,7 @@ export function ProjectHeader() {
               <DropdownMenuItem
                 onSelect={() => dispatch({ type: "CLEAR_FILTERS" })}
               >
-                Clear all
+                {t("common.cancel")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -151,21 +156,21 @@ export function ProjectHeader() {
                 type="button"
               >
                 <SortIcon className="ico" />
-                <span>Sort</span>
+                <span>{t("kanban.sort")}</span>
                 {state.sort !== "default" && (
-                  <span className="hbtn-count">{sortLabel?.split(" ")[0]}</span>
+                  <span className="hbtn-count">{sortLabelText.split(" ")[0]}</span>
                 )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-56">
-              <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+              <DropdownMenuLabel>{t("kanban.sort_by")}</DropdownMenuLabel>
               {sortOptions.map((o) => (
                 <DropdownMenuItem
                   key={o.value}
                   data-active={state.sort === o.value || undefined}
                   onSelect={() => dispatch({ type: "SET_SORT", sort: o.value })}
                 >
-                  {o.label}
+                  {t(o.labelKey)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -177,50 +182,49 @@ export function ProjectHeader() {
                 <button
                   type="button"
                   className="hbtn hbtn-icon"
-                  aria-label="Project settings"
-                  title="Project settings"
+                  aria-label={t("kanban.project_settings")}
+                  title={t("kanban.project_settings")}
                 >
                   <MoreHorizontal className="size-4" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-56">
-                <DropdownMenuLabel>Board</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("kanban.view_board")}</DropdownMenuLabel>
                 <DropdownMenuItem onSelect={() => setEditingTitle(true)}>
-                  Rename board
+                  {t("common.rename")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
                     void (async () => {
                       const ok = await dialog.confirm({
-                        title: "Clear all cards",
-                        message: `Delete every card on "${state.boardName}"? Columns are kept. This cannot be undone.`,
+                        title: t("kanban.clear_all_cards"),
+                        message: t("kanban.clear_cards_message", { board: state.boardName }),
                         variant: "danger",
-                        confirmLabel: "Clear cards",
+                        confirmLabel: t("kanban.clear_cards_confirm"),
                       });
                       if (ok) await clearBoardCards();
                     })();
                   }}
                 >
-                  Clear all cards
+                  {t("kanban.clear_all_cards")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel>Columns</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("kanban.columns_heading")}</DropdownMenuLabel>
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={() => {
                     void (async () => {
                       const ok = await dialog.confirm({
-                        title: "Reset columns to defaults",
-                        message:
-                          "Delete every existing column (and its cards) and recreate the four defaults: To do, In progress, Review, Done. This cannot be undone.",
+                        title: t("kanban.reset_columns"),
+                        message: t("kanban.reset_columns_message"),
                         variant: "danger",
-                        confirmLabel: "Reset columns",
+                        confirmLabel: t("kanban.reset_columns_confirm"),
                       });
                       if (ok) await resetBoardColumns();
                     })();
                   }}
                 >
-                  Reset columns to defaults
+                  {t("kanban.reset_columns")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -229,19 +233,19 @@ export function ProjectHeader() {
       </div>
 
       <div className="header-tabs">
-        {subTabs.map((t) => (
+        {subTabs.map((tab) => (
           <button
-            key={t.key}
+            key={tab.key}
             type="button"
             className={
               "header-tab" +
-              (t.key === "board" ? " is-active" : "") +
-              (!t.available ? " is-disabled" : "")
+              (tab.key === "board" ? " is-active" : "") +
+              (!tab.available ? " is-disabled" : "")
             }
-            disabled={!t.available}
-            title={!t.available ? "Coming soon" : undefined}
+            disabled={!tab.available}
+            title={!tab.available ? t("kanban.coming_soon") : undefined}
           >
-            {t.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>

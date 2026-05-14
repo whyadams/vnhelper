@@ -387,13 +387,22 @@
   opacity: 1;
   pointer-events: auto;
 }
+/* Reserve horizontal space when the action group is revealed so the
+   filename truncates with ellipsis *before* it slides under the icons. */
+.tr-row-wrap:hover .tr-row-text,
+.tr-row-wrap:focus-within .tr-row-text {
+  padding-right: 72px;
+}
 .tr-row-actions .tr-icon-btn {
   width: 20px;
   height: 20px;
-  color: rgba(200, 199, 202, 0.5);
+  color: rgba(200, 199, 202, 0.28);
 }
 .tr-row-actions .tr-icon-btn:hover {
-  background: transparent;
+  background: rgba(200, 199, 202, 0.08);
+  color: var(--text-1);
+}
+.tr-row-actions .tr-icon-btn.is-delete:hover {
   color: var(--status-danger);
 }
 
