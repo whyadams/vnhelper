@@ -6,6 +6,13 @@ import {
 } from "@tauri-apps/plugin-autostart";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "../../../i18n";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../ui/select";
 import { SectionHead } from "./shared";
 
 const isTauri = (): boolean =>
@@ -110,18 +117,25 @@ export function GeneralSection() {
               {t("settings.general.language_hint")}
             </div>
           </div>
-          <select
-            className="set-select"
+          <Select
             value={currentLang}
-            onChange={(e) => void i18n.changeLanguage(e.target.value)}
-            aria-label={t("settings.general.language_title")}
+            onValueChange={(v) => void i18n.changeLanguage(v)}
           >
-            {SUPPORTED_LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.nativeLabel}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              size="sm"
+              className="min-w-[150px]"
+              aria-label={t("settings.general.language_title")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="z-[300]">
+              {SUPPORTED_LANGUAGES.map((l) => (
+                <SelectItem key={l.code} value={l.code}>
+                  {l.nativeLabel}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </>

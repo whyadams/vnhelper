@@ -485,40 +485,6 @@
 }
 
 /* ---------- Native select control (language picker, etc.) ---------- */
-.set-select {
-  height: 32px;
-  padding: 0 30px 0 12px;
-  background: rgba(200, 199, 202, 0.05);
-  border: 1px solid rgba(200, 199, 202, 0.18);
-  border-radius: 8px;
-  color: #c8c7ca;
-  font-family: Montserrat, sans-serif;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  appearance: none;
-  background-image: linear-gradient(
-      45deg,
-      transparent 50%,
-      rgba(200, 199, 202, 0.5) 50%
-    ),
-    linear-gradient(135deg, rgba(200, 199, 202, 0.5) 50%, transparent 50%);
-  background-position:
-    calc(100% - 14px) 50%,
-    calc(100% - 9px) 50%;
-  background-size:
-    5px 5px,
-    5px 5px;
-  background-repeat: no-repeat;
-}
-.set-select:hover {
-  border-color: rgba(200, 199, 202, 0.32);
-}
-.set-select:focus {
-  outline: none;
-  border-color: rgba(200, 199, 202, 0.4);
-}
-
 /* ---------- Switch toggle (autostart, notifications enable, …) ---------- */
 .set-toggle {
   position: relative;

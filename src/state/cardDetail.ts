@@ -293,6 +293,10 @@ export function useCardDetail(cardId: string | null, boardId: string | null) {
   const renameSubtask = useCallback(async (id: string, label: string) => {
     const trimmed = label.trim();
     if (!trimmed) return;
+    // Optimistic
+    setSubtasks((list) =>
+      list.map((s) => (s.id === id ? { ...s, label: trimmed } : s)),
+    );
     const { error } = await supabase
       .from("card_subtasks")
       .update({ label: trimmed })

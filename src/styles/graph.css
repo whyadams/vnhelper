@@ -59,30 +59,156 @@
   min-height: 0;
 }
 
-/* Canvas-anchored toolbar — replaces the old floating stats + search
-   overlays. Sits flush under the main topbar so the canvas underneath
-   stays uncluttered. */
-.graph-canvas-toolbar {
+/* Flush canvas-toolbar — sits below GraphScreen's breadcrumb topbar,
+   mirrors Calendar's `tmt-bar` chrome (height 60, flex row, hairline
+   border-bottom, same diagonal-pinstripe bg). All graph-specific
+   chrome lives here so the canvas stays clean. */
+.graph-canvas-bar {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-canvas);
-  min-height: 44px;
+  gap: 12px;
+  height: 60px;
+  padding: 0 28px;
+  border-bottom: 1px solid rgba(200, 199, 202, 0.05);
+  background-color: var(--bg-canvas);
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.005) 0px,
+    rgba(255, 255, 255, 0.005) 10px,
+    transparent 10px,
+    transparent 20px
+  );
 }
-.graph-canvas-toolbar-actions {
-  margin-left: auto;
-  display: flex;
+
+/* Inline meta — `35 labels · 41 edges · 1 ending`. Numbers in text-1,
+   labels in muted text-3, separators in text-4. Mirrors Tasks' tmt-meta
+   pattern but with multiple metrics. */
+.graph-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: Montserrat, sans-serif;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.graph-meta-num {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.graph-meta-num.is-danger {
+  color: var(--status-danger);
+}
+.graph-meta-num.is-warn {
+  color: var(--status-warn);
+}
+.graph-meta-lbl {
+  color: rgba(200, 199, 202, 0.5);
+  font-weight: 500;
+  margin-right: 2px;
+}
+.graph-meta-sep {
+  color: rgba(200, 199, 202, 0.25);
+  margin: 0 2px;
+}
+
+/* Auto-match toast — short-lived status message. */
+.graph-automatch-toast {
+  font: 500 11px/1 Montserrat, sans-serif;
+  color: var(--status-ok);
+  margin-left: 4px;
+}
+
+/* Topbar ghost button — Reset / Simulate. Quiet by default, slight
+   surround on hover. `.is-primary` is the Simulate variant: thin
+   border + light icon, no accent fill (Figma/Miro-style restraint). */
+.graph-ghost-btn {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: transparent;
+  border: 1px solid rgba(200, 199, 202, 0.08);
+  border-radius: 8px;
+  color: rgba(200, 199, 202, 0.7);
+  font: 500 12px/1 Montserrat, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-.graph-canvas-toolbar-sep {
+.graph-ghost-btn:hover {
+  background: rgba(200, 199, 202, 0.05);
+  color: var(--text-1);
+  border-color: rgba(200, 199, 202, 0.18);
+}
+.graph-ghost-btn.is-primary {
+  color: var(--text-1);
+  border-color: rgba(200, 199, 202, 0.18);
+  background: rgba(200, 199, 202, 0.04);
+}
+.graph-ghost-btn.is-primary:hover {
+  background: rgba(200, 199, 202, 0.09);
+  border-color: rgba(200, 199, 202, 0.26);
+}
+
+/* ============================================================
+   Bottom-center floating tool palette — Figma / Miro pattern.
+   Sits inside `.graph-canvas-stage`, centered along its bottom
+   edge. Same surface tokens as minimap / controls dock so all
+   floating chrome reads as one family.
+   ============================================================ */
+.graph-bottom-toolbar {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(28, 29, 31, 0.92);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  z-index: 5;
+}
+.graph-bt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: rgba(200, 199, 202, 0.65);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.graph-bt-btn:hover {
+  background: rgba(200, 199, 202, 0.08);
+  color: var(--text-1);
+}
+.graph-bt-btn.is-active {
+  background: var(--status-info);
+  color: #fff;
+}
+.graph-bt-btn.is-active:hover {
+  background: var(--status-info);
+  color: #fff;
+}
+.graph-bt-icon {
+  width: 18px;
+  height: 18px;
+}
+.graph-bt-divider {
   width: 1px;
-  height: 20px;
-  background: var(--border);
+  height: 22px;
   margin: 0 4px;
+  background: rgba(200, 199, 202, 0.1);
 }
 
 .graph-loading,
@@ -538,14 +664,10 @@
   backdrop-filter: blur(10px);
 }
 
-.graph-stats {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--text-2);
-  font-family: Montserrat, sans-serif;
-}
+/* The legacy floating top-left `.graph-stats` pill (and its
+   `.graph-stat-mini-btn` / `.graph-stat-divider` helpers) was retired
+   in the v0.4 chrome refresh. Stats now live inline in the flush
+   `.graph-canvas-bar` row — see `.graph-meta` above. */
 .graph-stats span {
   white-space: nowrap;
 }
@@ -1087,7 +1209,9 @@
 
 .graph-filter-bar {
   position: absolute;
-  bottom: 14px;
+  /* Anchored top-center, just below the 60 px `.graph-canvas-bar`
+     header (stats + Reset/Simulate) with breathing room. */
+  top: 22px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -1096,8 +1220,6 @@
   padding: 4px 6px;
   font-family: Montserrat, sans-serif;
   z-index: 4;
-  /* Sits above xyflow's Controls/MiniMap by default, but stops short of
-     the right edge so it doesn't collide with the search palette button. */
   max-width: calc(100% - 360px);
   overflow-x: auto;
   scrollbar-width: none;

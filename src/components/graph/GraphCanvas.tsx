@@ -39,6 +39,7 @@ import {
 } from "./graphEdit";
 import { StickyNoteNode, type StickyNoteDatum } from "./StickyNoteNode";
 import { GroupRectangleNode, type GroupDatum } from "./GroupRectangleNode";
+import { GraphBottomToolbar } from "./GraphBottomToolbar";
 
 type CreateNodeOpts = {
   parentId?: string | null;
@@ -119,14 +120,6 @@ interface GroupRow {
   name: string;
   color: string;
   label_names: string[];
-}
-
-// Show ⌘ on macOS, Ctrl elsewhere — keeps the hotkey hint accurate to what
-// the user actually has to press. `navigator.platform` is deprecated but
-// still the most reliable signal across Tauri's WebView2 surface.
-function isMac(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Mac|iPhone|iPad/i.test(navigator.platform);
 }
 
 export function GraphCanvas(props: Props) {
@@ -706,45 +699,12 @@ function GraphCanvasInner({
   }, [toolMode]);
 
   // -- Sticky-note CRUD --------------------------------------------------
-  // Inserts an empty note at the current viewport centre — close to the
-  // user's attention without needing to click on a specific spot. The
-  // insert is optimistic: realtime will replay our own row but the merge
-  // is idempotent so duplicates don't accumulate.
-  const onAddNote = useCallback(() => {
-    const wrap = wrapRef.current;
-    if (!wrap) return;
-    const rect = wrap.getBoundingClientRect();
-    const vp = getViewport();
-    // Convert screen-centre to flow-coords using the current viewport's
-    // pan + zoom. xyflow has `screenToFlowPosition` for this but we'd
-    // need the canvas ref; the inline math below is the same formula.
-    const cx = (rect.width / 2 - vp.x) / vp.zoom;
-    const cy = (rect.height / 2 - vp.y) / vp.zoom;
-    void supabase
-      .from("graph_annotations")
-      .insert({
-        project_id: projectId,
-        workspace_id: workspaceId,
-        x: cx - 100,
-        y: cy - 40,
-        text: "",
-        color: "yellow",
-      })
-      .select()
-      .single()
-      .then(({ data, error: err }) => {
-        if (err) {
-          console.error("graph_annotations insert", err);
-          return;
-        }
-        if (data) {
-          setAnnotations((curr) => {
-            if (curr.some((a) => a.id === data.id)) return curr;
-            return [...curr, data as AnnotationRow];
-          });
-        }
-      });
-  }, [getViewport, projectId, workspaceId]);
+  // The legacy "+ Note" button in the v0.3 top strip created a note at
+  // viewport centre via an `onAddNote` callback. The v0.4 top toolbar
+  // replaced it with the "Add note" tool mode (click anywhere on canvas
+  // to drop) — see `addNoteAt(coords)` paths below. The viewport-centre
+  // insert can be reconstructed from `getViewport()` + a canvas insert
+  // when a future keyboard shortcut needs it.
 
   const onNoteTextChange = useCallback((id: string, text: string) => {
     setAnnotations((curr) =>
@@ -1927,117 +1887,86 @@ function GraphCanvasInner({
       // the OS menu through over minimap / controls / edges.
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="graph-canvas-toolbar">
-        <div className="graph-stats">
-          <span>{t("graph.stats.labels", { count: built.stats.labelCount })}</span>
-          <span>{t("graph.stats.edges", { count: built.stats.edgeCount })}</span>
-          {built.stats.conditionalEdgeCount > 0 && (
-            <span>{t("graph.stats.conditional", { count: built.stats.conditionalEdgeCount })}</span>
+      {/* Minimal canvas-topbar — Figma/Miro pattern. Stats inline on the
+          left, Simulate (and Reset, when a saved layout exists) as quiet
+          ghost buttons on the right. The actual tool palette lives as a
+          floating capsule at the bottom of the canvas — see
+          `GraphBottomToolbar`. Search opens via ⌘K or its icon down there. */}
+      <div className="graph-canvas-bar">
+        <div className="graph-meta">
+          <span className="graph-meta-num">{built.stats.labelCount}</span>
+          <span className="graph-meta-lbl">labels</span>
+          <span className="graph-meta-sep" aria-hidden>·</span>
+          <span className="graph-meta-num">{built.stats.edgeCount}</span>
+          <span className="graph-meta-lbl">edges</span>
+          {built.stats.endingCount > 0 && (
+            <>
+              <span className="graph-meta-sep" aria-hidden>·</span>
+              <span className="graph-meta-num">{built.stats.endingCount}</span>
+              <span className="graph-meta-lbl">ending</span>
+            </>
           )}
           {built.stats.brokenEdgeCount > 0 && (
-            <span className="graph-stat-danger">
-              {t("graph.stats.broken", { count: built.stats.brokenEdgeCount })}
-            </span>
+            <>
+              <span className="graph-meta-sep" aria-hidden>·</span>
+              <span className="graph-meta-num is-danger">
+                {built.stats.brokenEdgeCount}
+              </span>
+              <span className="graph-meta-lbl">broken</span>
+            </>
           )}
           {built.stats.orphanCount > 0 && (
-            <span className="graph-stat-warn">
-              {t("graph.stats.orphan", { count: built.stats.orphanCount })}
-            </span>
-          )}
-          {built.stats.unreachableCount > built.stats.orphanCount && (
-            <span className="graph-stat-warn">
-              {t("graph.stats.unreachable", { count: built.stats.unreachableCount })}
-            </span>
-          )}
-          {built.stats.endingCount > 0 && (
-            <span className="graph-stat-info">
-              {t("graph.stats.ending", { count: built.stats.endingCount })}
-            </span>
+            <>
+              <span className="graph-meta-sep" aria-hidden>·</span>
+              <span className="graph-meta-num is-warn">
+                {built.stats.orphanCount}
+              </span>
+              <span className="graph-meta-lbl">orphan</span>
+            </>
           )}
         </div>
-        <div className="graph-canvas-toolbar-actions">
+
+        {autoMatchToast && (
+          <span
+            className="graph-automatch-toast"
+            role="status"
+            aria-live="polite"
+          >
+            {autoMatchToast}
+          </span>
+        )}
+
+        <span className="tmt-spacer" />
+
+        {savedLayouts.size > 0 && (
           <button
             type="button"
-            className={
-              "graph-stat-coverage-btn" + (coverageOpen ? " is-open" : "")
-            }
-            onClick={() => setCoverageOpen((v) => !v)}
-            title="Path coverage: reachable labels, reachable endings, path lengths"
-            aria-expanded={coverageOpen}
+            className="graph-ghost-btn"
+            onClick={() => void onResetLayout()}
           >
-            {t("graph.coverage")}
+            {t("graph.reset_layout")}
           </button>
-          <button
-            type="button"
-            className="graph-stat-sim-btn"
-            onClick={() => {
-              const sel = nodes.find((n) => n.selected);
-              const start = sel ? sel.id : null;
-              // Try to open the standalone fullscreen Tauri window
-              // first; if that fails (running outside Tauri, e.g. dev
-              // in a regular browser), fall back to the in-app overlay
-              // so the simulator is still usable.
-              void (async () => {
-                const ok = await openSimulatorWindow(projectId, start);
-                if (!ok) {
-                  setSimulatorStart(start);
-                  setSimulatorOpen(true);
-                }
-              })();
-            }}
-          >
-            {t("graph.simulate")}
-          </button>
-          <button
-            type="button"
-            className="graph-stat-note-btn"
-            onClick={onAddNote}
-          >
-            {t("graph.add_note")}
-          </button>
-          <button
-            type="button"
-            className="graph-stat-automatch-btn"
-            onClick={() => void autoMatchPhotos()}
-            title="Bind every scene to a local photo whose filename matches its label (e.g. detective_1 ↔ detective_1.jpg). Skips scenes that already have a photo attached."
-          >
-            🖼 Auto-match photos
-          </button>
-          {autoMatchToast && (
-            <span
-              className="graph-stat-automatch-toast"
-              role="status"
-              aria-live="polite"
-            >
-              {autoMatchToast}
-            </span>
-          )}
-          {savedLayouts.size > 0 && (
-            <button
-              type="button"
-              className="graph-stat-reset"
-              onClick={() => {
-                void onResetLayout();
-              }}
-            >
-              {t("graph.reset_layout")}
-            </button>
-          )}
-          <span className="graph-canvas-toolbar-sep" aria-hidden />
-          <button
-            type="button"
-            className="graph-search-trigger"
-            onClick={() => setSearchOpen(true)}
-            title={t("graph.search_labels")}
-          >
-            <span className="graph-search-trigger-icon">⌕</span>
-            <span className="graph-search-trigger-text">{t("graph.search_labels")}</span>
-            <span className="graph-search-trigger-kbd">
-              {isMac() ? "⌘" : "Ctrl"} K
-            </span>
-          </button>
-        </div>
+        )}
+
+        <button
+          type="button"
+          className="graph-ghost-btn is-primary"
+          onClick={() => {
+            const sel = nodes.find((n) => n.selected);
+            const start = sel ? sel.id : null;
+            void (async () => {
+              const ok = await openSimulatorWindow(projectId, start);
+              if (!ok) {
+                setSimulatorStart(start);
+                setSimulatorOpen(true);
+              }
+            })();
+          }}
+        >
+          ▶ {t("graph.simulate")}
+        </button>
       </div>
+
       <div className="graph-canvas-stage">
       <ReactFlow
         nodes={displayedNodes}
@@ -2138,6 +2067,14 @@ function GraphCanvasInner({
         onJumpToLabel={onJumpToLabel}
         onClose={() => setSearchOpen(false)}
       />
+      <GraphBottomToolbar
+        mode={toolMode}
+        onChange={setToolMode}
+        onAutoMatch={() => void autoMatchPhotos()}
+        onSearch={() => setSearchOpen(true)}
+        onCoverageToggle={() => setCoverageOpen((v) => !v)}
+        coverageActive={coverageOpen}
+      />
       <PathSimulator
         open={simulatorOpen}
         rows={rows ?? []}
@@ -2146,7 +2083,6 @@ function GraphCanvasInner({
         onClose={() => setSimulatorOpen(false)}
         onJumpToLabel={onJumpToLabel}
       />
-      <ToolPalette mode={toolMode} onChange={setToolMode} />
       </div>
     </div>
   );
@@ -2234,126 +2170,7 @@ function FilterToolbar({ mode, counts, onChange }: FilterToolbarProps) {
 
 type ToolMode = "select" | "pan" | "add-scene" | "add-note";
 
-interface ToolPaletteProps {
-  mode: ToolMode;
-  onChange: (m: ToolMode) => void;
-}
-
-/**
- * Figma-style vertical toolbar pinned to the left edge of the canvas.
- * Tools: select (default cursor), pan (hand — left-drag pans), add-scene
- * (creates a labelled scene at click point), add-note (creates a sticky
- * note at click point). Active tool is highlighted; Esc cancels.
- */
-function ToolPalette({ mode, onChange }: ToolPaletteProps) {
-  const { t } = useTranslation();
-  const tools: Array<{
-    id: ToolMode;
-    labelKey: string;
-    glyph: React.ReactElement;
-    shortcut: string;
-  }> = [
-    { id: "select", labelKey: "graph.tool.select", shortcut: "V", glyph: <CursorGlyph /> },
-    { id: "pan", labelKey: "graph.tool.pan", shortcut: "H", glyph: <HandGlyph /> },
-    {
-      id: "add-scene",
-      labelKey: "graph.tool.add_scene",
-      shortcut: "S",
-      glyph: <FrameGlyph />,
-    },
-    {
-      id: "add-note",
-      labelKey: "graph.tool.add_note",
-      shortcut: "N",
-      glyph: <NoteGlyph />,
-    },
-  ];
-  return (
-    <div className="graph-tools" role="toolbar">
-      {tools.map((tool, i) => {
-        const label = t(tool.labelKey);
-        return (
-          <button
-            key={tool.id}
-            type="button"
-            className={
-              "graph-tools-item" + (mode === tool.id ? " is-active" : "")
-            }
-            onClick={() => onChange(tool.id)}
-            title={`${label} (${tool.shortcut})`}
-            aria-label={label}
-            aria-pressed={mode === tool.id}
-            // Divider before the "creation" tools — visually pairs the
-            // navigation tools (select / pan) at the top.
-            data-divider={i === 2 ? "before" : undefined}
-          >
-            {tool.glyph}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function CursorGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-      <path d="M2.5 1.5l9.5 5.2-4.4 1.1-1.3 4.3z" />
-    </svg>
-  );
-}
-function HandGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M8 13V5a2 2 0 0 1 4 0v6" />
-      <path d="M12 11V4a2 2 0 0 1 4 0v8" />
-      <path d="M16 12V6a2 2 0 0 1 4 0v8a8 8 0 0 1-8 8h-2a8 8 0 0 1-6.85-3.89l-2.15-3.6a2 2 0 0 1 3.7-1.5L6 14" />
-      <path d="M8 11V8a2 2 0 0 0-4 0v6" />
-    </svg>
-  );
-}
-function FrameGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="4" y="6" width="16" height="12" rx="2" />
-      <path d="M4 10h16" />
-    </svg>
-  );
-}
-function NoteGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 4H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-    </svg>
-  );
-}
+// Tools live in the bottom-center floating palette — see `./GraphBottomToolbar.tsx`.
 
 interface GroupEditPanelProps {
   group: GroupRow | null;

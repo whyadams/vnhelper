@@ -972,9 +972,12 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         (
           payload: RealtimePostgresChangesPayload<Tables<"card_tags">>,
         ) => {
-          const row = (payload.new ?? payload.old) as
-            | Tables<"card_tags">
-            | null;
+          // On DELETE, supabase-js sets `new` to `{}` (not null) and puts
+          // the removed row in `old`; `??` would wrongly keep the empty
+          // `new`, so branch on event type explicitly.
+          const row = (
+            payload.eventType === "DELETE" ? payload.old : payload.new
+          ) as Tables<"card_tags"> | null;
           if (row?.card_id) void refreshCardTags(row.card_id);
         },
       )
@@ -984,9 +987,11 @@ export function KanbanProvider({ children }: { children: ReactNode }) {
         (
           payload: RealtimePostgresChangesPayload<Tables<"card_assignees">>,
         ) => {
-          const row = (payload.new ?? payload.old) as
-            | Tables<"card_assignees">
-            | null;
+          // See card_tags handler: DELETE delivers an empty `new`, so the
+          // removed card_id only lives in `old`.
+          const row = (
+            payload.eventType === "DELETE" ? payload.old : payload.new
+          ) as Tables<"card_assignees"> | null;
           if (row?.card_id) void refreshCardAssignees(row.card_id);
         },
       )

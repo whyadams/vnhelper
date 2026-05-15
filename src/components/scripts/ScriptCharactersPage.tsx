@@ -847,6 +847,40 @@ function WritingStyleTab({
     update({ tone: tags.length > 0 ? tags : undefined });
   };
 
+  // Segmented control — the app's connected pill pattern, replacing the
+  // loose radio chips. Keeps the same auto-save-on-change behavior.
+  const Segmented = <T extends string>({
+    label,
+    options,
+    value,
+    onPick,
+  }: {
+    label: string;
+    options: readonly T[];
+    value: T | undefined;
+    onPick: (v: T) => void;
+  }) => (
+    <div className="vn-style-field">
+      <span className="vn-style-label">{label}</span>
+      <div className="vn-style-seg" role="radiogroup" aria-label={label}>
+        {options.map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={value === v}
+            className={
+              "vn-style-seg-item" + (value === v ? " is-active" : "")
+            }
+            onClick={() => onPick(v)}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="vn-style-form">
       <div className="vn-style-hint">
@@ -856,168 +890,165 @@ function WritingStyleTab({
         have no preference.
       </div>
 
-      <div className="vn-style-grid">
-        <label className="vn-style-field">
-          <span className="vn-style-label">Language</span>
-          <input
-            className="vn-input"
-            placeholder="e.g. ru, en-US, ja"
-            defaultValue={style.language ?? ""}
-            onBlur={(e) =>
-              update({ language: e.target.value.trim() || undefined })
-            }
+      <section className="vn-style-card">
+        <div className="vn-style-card-head">
+          <h3 className="vn-style-card-title">Voice</h3>
+          <p className="vn-style-card-sub">
+            The language and emotional register new scenes are drafted in.
+          </p>
+        </div>
+        <div className="vn-style-card-body vn-style-grid">
+          <label className="vn-style-field">
+            <span className="vn-style-label">Language</span>
+            <input
+              className="vn-input"
+              placeholder="e.g. ru, en-US, ja"
+              defaultValue={style.language ?? ""}
+              onBlur={(e) =>
+                update({ language: e.target.value.trim() || undefined })
+              }
+            />
+          </label>
+
+          <label className="vn-style-field">
+            <span className="vn-style-label">Tone tags</span>
+            <input
+              className="vn-input"
+              placeholder="dark, intimate, comedic, melancholic, …"
+              value={toneDraft}
+              onChange={(e) => setToneDraft(e.target.value)}
+              onBlur={commitTone}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="vn-style-card">
+        <div className="vn-style-card-head">
+          <h3 className="vn-style-card-title">Narrative form</h3>
+          <p className="vn-style-card-sub">
+            Grammatical choices the AI should keep consistent.
+          </p>
+        </div>
+        <div className="vn-style-card-body vn-style-grid">
+          <Segmented
+            label="POV"
+            options={["first", "second", "third", "mixed"] as const}
+            value={style.pov}
+            onPick={(v) => update({ pov: v })}
           />
-        </label>
-
-        <label className="vn-style-field">
-          <span className="vn-style-label">Tone tags</span>
-          <input
-            className="vn-input"
-            placeholder="dark, intimate, comedic, melancholic, …"
-            value={toneDraft}
-            onChange={(e) => setToneDraft(e.target.value)}
-            onBlur={commitTone}
+          <Segmented
+            label="Tense"
+            options={["past", "present", "mixed"] as const}
+            value={style.tense}
+            onPick={(v) => update({ tense: v })}
           />
-        </label>
+          <Segmented
+            label="Sentence length"
+            options={["short", "varied", "long"] as const}
+            value={style.sentence_length}
+            onPick={(v) => update({ sentence_length: v })}
+          />
+          <Segmented
+            label="Vocabulary"
+            options={["simple", "moderate", "rich"] as const}
+            value={style.vocabulary}
+            onPick={(v) => update({ vocabulary: v })}
+          />
+        </div>
+      </section>
 
-        <fieldset className="vn-style-field">
-          <legend className="vn-style-label">POV</legend>
-          <div className="vn-style-radios">
-            {(["first", "second", "third", "mixed"] as const).map((v) => (
-              <label key={v} className="vn-style-radio">
-                <input
-                  type="radio"
-                  name="pov"
-                  checked={style.pov === v}
-                  onChange={() => update({ pov: v })}
-                />
-                <span>{v}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+      <section className="vn-style-card">
+        <div className="vn-style-card-head">
+          <h3 className="vn-style-card-title">Examples for the AI</h3>
+          <p className="vn-style-card-sub">
+            Concrete lines to imitate or avoid — one per line.
+          </p>
+        </div>
+        <div className="vn-style-card-body vn-style-examples">
+          <label className="vn-style-field">
+            <span className="vn-style-label">
+              DO — lines to imitate
+            </span>
+            <textarea
+              className="vn-textarea"
+              rows={5}
+              placeholder={
+                "Лес шёл за ней третий час. Она перестала считать.\n" +
+                "He smiled, but it didn't reach his eyes."
+              }
+              defaultValue={(style.do_examples ?? []).join("\n")}
+              onBlur={(e) => {
+                const lines = e.target.value
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter(Boolean);
+                update({ do_examples: lines.length > 0 ? lines : undefined });
+              }}
+            />
+          </label>
 
-        <fieldset className="vn-style-field">
-          <legend className="vn-style-label">Tense</legend>
-          <div className="vn-style-radios">
-            {(["past", "present", "mixed"] as const).map((v) => (
-              <label key={v} className="vn-style-radio">
-                <input
-                  type="radio"
-                  name="tense"
-                  checked={style.tense === v}
-                  onChange={() => update({ tense: v })}
-                />
-                <span>{v}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+          <label className="vn-style-field">
+            <span className="vn-style-label">
+              DON'T — patterns to avoid
+            </span>
+            <textarea
+              className="vn-textarea"
+              rows={5}
+              placeholder={
+                "purple prose\n" +
+                'adverbs in dialogue tags ("she said loudly")\n' +
+                "modern slang in a historical setting"
+              }
+              defaultValue={(style.dont_examples ?? []).join("\n")}
+              onBlur={(e) => {
+                const lines = e.target.value
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter(Boolean);
+                update({
+                  dont_examples: lines.length > 0 ? lines : undefined,
+                });
+              }}
+            />
+          </label>
+        </div>
+      </section>
 
-        <fieldset className="vn-style-field">
-          <legend className="vn-style-label">Sentence length</legend>
-          <div className="vn-style-radios">
-            {(["short", "varied", "long"] as const).map((v) => (
-              <label key={v} className="vn-style-radio">
-                <input
-                  type="radio"
-                  name="sentence_length"
-                  checked={style.sentence_length === v}
-                  onChange={() => update({ sentence_length: v })}
-                />
-                <span>{v}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+      <section className="vn-style-card">
+        <div className="vn-style-card-head">
+          <h3 className="vn-style-card-title">Rules &amp; notes</h3>
+        </div>
+        <div className="vn-style-card-body">
+          <label className="vn-style-field">
+            <span className="vn-style-label">Custom rules</span>
+            <textarea
+              className="vn-textarea"
+              rows={3}
+              placeholder="Free-form rules: 'never break the fourth wall', 'always include a sensory detail', …"
+              defaultValue={style.custom_rules ?? ""}
+              onBlur={(e) =>
+                update({ custom_rules: e.target.value.trim() || undefined })
+              }
+            />
+          </label>
 
-        <fieldset className="vn-style-field">
-          <legend className="vn-style-label">Vocabulary</legend>
-          <div className="vn-style-radios">
-            {(["simple", "moderate", "rich"] as const).map((v) => (
-              <label key={v} className="vn-style-radio">
-                <input
-                  type="radio"
-                  name="vocabulary"
-                  checked={style.vocabulary === v}
-                  onChange={() => update({ vocabulary: v })}
-                />
-                <span>{v}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      </div>
-
-      <label className="vn-style-field">
-        <span className="vn-style-label">
-          DO — example lines to imitate
-          <span className="vn-style-hint-inline"> (one per line)</span>
-        </span>
-        <textarea
-          className="vn-textarea"
-          rows={4}
-          placeholder={
-            "Лес шёл за ней третий час. Она перестала считать.\n" +
-            "He smiled, but it didn't reach his eyes."
-          }
-          defaultValue={(style.do_examples ?? []).join("\n")}
-          onBlur={(e) => {
-            const lines = e.target.value
-              .split("\n")
-              .map((l) => l.trim())
-              .filter(Boolean);
-            update({ do_examples: lines.length > 0 ? lines : undefined });
-          }}
-        />
-      </label>
-
-      <label className="vn-style-field">
-        <span className="vn-style-label">
-          DON'T — patterns to avoid
-          <span className="vn-style-hint-inline"> (one per line)</span>
-        </span>
-        <textarea
-          className="vn-textarea"
-          rows={4}
-          placeholder={
-            "purple prose\n" +
-            'adverbs in dialogue tags ("she said loudly")\n' +
-            "modern slang in a historical setting"
-          }
-          defaultValue={(style.dont_examples ?? []).join("\n")}
-          onBlur={(e) => {
-            const lines = e.target.value
-              .split("\n")
-              .map((l) => l.trim())
-              .filter(Boolean);
-            update({ dont_examples: lines.length > 0 ? lines : undefined });
-          }}
-        />
-      </label>
-
-      <label className="vn-style-field">
-        <span className="vn-style-label">Custom rules</span>
-        <textarea
-          className="vn-textarea"
-          rows={3}
-          placeholder="Free-form rules: 'never break the fourth wall', 'always include a sensory detail', …"
-          defaultValue={style.custom_rules ?? ""}
-          onBlur={(e) =>
-            update({ custom_rules: e.target.value.trim() || undefined })
-          }
-        />
-      </label>
-
-      <label className="vn-style-field">
-        <span className="vn-style-label">Notes (private — not sent to AI)</span>
-        <textarea
-          className="vn-textarea"
-          rows={2}
-          defaultValue={style.notes ?? ""}
-          onBlur={(e) => update({ notes: e.target.value.trim() || undefined })}
-        />
-      </label>
+          <label className="vn-style-field">
+            <span className="vn-style-label">
+              Notes
+              <span className="vn-style-hint-inline"> (private — not sent to AI)</span>
+            </span>
+            <textarea
+              className="vn-textarea"
+              rows={2}
+              defaultValue={style.notes ?? ""}
+              onBlur={(e) =>
+                update({ notes: e.target.value.trim() || undefined })
+              }
+            />
+          </label>
+        </div>
+      </section>
 
       <details className="vn-style-preview">
         <summary>How Claude will see this</summary>

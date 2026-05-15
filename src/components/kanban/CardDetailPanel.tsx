@@ -90,6 +90,8 @@ export function CardDetailPanel() {
   const [draftDesc, setDraftDesc] = useState("");
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [addingSubtask, setAddingSubtask] = useState(false);
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskLabel, setEditingSubtaskLabel] = useState("");
   const [tagSearch, setTagSearch] = useState("");
   const [assignSearch, setAssignSearch] = useState("");
 
@@ -98,6 +100,8 @@ export function CardDetailPanel() {
       setDraftDesc(found.card.description ?? "");
       setSubtaskDraft("");
       setAddingSubtask(false);
+      setEditingSubtaskId(null);
+      setEditingSubtaskLabel("");
       setStatusOpen(false);
       setTagOpen(false);
       setTagSearch("");
@@ -197,6 +201,37 @@ export function CardDetailPanel() {
     } else if (e.key === "Escape") {
       setSubtaskDraft("");
       setAddingSubtask(false);
+    }
+  };
+
+  const startEditSubtask = (id: string, label: string) => {
+    setEditingSubtaskId(id);
+    setEditingSubtaskLabel(label);
+  };
+
+  const commitEditSubtask = () => {
+    if (!editingSubtaskId) return;
+    const v = editingSubtaskLabel.trim();
+    const current = detail.subtasks.find((s) => s.id === editingSubtaskId);
+    if (v && current && v !== current.label) {
+      void detail.renameSubtask(editingSubtaskId, v);
+    }
+    setEditingSubtaskId(null);
+    setEditingSubtaskLabel("");
+  };
+
+  const cancelEditSubtask = () => {
+    setEditingSubtaskId(null);
+    setEditingSubtaskLabel("");
+  };
+
+  const onEditSubtaskKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitEditSubtask();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEditSubtask();
     }
   };
 
@@ -635,16 +670,49 @@ export function CardDetailPanel() {
                     onChange={() => void detail.toggleSubtask(s.id, !s.done)}
                   />
                   <span className="cp-check" />
-                  <span className="cp-subtask-label">{s.label}</span>
+                  {editingSubtaskId === s.id ? (
+                    <input
+                      className="cp-subtask-input cp-subtask-edit"
+                      value={editingSubtaskLabel}
+                      autoFocus
+                      onChange={(e) => setEditingSubtaskLabel(e.target.value)}
+                      onKeyDown={onEditSubtaskKey}
+                      onBlur={commitEditSubtask}
+                      onClick={(e) => e.preventDefault()}
+                    />
+                  ) : (
+                    <span
+                      className="cp-subtask-label"
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        startEditSubtask(s.id, s.label);
+                      }}
+                      title="Double-click to edit"
+                    >
+                      {s.label}
+                    </span>
+                  )}
                 </label>
-                <button
-                  className="cp-subtask-delete"
-                  type="button"
-                  aria-label="Delete subtask"
-                  onClick={() => void detail.deleteSubtask(s.id)}
-                >
-                  ×
-                </button>
+                {editingSubtaskId !== s.id && (
+                  <>
+                    <button
+                      className="cp-subtask-edit-btn"
+                      type="button"
+                      aria-label="Edit subtask"
+                      onClick={() => startEditSubtask(s.id, s.label)}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      className="cp-subtask-delete"
+                      type="button"
+                      aria-label="Delete subtask"
+                      onClick={() => void detail.deleteSubtask(s.id)}
+                    >
+                      ×
+                    </button>
+                  </>
+                )}
               </div>
             ))}
             {addingSubtask && (

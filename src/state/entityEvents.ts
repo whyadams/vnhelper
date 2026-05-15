@@ -106,9 +106,10 @@ export function useEntityEvents(opts: {
           filter: `workspace_id=eq.${workspaceId}`,
         },
         (payload) => {
-          const row = (payload.new ?? payload.old) as
-            | { entity_type?: string; entity_id?: string }
-            | null;
+          // DELETE delivers an empty `new`; the detached row is in `old`.
+          const row = (
+            payload.eventType === "DELETE" ? payload.old : payload.new
+          ) as { entity_type?: string; entity_id?: string } | null;
           if (!row) return;
           if (
             row.entity_type === entity_type &&
