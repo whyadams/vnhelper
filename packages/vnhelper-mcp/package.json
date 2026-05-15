@@ -1,6 +1,6 @@
 {
   "name": "vnhelper-mcp",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "MCP server exposing VnHelper (Supabase) workspace operations to Claude.",
   "private": true,
   "type": "module",

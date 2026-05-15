@@ -26,6 +26,65 @@ interface ToolDef {
   handler: Handler;
 }
 
+/* ---------- Ren'Py blocks (Renpy tab / Graph source of truth) ----------
+ * `script_nodes.rpy_blocks` is a jsonb array of structured blocks that the
+ * Renpy-tab editor and the Graph view consume. It is INDEPENDENT from the
+ * Doc tab (`content`/`body`). Each block is `{ id, kind, depth, ...fields }`.
+ *
+ * Supported kinds & their extra fields:
+ *   label    { name }                                  depth 0, jump/call target
+ *   scene    { bg, transition? }
+ *   show     { char, expression?, position?, transition? }
+ *   hide     { char, transition? }
+ *   say      { char_var, char_id|null, char_name, text, expression? }
+ *   narrator { text }
+ *   menu     {}                                        owns choice blocks at depth+1
+ *   choice   { text, condition? }                      depth = menu.depth + 1
+ *   jump     { target }
+ *   call     { target }
+ *   return   { expression? }
+ *   with     { transition }
+ *   pause    { duration? }                              seconds; omit = until click
+ *   note     { text }                                   emitted as a # comment
+ *   raw      { lines: string[], head }                  verbatim escape hatch
+ *
+ * Indentation: label = 0, most blocks = 1, choice = menu.depth+1, blocks
+ * inside a choice deeper still. `id` is any stable string — when omitted on
+ * a block we generate one so the agent can pass plain block objects. */
+const rpyBlockSchema = z
+  .object({
+    id: z.string().optional(),
+    kind: z.string(),
+    depth: z.number().int().min(0).default(1),
+  })
+  .passthrough();
+
+const RPY_BLOCKS_DESC =
+  "Structured Ren'Py blocks (jsonb array) for the Renpy tab / Graph — " +
+  "independent from the Doc-tab `body`. Kinds: label{name}, scene{bg," +
+  "transition?}, show{char,expression?,position?,transition?}, hide{char," +
+  "transition?}, say{char_var,char_id,char_name,text,expression?}, " +
+  "narrator{text}, menu{}, choice{text,condition?}, jump{target}, " +
+  "call{target}, return{expression?}, with{transition}, pause{duration?}, " +
+  "note{text}, raw{lines[],head}. Indentation via `depth` (label=0, body=1, " +
+  "choice=menu.depth+1). `id` auto-filled when omitted.";
+
+let rpyIdSeq = 0;
+/** Ensure every block carries a stable `id` so the editor's React keys and
+ *  drag/drop stay consistent — the agent can omit them. */
+function normalizeRpyBlocks(
+  blocks: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  return blocks.map((b) => ({
+    ...b,
+    id:
+      typeof b.id === "string" && b.id.length > 0
+        ? b.id
+        : `mcp_${Date.now().toString(36)}_${(rpyIdSeq++).toString(36)}`,
+    depth: typeof b.depth === "number" ? b.depth : 1,
+  }));
+}
+
 /* ---------- Workspaces / projects ---------- */
 
 const listWorkspaces: ToolDef = {
@@ -65,12 +124,110 @@ const listProjects: ToolDef = {
   },
 };
 
+const createScriptProject: ToolDef = {
+  name: "create_script_project",
+  description:
+    "Create a new script project in a workspace. Note: the free tier is " +
+    "capped at 1 script project per workspace (call `get_subscription` " +
+    "first if unsure) — the DB quota guard will reject the insert otherwise.",
+  inputSchema: z.object({
+    workspace_id: z.string().uuid().optional(),
+    title: z.string().min(1),
+    synopsis: z.string().optional(),
+    cover_emoji: z.string().nullable().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        workspace_id: z.string().uuid().optional(),
+        title: z.string().min(1),
+        synopsis: z.string().optional(),
+        cover_emoji: z.string().nullable().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const ws = await resolveWorkspaceId(c, args.workspace_id);
+    const { data, error } = await c
+      .from("script_projects")
+      .insert({
+        workspace_id: ws,
+        title: args.title.trim(),
+        synopsis: args.synopsis ?? "",
+        cover_emoji: args.cover_emoji ?? null,
+        position: Date.now(),
+      })
+      .select("id, title, cover_emoji, created_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const updateScriptProject: ToolDef = {
+  name: "update_script_project",
+  description:
+    "Patch a script project's title / synopsis / cover_emoji. Only the " +
+    "fields you pass are updated. To change writing style use " +
+    "`update_writing_style` instead.",
+  inputSchema: z.object({
+    project_id: z.string().uuid(),
+    title: z.string().min(1).optional(),
+    synopsis: z.string().optional(),
+    cover_emoji: z.string().nullable().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        project_id: z.string().uuid(),
+        title: z.string().min(1).optional(),
+        synopsis: z.string().optional(),
+        cover_emoji: z.string().nullable().optional(),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const { project_id, ...rest } = args;
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (v !== undefined) patch[k] = v;
+    }
+    if (Object.keys(patch).length === 0) {
+      throw new Error("Nothing to update.");
+    }
+    const { data, error } = await c
+      .from("script_projects")
+      .update(patch)
+      .eq("id", project_id)
+      .select("id, title, synopsis, cover_emoji")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const deleteScriptProject: ToolDef = {
+  name: "delete_script_project",
+  description:
+    "Permanently delete a script project AND all its nodes, characters and " +
+    "locations (DB cascade). Irreversible — confirm with the user first.",
+  inputSchema: z.object({ project_id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ project_id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("script_projects")
+      .delete()
+      .eq("id", args.project_id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.project_id };
+  },
+};
+
 /* ---------- Tasks (kanban) ---------- */
 
 const listTasks: ToolDef = {
   name: "list_tasks",
   description:
-    "List kanban cards in the workspace. Filter by column key (todo/progress/review/done) or status.",
+    "List kanban cards in the workspace. Filter by column key (todo/progress/review/done) or status. Each card includes a `subtasks` summary `{ done, total }` so you can see checklist progress at a glance — use `list_task_subtasks` for the individual items.",
   inputSchema: z.object({
     workspace_id: z.string().uuid().optional(),
     column: z.string().optional(),
@@ -114,7 +271,34 @@ const listTasks: ToolDef = {
         return key !== "done";
       });
     }
-    return rows;
+
+    // Attach a checklist summary per card in one extra round-trip so the
+    // agent "sees" subtask progress without N follow-up calls.
+    const cardIds = rows
+      .map((r) => r.id)
+      .filter((v): v is string => typeof v === "string");
+    const summary = new Map<string, { done: number; total: number }>();
+    if (cardIds.length > 0) {
+      const { data: subs, error: subErr } = await c
+        .from("card_subtasks")
+        .select("card_id, done")
+        .in("card_id", cardIds);
+      if (subErr) throw new Error(subErr.message);
+      for (const s of (subs ?? []) as Array<{
+        card_id: string;
+        done: boolean;
+      }>) {
+        const cur = summary.get(s.card_id) ?? { done: 0, total: 0 };
+        cur.total += 1;
+        if (s.done) cur.done += 1;
+        summary.set(s.card_id, cur);
+      }
+    }
+
+    return rows.map((r) => ({
+      ...r,
+      subtasks: summary.get(r.id as string) ?? { done: 0, total: 0 },
+    }));
   },
 };
 
@@ -266,6 +450,123 @@ const deleteTask: ToolDef = {
   },
 };
 
+/* ---------- Card subtasks (checklist items inside a kanban card) ---------- */
+
+const listTaskSubtasks: ToolDef = {
+  name: "list_task_subtasks",
+  description:
+    "List the checklist subtasks of a kanban card, in display order. Each " +
+    "row is { id, label, done, position }. Use this to inspect a card's " +
+    "progress in detail (list_tasks already returns a {done,total} summary).",
+  inputSchema: z.object({ card_id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ card_id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { data, error } = await c
+      .from("card_subtasks")
+      .select("id, label, done, position, created_at")
+      .eq("card_id", args.card_id)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+};
+
+const addTaskSubtask: ToolDef = {
+  name: "add_task_subtask",
+  description:
+    "Add a checklist subtask to a kanban card. Appended to the end of the " +
+    "list. New subtasks start unchecked unless `done` is passed.",
+  inputSchema: z.object({
+    card_id: z.string().uuid(),
+    label: z.string().min(1),
+    done: z.boolean().default(false),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        card_id: z.string().uuid(),
+        label: z.string().min(1),
+        done: z.boolean().default(false),
+      })
+      .parse(raw);
+    const c = await getClient();
+    const { data: maxRow } = await c
+      .from("card_subtasks")
+      .select("position")
+      .eq("card_id", args.card_id)
+      .order("position", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextPos = (maxRow?.position ?? 0) + 1024;
+    const { data, error } = await c
+      .from("card_subtasks")
+      .insert({
+        card_id: args.card_id,
+        label: args.label.trim(),
+        done: args.done,
+        position: nextPos,
+      })
+      .select("id, label, done, position")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const updateTaskSubtask: ToolDef = {
+  name: "update_task_subtask",
+  description:
+    "Patch a subtask: toggle `done` and/or rename `label`. Only the fields " +
+    "you pass are changed. Use this to tick items off as work completes.",
+  inputSchema: z.object({
+    subtask_id: z.string().uuid(),
+    label: z.string().min(1).optional(),
+    done: z.boolean().optional(),
+  }),
+  handler: async (raw) => {
+    const args = z
+      .object({
+        subtask_id: z.string().uuid(),
+        label: z.string().min(1).optional(),
+        done: z.boolean().optional(),
+      })
+      .parse(raw);
+    const patch: Record<string, unknown> = {};
+    if (args.label !== undefined) patch.label = args.label.trim();
+    if (args.done !== undefined) patch.done = args.done;
+    if (Object.keys(patch).length === 0) {
+      throw new Error("Nothing to update.");
+    }
+    const c = await getClient();
+    const { data, error } = await c
+      .from("card_subtasks")
+      .update(patch)
+      .eq("id", args.subtask_id)
+      .select("id, label, done, position")
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
+const deleteTaskSubtask: ToolDef = {
+  name: "delete_task_subtask",
+  description: "Delete a single checklist subtask by its id.",
+  inputSchema: z.object({ subtask_id: z.string().uuid() }),
+  handler: async (raw) => {
+    const args = z.object({ subtask_id: z.string().uuid() }).parse(raw);
+    const c = await getClient();
+    const { error } = await c
+      .from("card_subtasks")
+      .delete()
+      .eq("id", args.subtask_id);
+    if (error) throw new Error(error.message);
+    return { deleted: args.subtask_id };
+  },
+};
+
 /* ---------- Script nodes (chapters/scenes/blocks) ---------- */
 
 const listScriptNodes: ToolDef = {
@@ -291,7 +592,7 @@ const listScriptNodes: ToolDef = {
     let q = c
       .from("script_nodes")
       .select(
-        "id, parent_id, kind, title, emoji, pinned, position, status, pov, tags, updated_at",
+        "id, parent_id, kind, title, emoji, pinned, position, status, pov, tags, rpy_label, source_kind, location_id, photo_id, updated_at",
       )
       .eq("project_id", project)
       .order("position", { ascending: true });
@@ -308,7 +609,10 @@ const readScriptNode: ToolDef = {
     "Read full content of a script node (chapter/scene/block). " +
     "Returns `body` as markdown — derived from the editor's structured " +
     "content if present, so it always reflects the latest visible state " +
-    "even after the user edited the document in the UI.",
+    "even after the user edited the document in the UI. Also returns " +
+    "`rpy_blocks` (the structured Ren'Py array powering the Renpy tab / " +
+    "Graph — independent from `body`), `rpy_label`, `source_kind`, " +
+    "`location_id` and `photo_id`.",
   inputSchema: z.object({ node_id: z.string().uuid() }),
   handler: async (raw) => {
     const args = z.object({ node_id: z.string().uuid() }).parse(raw);
@@ -316,7 +620,7 @@ const readScriptNode: ToolDef = {
     const { data, error } = await c
       .from("script_nodes")
       .select(
-        "id, project_id, parent_id, kind, title, emoji, body, content, status, pov, tags, position, updated_at",
+        "id, project_id, parent_id, kind, title, emoji, body, content, rpy_blocks, rpy_label, source_kind, status, pov, tags, location_id, photo_id, position, updated_at",
       )
       .eq("id", args.node_id)
       .single();
@@ -339,6 +643,9 @@ const createScriptNode: ToolDef = {
     "`body` accepts markdown (#/##/### headings, **bold**, *italic*, ~~strike~~, " +
     "--- horizontal rule, > blockquote, - lists). Single newlines render as visible " +
     "line breaks (hardBreak), blank lines start a new paragraph. " +
+    "For Ren'Py scenes you may also pass `rpy_blocks` (structured Renpy-tab " +
+    "content, independent from `body`), plus `rpy_label`, `location_id` and " +
+    "`photo_id`. " + RPY_BLOCKS_DESC + " " +
     "Tip: call `get_writing_style` first to read the project's author voice " +
     "preferences (language, tone, POV, …) before drafting content.",
   inputSchema: z.object({
@@ -349,6 +656,10 @@ const createScriptNode: ToolDef = {
     title: z.string().min(1),
     emoji: z.string().optional(),
     body: z.string().optional(),
+    rpy_label: z.string().optional(),
+    rpy_blocks: z.array(rpyBlockSchema).optional(),
+    location_id: z.string().uuid().nullable().optional(),
+    photo_id: z.string().nullable().optional(),
   }),
   handler: async (raw) => {
     const args = z
@@ -360,6 +671,10 @@ const createScriptNode: ToolDef = {
         title: z.string().min(1),
         emoji: z.string().optional(),
         body: z.string().optional(),
+        rpy_label: z.string().optional(),
+        rpy_blocks: z.array(rpyBlockSchema).optional(),
+        location_id: z.string().uuid().nullable().optional(),
+        photo_id: z.string().nullable().optional(),
       })
       .parse(raw);
     const c = await getClient();
@@ -389,6 +704,14 @@ const createScriptNode: ToolDef = {
     // Always populate `content` so the editor renders rich text instead
     // of literal markdown characters. Empty body → empty doc.
     insert.content = markdownToTiptapDoc(body);
+    if (args.rpy_label !== undefined) insert.rpy_label = args.rpy_label;
+    if (args.rpy_blocks !== undefined) {
+      insert.rpy_blocks = normalizeRpyBlocks(
+        args.rpy_blocks as Array<Record<string, unknown>>,
+      );
+    }
+    if (args.location_id !== undefined) insert.location_id = args.location_id;
+    if (args.photo_id !== undefined) insert.photo_id = args.photo_id;
     const { data, error } = await c
       .from("script_nodes")
       .insert(insert)
@@ -406,7 +729,10 @@ const updateScriptNode: ToolDef = {
     "`body` accepts markdown (#/##/### headings, **bold**, *italic*, ~~strike~~, " +
     "--- horizontal rule, > blockquote, - lists). Single newlines render as visible " +
     "line breaks (hardBreak), blank lines start a new paragraph. The structured " +
-    "editor content is regenerated from the markdown automatically.",
+    "editor content is regenerated from the markdown automatically. " +
+    "`rpy_blocks` replaces the whole Renpy-tab block array (independent from " +
+    "`body`); `rpy_label` / `location_id` / `photo_id` accept null to clear. " +
+    RPY_BLOCKS_DESC,
   inputSchema: z.object({
     node_id: z.string().uuid(),
     title: z.string().optional(),
@@ -415,6 +741,10 @@ const updateScriptNode: ToolDef = {
     emoji: z.string().nullable().optional(),
     status: z.string().optional(),
     pov: z.string().nullable().optional(),
+    rpy_label: z.string().nullable().optional(),
+    rpy_blocks: z.array(rpyBlockSchema).optional(),
+    location_id: z.string().uuid().nullable().optional(),
+    photo_id: z.string().nullable().optional(),
   }),
   handler: async (raw) => {
     const args = z
@@ -426,12 +756,24 @@ const updateScriptNode: ToolDef = {
         emoji: z.string().nullable().optional(),
         status: z.string().optional(),
         pov: z.string().nullable().optional(),
+        rpy_label: z.string().nullable().optional(),
+        rpy_blocks: z.array(rpyBlockSchema).optional(),
+        location_id: z.string().uuid().nullable().optional(),
+        photo_id: z.string().nullable().optional(),
       })
       .parse(raw);
     const c = await getClient();
     const patch: Record<string, unknown> = {};
     for (const k of ["title", "body", "kind", "emoji", "status", "pov"] as const) {
       if (args[k] !== undefined) patch[k] = args[k];
+    }
+    if (args.rpy_label !== undefined) patch.rpy_label = args.rpy_label;
+    if (args.location_id !== undefined) patch.location_id = args.location_id;
+    if (args.photo_id !== undefined) patch.photo_id = args.photo_id;
+    if (args.rpy_blocks !== undefined) {
+      patch.rpy_blocks = normalizeRpyBlocks(
+        args.rpy_blocks as Array<Record<string, unknown>>,
+      );
     }
     if (Object.keys(patch).length === 0) {
       throw new Error("Nothing to update.");
@@ -545,7 +887,7 @@ const listCharacters: ToolDef = {
     const { data, error } = await c
       .from("script_characters")
       .select(
-        "id, name, short_name, color, emoji, pronouns, age, role, voice_notes, traits, aliases",
+        "id, name, short_name, color, emoji, pronouns, age, role, voice_notes, traits, aliases, rpy_var",
       )
       .eq("project_id", project)
       .order("position", { ascending: true });
@@ -774,7 +1116,10 @@ const updateWritingStyle: ToolDef = {
 
 const createCharacter: ToolDef = {
   name: "create_character",
-  description: "Create a character in the project.",
+  description:
+    "Create a character in the project. `rpy_var` is the Ren'Py variable " +
+    "name (e.g. `mc`, `eileen`) used by say-blocks for exact Cast linkage — " +
+    "must be unique within the project when set.",
   inputSchema: z.object({
     workspace_id: z.string().uuid().optional(),
     project_id: z.string().uuid().optional(),
@@ -784,6 +1129,7 @@ const createCharacter: ToolDef = {
     emoji: z.string().optional(),
     pronouns: z.string().optional(),
     role: z.string().optional(),
+    rpy_var: z.string().optional(),
   }),
   handler: async (raw) => {
     const args = z
@@ -796,6 +1142,7 @@ const createCharacter: ToolDef = {
         emoji: z.string().optional(),
         pronouns: z.string().optional(),
         role: z.string().optional(),
+        rpy_var: z.string().optional(),
       })
       .parse(raw);
     const c = await getClient();
@@ -812,11 +1159,12 @@ const createCharacter: ToolDef = {
         emoji: args.emoji ?? null,
         pronouns: args.pronouns ?? null,
         role: args.role ?? null,
+        rpy_var: args.rpy_var ?? null,
         voice_notes: "",
         traits: {} as never,
         aliases: [],
       })
-      .select("id, name")
+      .select("id, name, rpy_var")
       .single();
     if (error) throw new Error(error.message);
     return data;
@@ -1787,11 +2135,18 @@ const deleteTranslationProject: ToolDef = {
 export const TOOLS: ToolDef[] = [
   listWorkspaces,
   listProjects,
+  createScriptProject,
+  updateScriptProject,
+  deleteScriptProject,
   listTasks,
   createTask,
   moveTask,
   updateTask,
   deleteTask,
+  listTaskSubtasks,
+  addTaskSubtask,
+  updateTaskSubtask,
+  deleteTaskSubtask,
   listScriptNodes,
   readScriptNode,
   createScriptNode,
